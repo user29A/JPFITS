@@ -1,0 +1,173 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{5E0105B8-C803-4436-9CB8-05FE2CDBAD91}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>JPFITS</RootNamespace>
+    <AssemblyName>JPFITS</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <TargetFrameworkProfile />
+    <Nullable>enable</Nullable>
+    <LangVersion>8.0</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DocumentationFile>bin\Release\JPFITS.xml</DocumentationFile>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="alglib318hpc_net2, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\alglib-3.18.0.csharp.hpc\alglib-3.18.0.csharp.hpc\alglib-csharp\lib-csharp-core\alglib318hpc_net2.dll</HintPath>
+    </Reference>
+    <Reference Include="JPChart">
+      <HintPath>..\..\JPChart\bin\Release\JPChart.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data.Linq" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Windows.Forms.DataVisualization" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="FITSBinTable.cs" />
+    <Compile Include="FitsBinTableViewer.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FitsBinTableViewer.Designer.cs">
+      <DependentUpon>FitsBinTableViewer.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FITSFinder.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FITSFinder.Designer.cs">
+      <DependentUpon>FITSFinder.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FITSFound.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FITSFound.Designer.cs">
+      <DependentUpon>FITSFound.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FITSHeaderViewer.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FITSHeaderViewer.Designer.cs">
+      <DependentUpon>FITSHeaderViewer.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FITSImageExtensionsLister.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FITSImageExtensionsLister.Designer.cs">
+      <DependentUpon>FITSImageExtensionsLister.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FITSImageExtensionsSaver.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FITSImageExtensionsSaver.Designer.cs">
+      <DependentUpon>FITSImageExtensionsSaver.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FITSHeaderKeyDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FITSHeaderKeyDialog.Designer.cs">
+      <DependentUpon>FITSHeaderKeyDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FITSImageSetSaver.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FITSImageSetSaver.Designer.cs">
+      <DependentUpon>FITSImageSetSaver.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Plotter.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Plotter.Designer.cs">
+      <DependentUpon>Plotter.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FITSFILEOPS.cs" />
+    <Compile Include="FITSHeaderKey.cs" />
+    <Compile Include="FITSImage.cs" />
+    <Compile Include="FITSHeader.cs" />
+    <Compile Include="FITSImageSet.cs" />
+    <Compile Include="JPBitMap.cs" />
+    <Compile Include="JPMath.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="REG.cs" />
+    <Compile Include="PointSourceExtractor.cs" />
+    <Compile Include="WaitBar.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="WaitBar.Designer.cs">
+      <DependentUpon>WaitBar.cs</DependentUpon>
+    </Compile>
+    <Compile Include="WCSAutoSolverReportingForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="WCSAutoSolverReportingForm.Designer.cs">
+      <DependentUpon>WCSAutoSolverReportingForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="WCSAutoSolver.cs" />
+    <Compile Include="WorldCoordinateSolution.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="FITSFinder.resx">
+      <DependentUpon>FITSFinder.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FITSFound.resx">
+      <DependentUpon>FITSFound.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FITSHeaderKeyDialog.resx">
+      <DependentUpon>FITSHeaderKeyDialog.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FITSHeaderViewer.resx">
+      <DependentUpon>FITSHeaderViewer.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FITSImageExtensionsLister.resx">
+      <DependentUpon>FITSImageExtensionsLister.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FITSImageSetSaver.resx">
+      <DependentUpon>FITSImageSetSaver.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Plotter.resx">
+      <DependentUpon>Plotter.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="WaitBar.resx">
+      <DependentUpon>WaitBar.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\.editorconfig">
+      <Link>.editorconfig</Link>
+    </None>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
