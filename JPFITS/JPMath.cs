@@ -127,12 +127,12 @@ namespace JPFITS
 				TOTALVERTEXPOINTVALUESUM = POINTS[0].Value + POINTS[1].Value + POINTS[2].Value;
 			}
 
-			public PointD Vertex(int i)
+			public PointD GetVertex(int i)
 			{
 				return POINTS[i];
 			}
 
-			public double VertexAngle(int i)
+			public double GetVertexAngle(int i)
 			{
 				return VERTEXANGLES[i];
 			}
@@ -143,7 +143,7 @@ namespace JPFITS
 				set { POINTS = value; }
 			}
 
-			public double SideLength(int i)
+			public double GetSideLength(int i)
 			{
 				return SIDELENGTHS[i];
 			}

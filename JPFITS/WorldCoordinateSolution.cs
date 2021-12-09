@@ -10,6 +10,7 @@ namespace JPFITS
 	/// <summary>WorldCoordinateSolution class for creating, interacting with, and solving the paramaters for World Coordinate Solutions for the FITS image standard.</summary>
 	public class WorldCoordinateSolution
 	{
+		#region PRIVATE
 		private double[,]? CDMATRIX;
 		private double[,]? CDMATRIXINV;
 		private double[]? CVAL1;
@@ -237,6 +238,9 @@ namespace JPFITS
 			});
 		}
 
+		#endregion
+
+		#region CONSTRUCTORS
 		/// <summary>Default constructor.</summary>
 		public WorldCoordinateSolution()
 		{
@@ -249,11 +253,17 @@ namespace JPFITS
 			EATHEADERFORWCS(header);
 		}
 
+		#endregion
+
+		#region PROPERTIES
+
+		/// <summary>Returns an array of PointF locations created within Grid_MakeWCSGrid for printing labels to the window.</summary>
 		public PointF[] Grid_RightAscensionLabelLocations
 		{
 			get { return RAS_LABEL_LOCATIONS; }
 		}
 
+		/// <summary>Returns an array of PointF locations created within Grid_MakeWCSGrid for printing labels to the window.</summary>
 		public PointF[] Grid_DeclinationLabelLocations
 		{
 			get { return DEC_LABEL_LOCATIONS; }
@@ -271,7 +281,7 @@ namespace JPFITS
 			get { return DEC_LABELS; }
 		}
 
-		/// <summary>Returns an array of arrays of PointF's each of which represent grid lines at intervals of Right Ascension</summary>
+		/// <summary>Returns an array of arrays of PointF's each of which represent grid lines at intervals of Right Ascension.</summary>
 		public PointF[][] Grid_RightAscensionPoints
 		{
 			get { return RAS_LINES; }
@@ -281,13 +291,6 @@ namespace JPFITS
 		public PointF[][] Grid_DeclinationPoints
 		{
 			get { return DEC_LINES; }
-		}		
-
-		/// <summary>Invalidates the existing grid so that it can be updated for new display settings.</summary>
-		public void Grid_Invalidate()
-		{
-			VALIDWCSGRIDLINES = false;
-
 		}
 
 		/// <summary>Gets or Sets the column-major CD matrix for this class instance.</summary>
@@ -305,6 +308,46 @@ namespace JPFITS
 			}
 		}
 
+		/// <summary>Gets the inverse of the CD matrix.</summary>
+		public double[,] CD_Matrix_Inverse
+		{
+			get { return CDMATRIXINV; }
+		}
+
+		/// <summary>Gets the mean of the residuals of the WCS solution in pixel units; should be very small as per least squares minimization.</summary>
+		public double WCSFitResidual_MeanPix
+		{
+			get { return CPIXRM; }
+		}
+
+		/// <summary>Gets the standard deviation of the residuals of the WCS solution in pixel units; gives the average WCS solution error in pixels.</summary>
+		public double WCSFitResidual_StdvPix
+		{
+			get { return CPIXRS; }
+		}
+
+		/// <summary>Gets the mean of the residuals of the WCS solution in arcseconds; should be very small as per least squares minimization.</summary>
+		public double WCSFitResidual_MeanSky
+		{
+			get { return CVALRM; }
+		}
+
+		/// <summary>Gets the standard deviation of the residuals of the WCS solution in arcseconds; gives the average WCS solution error in arcseconds.</summary>
+		public double WCSFitResidual_StdvSky
+		{
+			get { return CVALRS; }
+		}
+
+		#endregion
+
+		#region MEMBERS
+		/// <summary>Invalidates the existing grid so that it can be updated for new display settings.</summary>
+		public void Grid_Invalidate()
+		{
+			VALIDWCSGRIDLINES = false;
+
+		}		
+
 		/// <summary>Gets the one-based row-major element from the CD matrix CDi_j[int i, int j], where i is the row index, and j is the column index.</summary>
 		public double GetCDi_j(int i, int j)
 		{
@@ -320,16 +363,10 @@ namespace JPFITS
 			CD2_1 = CDMATRIX[0, 1];
 			CD2_2 = CDMATRIX[1, 1];
 			SET_CDMATRIXINV();
-		}
+		}		
 
-		/// <summary>Gets the inverse of the CD matrix.</summary>
-		public double[,] CD_Matrix_Inverse
-		{
-			get { return CDMATRIXINV; }
-		}
-
-		/// <summary>Gets the array of coordinate values on one-based axis i (Coordinate_Values[i]) used for this World Coordinate Solution.</summary>
-		public double[] GetCoordinate_Values(int coordinate_Axis)
+		/// <summary>Gets the array of coordinate values on one-based axis i used for this World Coordinate Solution.</summary>
+		public double[] GetCVALValues(int coordinate_Axis)
 		{
 			if (coordinate_Axis == 1)
 				return CVAL1;
@@ -338,8 +375,8 @@ namespace JPFITS
 			throw new Exception("coordinate_Axis '" + coordinate_Axis + "' not either 1 or 2");
 		}
 
-		/// <summary>Sets the array of coordinate values on one-based axis i (Coordinate_Values[i]) used for this World Coordinate Solution.</summary>
-		public void SetCoordinate_Values(int coordinate_Axis, double[] cvals)
+		/// <summary>Sets the array of coordinate values on one-based axis i used for this World Coordinate Solution.</summary>
+		public void SetCVALValues(int coordinate_Axis, double[] cvals)
 		{
 			if (coordinate_Axis == 1)
 				CVAL1 = cvals;
@@ -350,7 +387,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Gets the array of one-based coordinate pixels on one-based axis n (Coordinate_Pixels[n]) used for this World Coordinate Solution.</summary>
-		public double[] GetCoordinate_Pixels(int coordinate_Axis)
+		public double[] GetCPIXPixels(int coordinate_Axis)
 		{
 			if (coordinate_Axis == 1)
 				return CPIX1;
@@ -360,7 +397,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Sets the array of one-based coordinate pixels on one-based axis n (Coordinate_Pixels[n]) used for this World Coordinate Solution.</summary>
-		public void SetCoordinate_Pixels(int coordinate_Axis, double[] cpixs)
+		public void SetCPIXPixels(int coordinate_Axis, double[] cpixs)
 		{
 			if (coordinate_Axis == 1)
 				CPIX1 = cpixs;
@@ -410,39 +447,15 @@ namespace JPFITS
 		public string GetCTYPEn(int coordinate_Axis)
 		{
 			return CTYPEN[coordinate_Axis - 1];
-		}
-
-		/// <summary>Gets the mean of the residuals of the WCS solution in pixel units; should be very small as per least squares minimization.</summary>
-		public double WCSFitResidual_MeanPix
-		{
-			get { return CPIXRM; }
-		}
-
-		/// <summary>Gets the standard deviation of the residuals of the WCS solution in pixel units; gives the average WCS solution error.</summary>
-		public double WCSFitResidual_StdvPix
-		{
-			get { return CPIXRS; }
-		}
-
-		/// <summary>Gets the mean of the residuals of the WCS solution in arcseconds; should be very small as per least squares minimization.</summary>
-		public double WCSFitResidual_MeanSky
-		{
-			get { return CVALRM; }
-		}
-
-		/// <summary>Gets the standard deviation of the residuals of the WCS solution in arcseconds; gives the average WCS solution error.</summary>
-		public double WCSFitResidual_StdvSky
-		{
-			get { return CVALRS; }
-		}
+		}		
 
 		/// <summary>Solves the projection parameters for a given list of pixel and coordinate values. Pass nullptr for FITS if writing WCS parameters to a primary header not required.</summary>
 		/// <param name="WCS_Type">The world coordinate solution type. For example: TAN, for tangent-plane or Gnomic projection. Only TAN is currently supported.</param>
 		/// <param name="X_pix">An array of the image x-axis pixel locations.</param>
 		/// <param name="Y_pix">An array of the image y-axis pixel locations.</param>
 		/// <param name="zero_based_pixels">A boolean to indicate if the X_Pix and Y_Pix are zero-based coordinates. They will be converted to one-based if true.</param>
-		/// <param name="cval1">An array of coordinate values in degrees on coordinats axis 1.</param>
-		/// <param name="cval2">An array of coordinate values in degrees on coordinats axis 2.</param>
+		/// <param name="cval1">An array of coordinate values in degrees on coordinate axis 1.</param>
+		/// <param name="cval2">An array of coordinate values in degrees on coordinate axis 2.</param>
 		/// <param name="header">An FITSImageHeader instance to write the solution into. Pass null if not required.</param>
 		public void Solve_WCS(string WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, JPFITS.FITSHeader header)
 		{
@@ -575,11 +588,11 @@ namespace JPFITS
 		}
 
 		/// <summary>Gets the image [x, y] pixel position for a given world coordinate in degrees at cval1 and cval2.</summary>
-		/// <param name="cval1">A coordinate values in degrees on coordinats axis 1 (i.e. right ascension).</param>
-		/// <param name="cval2">A coordinate values in degrees on coordinats axis 2 (i.e. declination).</param>
+		/// <param name="cval1">A coordinate values in degrees on coordinate axis 1 (i.e. right ascension).</param>
+		/// <param name="cval2">A coordinate values in degrees on coordinate axis 2 (i.e. declination).</param>
 		/// <param name="WCS_Type">The type of WCS solution: "TAN" for tangent-plane or Gnomic projection. Only "TAN" supported at this time.</param>
-		/// <param name="X_pix">The x-pixel position of the sky coordinates.</param>
-		/// <param name="Y_pix">The y-pixel position of the sky coordinates.</param>
+		/// <param name="X_pix">The x-pixel position of the sky coordinate.</param>
+		/// <param name="Y_pix">The y-pixel position of the sky coordinate.</param>
 		/// <param name="return_zero_based_pixels">If the pixels for the image should be interpreted as zero-based, pass true.</param>
 		public void Get_Pixel(double cval1, double cval2, string WCS_Type, out double X_pix, out double Y_pix, bool return_zero_based_pixels)
 		{
@@ -597,8 +610,8 @@ namespace JPFITS
 		}
 
 		/// <summary>Gets arrays of image [x, y] pixel positions for a list of given world coordinates in degrees at cval1 and cval2.</summary>
-		/// <param name="cval1">An array of coordinate values in degrees on coordinats axis 1.</param>
-		/// <param name="cval2">An array of coordinate values in degrees on coordinats axis 2.</param>
+		/// <param name="cval1">An array of coordinate values in degrees on coordinate axis 1.</param>
+		/// <param name="cval2">An array of coordinate values in degrees on coordinate axis 2.</param>
 		/// <param name="WCS_Type">The type of WCS solution: "TAN" for tangent-plane or Gnomic projection. Only "TAN" supported at this time.</param>
 		/// <param name="X_pix">An array of the image x-axis pixel locations.</param>
 		/// <param name="Y_pix">An array of the image y-axis pixel locations.</param>
@@ -717,6 +730,7 @@ namespace JPFITS
 			}
 		}
 
+		/// <summary>Copy WCS parameters from another WCS solution into the current instance.</summary>
 		public void CopyFrom(JPFITS.WorldCoordinateSolution wcs_source)
 		{
 			try
@@ -745,10 +759,10 @@ namespace JPFITS
 				this.CROTAN[0] = wcs_source.GetCROTAn(1);
 				this.CROTAN[1] = wcs_source.GetCROTAn(2);
 
-				this.CPIX1 = wcs_source.GetCoordinate_Pixels(1);
-				this.CPIX2 = wcs_source.GetCoordinate_Pixels(2);
-				this.CVAL1 = wcs_source.GetCoordinate_Values(1);
-				this.CVAL2 = wcs_source.GetCoordinate_Values(2);
+				this.CPIX1 = wcs_source.GetCPIXPixels(1);
+				this.CPIX2 = wcs_source.GetCPIXPixels(2);
+				this.CVAL1 = wcs_source.GetCVALValues(1);
+				this.CVAL2 = wcs_source.GetCVALValues(2);
 
 				this.CCVALD1 = wcs_source.CCVALD1;
 				this.CCVALD2 = wcs_source.CCVALD2;
@@ -774,6 +788,7 @@ namespace JPFITS
 			}
 		}
 
+		/// <summary>Copy WCS parameters from the current instance into another FITSHeader.</summary>
 		public void CopyTo(JPFITS.FITSHeader header)
 		{
 			try
@@ -845,6 +860,9 @@ namespace JPFITS
 			}
 		}
 
+		/// <summary>
+		/// Clear all WCS parameters from this instance.
+		/// </summary>
 		public void Clear()
 		{
 			CDMATRIX = new double[0, 0];
@@ -1022,7 +1040,7 @@ namespace JPFITS
 				}
 				else if (raarm)
 				{
-					ragrad = ROUNDTOHUMANINTERVAL(raintervalarm * 3);
+					ragrad = ROUNDTOHUMANINTERVAL(raintervalarm);
 					fieldcenterRA = Math.Round(fieldcenterRA * 60 / ragrad) * ragrad;
 					ragrad /= 60;
 					fieldcenterRA /= 60;
@@ -1034,9 +1052,6 @@ namespace JPFITS
 					ragrad /= 3600;
 					fieldcenterRA /= 3600;
 				}
-
-				if (raspan / ragrad < 4)
-					ragrad /= 2;
 
 				int nRAintervalsHW = (int)Math.Ceiling(raspan / 2 / ragrad);
 				RAS_LINES = new PointF[nRAintervalsHW * 2 + 1][];
@@ -1091,29 +1106,32 @@ namespace JPFITS
 				return 1;
 			else if (value > 1 && value <= 2)
 			{
-				if (value < 1.5)
+				/*if (value < 1.5)
 					return 1;
-				else
+				else*/
 					return 2;
 			}
 			else if (value > 2 && value <= 5)
 			{
-				if (value < 3.5)
+				/*if (value < 3.5)
 					return 2;
-				else
+				else*/
 					return 5;
 			}
 			else if (value > 5 && value <= 10)
 			{
-				if (value < 8)
+				/*if (value < 8)
 					return 5;
-				else
+				else*/
 					return 10;
 			}
 			else 
 				return 30;
 		}
 
+		#endregion
+
+		#region STATIC MEMBERS
 		/// <summary>Checks if a WCS solution exists based on the existence of the CTYPE keywords in the primary header of the given FITS object.</summary>
 		/// <param name="header">The header to scan for complete FITS standard WCS keywords.</param>
 		/// <param name="wcs_CTYPEN">The WCS solution type CTYPE to check for. Only "TAN" supported at this time. Typically both axes utilize the same solution type. For example wcs_CTYPEN = new string[2]{"TAN", "TAN"}</param>
@@ -1126,6 +1144,9 @@ namespace JPFITS
 			return true;
 		}
 
+		/// <summary>
+		/// Clears the WCS keywords from the header.
+		/// </summary>
 		public static void Clear(JPFITS.FITSHeader header)
 		{
 			header.RemoveKey("CTYPE1");
@@ -1179,10 +1200,10 @@ namespace JPFITS
 		}
 
 		/// <summary>Convert sexagesimal coordinate elements to degree units, with possibly arbitrary scale delimitters.</summary>
-		/// <param name="ra_sexa">The right ascenscion in sexagesimal format.</param>
+		/// <param name="ra_sexa">The right ascension in sexagesimal format.</param>
 		/// <param name="dec_sexa">The declination in sexagesimal format.</param>
-		/// <param name="delimit">If the scale delimitter is known then pass it (fast), otherwise it will be arbitrarily determined at each scale separation by passing an empty string (slower).</param>
-		/// <param name="ra_deg">Return parameter for right ascenscion in degrees.</param>
+		/// <param name="delimit">If the scale delimiter is known then pass it (fast), otherwise it will be arbitrarily determined at each scale separation by passing an empty string (slower).</param>
+		/// <param name="ra_deg">Return parameter for right ascension in degrees.</param>
 		/// <param name="dec_deg">Return parameter for declination in degrees.</param>
 		public static void SexagesimalElementsToDegreeElements(string ra_sexa, string dec_sexa, string delimit, out double ra_deg, out double dec_deg)
 		{
@@ -1309,7 +1330,7 @@ namespace JPFITS
 
 		/// <summary>Convert sexigesimal coordinates found in the first two columns of a String line into degree coordinate units.</summary>
 		/// <param name="line">A String line whose first two columns contain sexagesimal coordinates.</param>
-		/// <param name="ra_deg">Return parameter for right ascenscion in degrees.</param>
+		/// <param name="ra_deg">Return parameter for right ascension in degrees.</param>
 		/// <param name="dec_deg">Return parameter for declination in degrees.</param>
 		public static void SexagesimalLineToDegreeElements(string line, out double ra_deg, out double dec_deg)
 		{
@@ -1460,11 +1481,11 @@ namespace JPFITS
 		}
 
 		/// <summary>Convert degree coordinate elements to sexagesimal format.</summary>
-		/// <param name="ra_deg">Right ascenscion in degrees.</param>
+		/// <param name="ra_deg">Right ascension in degrees.</param>
 		/// <param name="dec_deg">Declination in degrees.</param>
-		/// <param name="ra_sexa">The right ascenscion in sexagesimal format, returned as a String.</param>
+		/// <param name="ra_sexa">The right ascension in sexagesimal format, returned as a String.</param>
 		/// <param name="dec_sexa">The declination in sexagesimal format, returned as a String.</param>
-		/// <param name="delimitter">The scale delimitter; if an empty String is passed then a colon will be used.</param>
+		/// <param name="delimitter">The scale delimiter; if an empty String is passed then a colon will be used.</param>
 		public static void DegreeElementstoSexagesimalElements(double ra_deg, double dec_deg, out string ra_sexa, out string dec_sexa, string delimitter, int decimals)
 		{
 			if (delimitter == "")
@@ -1499,9 +1520,9 @@ namespace JPFITS
 
 		/// <summary>Convert degree coordinates found in the first two columns of a String line into sexigesimal coordinate format.</summary>
 		/// <param name="line">A String line whose first two columns contain degree unit coordinates.</param>
-		/// <param name="ra_sexa">The right ascenscion in sexagesimal format, returned as a String.</param>
+		/// <param name="ra_sexa">The right ascension in sexagesimal format, returned as a String.</param>
 		/// <param name="dec_sexa">The declination in sexagesimal format, returned as a String.</param>
-		/// <param name="delimitter">The scale delimitter; if an empty String is passed then a colon will be used.</param>
+		/// <param name="delimitter">The scale delimiter; if an empty String is passed then a colon will be used.</param>
 		public static void DegreeLineToSexagesimalElements(string line, out string ra_sexa, out string dec_sexa, string delimitter, int decimals)
 		{
 			line = line.Trim();//clean leading and trailing white space
@@ -1593,5 +1614,7 @@ namespace JPFITS
 				sw.WriteLine(raSexagesimal[i] + delimit + decSexagesimal[i]);
 			sw.Close();
 		}
+
+		#endregion
 	}
 }

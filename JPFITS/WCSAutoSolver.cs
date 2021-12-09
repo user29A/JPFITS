@@ -264,7 +264,7 @@ namespace JPFITS
 			int thrgrpsz = PSEtriangles.Length / opts.MaxDegreeOfParallelism;
 			double mdpT100ovrlen = (double)(opts.MaxDegreeOfParallelism * 100) / (double)PSEtriangles.Length;
 
-			BGWRKR.ReportProgress(0, Environment.NewLine + "Starting search for matching triangles among " + (PSEtriangles.Length * CATtriangles_intrmdt.Length).ToString("0.00##e+00") + " possible comparisons...");
+			BGWRKR.ReportProgress(0, Environment.NewLine + "Starting search for matching triangles among " + ((long)(PSEtriangles.Length) * (long)(CATtriangles_intrmdt.Length)).ToString("0.00##e+00") + " possible comparisons...");
 
 			Parallel.ForEach(rangePartitioner, opts, (range, loopState) =>
 			{
@@ -294,14 +294,14 @@ namespace JPFITS
 						if ((double)i * mdpT100ovrlen > prog)
 							BGWRKR.ReportProgress(++prog);
 					
-					xpix_triplet[0] = PSEtriangles[i].Vertex(0).X;
-					ypix_triplet[0] = PSEtriangles[i].Vertex(0).Y;
-					xpix_triplet[1] = PSEtriangles[i].Vertex(1).X;
-					ypix_triplet[1] = PSEtriangles[i].Vertex(1).Y;
-					xpix_triplet[2] = PSEtriangles[i].Vertex(2).X;
-					ypix_triplet[2] = PSEtriangles[i].Vertex(2).Y;
-					minlength2 = SCALE_LB * (PSEtriangles[i].SideLength(2) - kern_diam);//longest side length min
-					maxlength2 = SCALE_UB * (PSEtriangles[i].SideLength(2) + kern_diam);//longest side length max
+					xpix_triplet[0] = PSEtriangles[i].GetVertex(0).X;
+					ypix_triplet[0] = PSEtriangles[i].GetVertex(0).Y;
+					xpix_triplet[1] = PSEtriangles[i].GetVertex(1).X;
+					ypix_triplet[1] = PSEtriangles[i].GetVertex(1).Y;
+					xpix_triplet[2] = PSEtriangles[i].GetVertex(2).X;
+					ypix_triplet[2] = PSEtriangles[i].GetVertex(2).Y;
+					minlength2 = SCALE_LB * (PSEtriangles[i].GetSideLength(2) - kern_diam);//longest side length min
+					maxlength2 = SCALE_UB * (PSEtriangles[i].GetSideLength(2) + kern_diam);//longest side length max
 
 					for (int j = 0; j < CATtriangles_intrmdt.Length; j++)
 					{
@@ -313,11 +313,11 @@ namespace JPFITS
 						ncompareslocal++;
 
 						//compare AAS (vertex0, vertex1, longest side)
-						if (Math.Abs(PSEtriangles[i].VertexAngle(0) - CATtriangles_intrmdt[j].VertexAngle(0)) > WCS_VERTEX_TOL)
+						if (Math.Abs(PSEtriangles[i].GetVertexAngle(0) - CATtriangles_intrmdt[j].GetVertexAngle(0)) > WCS_VERTEX_TOL)
 							continue;
-						if (Math.Abs(PSEtriangles[i].VertexAngle(1) - CATtriangles_intrmdt[j].VertexAngle(1)) > WCS_VERTEX_TOL)
+						if (Math.Abs(PSEtriangles[i].GetVertexAngle(1) - CATtriangles_intrmdt[j].GetVertexAngle(1)) > WCS_VERTEX_TOL)
 							continue;
-						if (CATtriangles_intrmdt[j].SideLength(2) < minlength2 || CATtriangles_intrmdt[j].SideLength(2) > maxlength2)
+						if (CATtriangles_intrmdt[j].GetSideLength(2) < minlength2 || CATtriangles_intrmdt[j].GetSideLength(2) > maxlength2)
 							continue;
 
 						if (compare_fieldvectors)
@@ -335,12 +335,12 @@ namespace JPFITS
 							PUB[1] = theta + 2;
 						}
 
-						Xintrmdt_triplet[0] = CATtriangles_intrmdt[j].Vertex(0).X;
-						Yintrmdt_triplet[0] = CATtriangles_intrmdt[j].Vertex(0).Y;
-						Xintrmdt_triplet[1] = CATtriangles_intrmdt[j].Vertex(1).X;
-						Yintrmdt_triplet[1] = CATtriangles_intrmdt[j].Vertex(1).Y;
-						Xintrmdt_triplet[2] = CATtriangles_intrmdt[j].Vertex(2).X;
-						Yintrmdt_triplet[2] = CATtriangles_intrmdt[j].Vertex(2).Y;
+						Xintrmdt_triplet[0] = CATtriangles_intrmdt[j].GetVertex(0).X;
+						Yintrmdt_triplet[0] = CATtriangles_intrmdt[j].GetVertex(0).Y;
+						Xintrmdt_triplet[1] = CATtriangles_intrmdt[j].GetVertex(1).X;
+						Yintrmdt_triplet[1] = CATtriangles_intrmdt[j].GetVertex(1).Y;
+						Xintrmdt_triplet[2] = CATtriangles_intrmdt[j].GetVertex(2).X;
+						Yintrmdt_triplet[2] = CATtriangles_intrmdt[j].GetVertex(2).Y;
 
 						//reset P0 for j'th iteration
 						P0[0] = SCALE_INIT;
@@ -545,7 +545,7 @@ namespace JPFITS
 				int x = (int)Math.Round(cpix1[i]);
 				int y = (int)Math.Round(cpix2[i]);
 				if (x > 0 && x < IMAGE_WIDTH && y > 0 && y < IMAGE_HEIGHT)
-					if (PSE.SourceBooleanMap[x, y] && PSE.SourceIndexMap[x, y] < PSE.N_Sources)
+					if (PSE.SourceBooleanMap[x, y]/* && PSE.SourceIndexMap[x, y] < PSE.N_Sources*/)
 					{
 						nmatches++;
 						match[i] = true;
@@ -696,7 +696,90 @@ namespace JPFITS
 			StreamWriter sw = new StreamWriter(script_filename);
 			sw.Write(script);
 			sw.Close();
-		}		
+		}
+
+		#endregion
+
+		#region CONSTRUCTORS
+		
+		/// <summary>Initializes the WCS_AutoSolver class including performing source extraction on a given FITS image.</summary>
+		/// <param name="WCS_type">The WCS tranformation type. Solution only uses TAN at this time.</param>
+		/// <param name="Number_of_Points">The number of points N to use to compare image coordinates to catalogue coordinates. Suggest N equals 25 for good correspondence, N equals 50 for poor, N equals 100 for very poor.</param>
+		/// <param name="Fits_Img">The JPFITS.FITSImage containing the primary image data.</param>
+		/// <param name="Image_ROI">The region of interest of the FITS image to search for point sources, of identical size to the FITS image. Pass null or all true for entire image.</param>
+		/// <param name="Image_Saturation">The saturation level of the source image for mapping saturated sources. Pass zero if no saturated sources exist.</param>
+		/// <param name="auto_background">Automatically determine local background for each centroiding kernel.</param>
+		/// <param name="PSE_kernel_radius">The radius of the point-source-extraction kernel, in pixels. PSEkernel_radius greater than or equal to 1.</param>
+		/// <param name="PSE_separation_radius">The minimum separation of point sources, in pixels. PSESeparation_radius greater than or equal to PSEkernel_radius.</param>
+		/// <param name="Fits_Catalogue_BinTable_File">The full path file name of the FITS binary table containing the catalogue data.</param>
+		/// <param name="Catalogue_Extension_Name">The extension name of the FITS binary table which contains the catalogue data. If empty string is passed then the first binary table extension is assumed.</param>
+		/// <param name="Catalogue_CVAL1_Name">The name of the entry inside the binary table which lists the CVAL1 (i.e. right ascension) coordinates.</param>
+		/// <param name="Catalogue_CVAL2_Name">The name of the entry inside the binary table which lists the CVAL2 (i.e. declination) coordinates.</param>
+		/// <param name="Catalogue_Magnitude_Name">The name of the entry inside the binary table which lists the source magnitudes.</param>
+		/// <param name="Refine">Option to automatically refine the solution further with additional points after the initial solution is found.</param>
+		public WCSAutoSolver(string WCS_type, int Number_of_Points, JPFITS.FITSImage Fits_Img, bool[,] Image_ROI, double Image_Saturation, bool auto_background, int PSE_kernel_radius, int PSE_separation_radius, string Fits_Catalogue_BinTable_File, string Catalogue_Extension_Name, string Catalogue_CVAL1_Name, string Catalogue_CVAL2_Name, string Catalogue_Magnitude_Name, bool Refine)
+		{
+			this.BGWRKR = new BackgroundWorker();
+			this.BGWRKR.WorkerReportsProgress = true;
+			this.BGWRKR.WorkerSupportsCancellation = true;
+			this.BGWRKR.DoWork += new System.ComponentModel.DoWorkEventHandler(BGWRKR_DoWork);
+			this.BGWRKR.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(BGWRKR_ProgressChanged);
+			this.BGWRKR.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
+
+			WCS_TYPE = WCS_type;
+			N_POINTS = Number_of_Points;
+			FITS_IMG = Fits_Img;
+			IMAGE_ROI = Image_ROI;
+			PIX_SAT = Image_Saturation;
+			AUTO_BACKGROUND = auto_background;
+			PSE_KERNEL_RADIUS = PSE_kernel_radius;
+			PSE_SEP_RADIUS = PSE_separation_radius;
+			CAT_FILENAME = Fits_Catalogue_BinTable_File;
+			CAT_EXTNAME = Catalogue_Extension_Name;
+			CAT_CVAL1NAME = Catalogue_CVAL1_Name;
+			CAT_CVAL2NAME = Catalogue_CVAL2_Name;
+			CAT_MAGNAME = Catalogue_Magnitude_Name;
+			REFINE = Refine;
+			DO_PSE = true;
+			CANCELLED = false;
+			PROGRESS = 0;
+			SOLVED = false;
+			PSE = new JPFITS.PointSourceExtractor();
+			WCS = new JPFITS.WorldCoordinateSolution();
+		}
+
+		/// <summary>Initializes the WCS_AutoSolver class for an existing pair of pixel source and catalogue coordinates.</summary>
+		/// <param name="WCS_type">The WCS tranformation type. Solution only uses TAN at this time.</param>
+		/// <param name="pixels">The source pixel positions in computer graphics coordinates, i.e., origin top left of screen.</param>
+		/// <param name="zero_based_pixels">If the source pixel positions are zero-based.</param>
+		/// <param name="pixels_tolerance_radius">The tolerance of the source positions, identical to usage as the PSE_kernel_radius in the other contructor. Typically 2 (pixels).</param>
+		/// <param name="image_width">The 1-based width of the source image from where the source pixels points originate.</param>
+		/// <param name="image_height">The 1-based height of the source image from where the source pixels points originate.</param>
+		/// <param name="wcspoints">The catalogue sky coordinate values, in degrees, corresponding to the region in the image of the source pixel positions.</param>
+		public WCSAutoSolver(string WCS_type, JPMath.PointD[] pixels, bool zero_based_pixels, int pixels_tolerance_radius, int image_width, int image_height, JPMath.PointD[] wcspoints)
+		{
+			this.BGWRKR = new BackgroundWorker();
+			this.BGWRKR.WorkerReportsProgress = true;
+			this.BGWRKR.WorkerSupportsCancellation = true;
+			this.BGWRKR.DoWork += new System.ComponentModel.DoWorkEventHandler(BGWRKR_DoWork);
+			this.BGWRKR.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(BGWRKR_ProgressChanged);
+			this.BGWRKR.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
+
+			WCS_TYPE = WCS_type;
+			PIX_PTS = pixels;
+			ZERO_BASED_PIX = zero_based_pixels;
+			PSE_KERNEL_RADIUS = pixels_tolerance_radius;
+			IMAGE_WIDTH = image_width;
+			IMAGE_HEIGHT = image_height;
+			CAT_PTS = wcspoints;
+			CANCELLED = false;
+			PROGRESS = 0;
+			DO_PSE = false;
+			N_POINTS = pixels.Length;
+			SOLVED = false;
+			PSE = null;
+			WCS = new JPFITS.WorldCoordinateSolution();
+		}
 
 		#endregion
 
@@ -761,85 +844,6 @@ namespace JPFITS
 		public void Status_Log_Clear()
 		{
 			STATUS_LOG = "";
-		}
-
-		/// <summary>Initializes the WCS_AutoSolver class including performing source extraction on a given FITS image.</summary>
-		/// <param name="WCS_type">The WCS tranformation type. Solution only uses TAN at this time.</param>
-		/// <param name="Number_of_Points">The number of points N to use to compare image coordinates to catalogue coordinates. Suggest N equals 25 for good correspondence, N equals 50 for poor, N equals 100 for very poor.</param>
-		/// <param name="Fits_Img">The JPFITS.FITSImage containing the primary image data.</param>
-		/// <param name="Image_ROI">The region of interest of the FITS image to search for point sources, of identical size to the FITS image. Pass null or all true for entire image.</param>
-		/// <param name="Image_Saturation">The saturation level of the source image for mapping saturated sources. Pass zero if no saturated sources exist.</param>
-		/// <param name="auto_background">Automatically determine local background for each centroiding kernel.</param>
-		/// <param name="PSE_kernel_radius">The radius of the point-source-extraction kernel, in pixels. PSEkernel_radius greater than or equal to 1.</param>
-		/// <param name="PSE_separation_radius">The minimum separation of point sources, in pixels. PSESeparation_radius greater than or equal to PSEkernel_radius.</param>
-		/// <param name="Fits_Catalogue_BinTable_File">The full path file name of the FITS binary table containing the catalogue data.</param>
-		/// <param name="Catalogue_Extension_Name">The extension name of the FITS binary table which contains the catalogue data. If empty string is passed then the first binary table extension is assumed.</param>
-		/// <param name="Catalogue_CVAL1_Name">The name of the entry inside the binary table which lists the CVAL1 (i.e. right ascension) coordinates.</param>
-		/// <param name="Catalogue_CVAL2_Name">The name of the entry inside the binary table which lists the CVAL2 (i.e. declination) coordinates.</param>
-		/// <param name="Catalogue_Magnitude_Name">The name of the entry inside the binary table which lists the source magnitudes.</param>
-		/// <param name="Refine">Option to refine the solution further with additional points after the initial solution is found.</param>
-		public WCSAutoSolver(string WCS_type, int Number_of_Points, JPFITS.FITSImage Fits_Img, bool[,] Image_ROI, double Image_Saturation, bool auto_background, int PSE_kernel_radius, int PSE_separation_radius, string Fits_Catalogue_BinTable_File, string Catalogue_Extension_Name, string Catalogue_CVAL1_Name, string Catalogue_CVAL2_Name, string Catalogue_Magnitude_Name, bool Refine)
-		{
-			this.BGWRKR = new BackgroundWorker();
-			this.BGWRKR.WorkerReportsProgress = true;
-			this.BGWRKR.WorkerSupportsCancellation = true;
-			this.BGWRKR.DoWork += new System.ComponentModel.DoWorkEventHandler(BGWRKR_DoWork);
-			this.BGWRKR.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(BGWRKR_ProgressChanged);
-			this.BGWRKR.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
-
-			WCS_TYPE = WCS_type;
-			N_POINTS = Number_of_Points;
-			FITS_IMG = Fits_Img;
-			IMAGE_ROI = Image_ROI;
-			PIX_SAT = Image_Saturation;
-			AUTO_BACKGROUND = auto_background;
-			PSE_KERNEL_RADIUS = PSE_kernel_radius;
-			PSE_SEP_RADIUS = PSE_separation_radius;
-			CAT_FILENAME = Fits_Catalogue_BinTable_File;
-			CAT_EXTNAME = Catalogue_Extension_Name;
-			CAT_CVAL1NAME = Catalogue_CVAL1_Name;
-			CAT_CVAL2NAME = Catalogue_CVAL2_Name;
-			CAT_MAGNAME = Catalogue_Magnitude_Name;
-			REFINE = Refine;
-			DO_PSE = true;
-			CANCELLED = false;
-			PROGRESS = 0;
-			SOLVED = false;
-			PSE = new JPFITS.PointSourceExtractor();
-			WCS = new JPFITS.WorldCoordinateSolution();
-		}
-
-		/// <summary>Initializes the WCS_AutoSolver class for a given pair of pixel source and catalogue coordinates.</summary>
-		/// <param name="WCS_type">The WCS tranformation type. Solution only uses TAN at this time.</param>
-		/// <param name="pixels">The source pixel positions in computer graphics coordinates, i.e., origin top left of screen.</param>
-		/// <param name="zero_based_pixels">If the source pixel positions are zero-based.</param>
-		/// <param name="pixels_tolerance_radius">The tolerance of the source positions, identical to usage as the PSE_kernel_radius in the other contructor. Typically 2 (pixels).</param>
-		/// <param name="image_width">The 1-based width of the source image from where the source pixels points originate.</param>
-		/// <param name="image_height">The 1-based height of the source image from where the source pixels points originate.</param>
-		/// <param name="wcspoints">The catalogue values corresponding to the region in the image of the source pixel positions.</param>
-		public WCSAutoSolver(string WCS_type, JPMath.PointD[] pixels, bool zero_based_pixels, int pixels_tolerance_radius, int image_width, int image_height, JPMath.PointD[] wcspoints)
-		{
-			this.BGWRKR = new BackgroundWorker();
-			this.BGWRKR.WorkerReportsProgress = true;
-			this.BGWRKR.WorkerSupportsCancellation = true;
-			this.BGWRKR.DoWork += new System.ComponentModel.DoWorkEventHandler(BGWRKR_DoWork);
-			this.BGWRKR.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(BGWRKR_ProgressChanged);
-			this.BGWRKR.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
-
-			WCS_TYPE = WCS_type;
-			PIX_PTS = pixels;
-			ZERO_BASED_PIX = zero_based_pixels;
-			PSE_KERNEL_RADIUS = pixels_tolerance_radius;
-			IMAGE_WIDTH = image_width;
-			IMAGE_HEIGHT = image_height;
-			CAT_PTS = wcspoints;
-			CANCELLED = false;
-			PROGRESS = 0;
-			DO_PSE = false;
-			N_POINTS = pixels.Length;//????????????????????????????????????????????????
-			SOLVED = false;
-			PSE = null;
-			WCS = new JPFITS.WorldCoordinateSolution();
 		}
 
 		/// <summary>Executes the auto-solver algorithm.</summary>

@@ -1737,35 +1737,14 @@ namespace JPFITS
 
 		#endregion
 
-		#region Class Properties		
+		#region PROPERTIES
 		/// <summary>NumberOfTableEntries reports the number of fields in the extension, i.e. the TFIELDS value.</summary>
 		public int NumberOfTableEntriesTFIELDS
 		{
 			get { return TFIELDS; }
 		}
 
-		/// <summary>TableDataTypes reports the .NET typecodes for each entry in the table.</summary>
-		public TypeCode GetTableDataTypes(int n)
-		{
-			if (TTYPEISHEAPARRAYDESC[n])
-				return HEAPTCODES[n];
-			else
-				return TCODES[n];
-		}
-
-		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat array.</summary>
-		public bool GetTTYPEIsHeapVariableRepeatEntry(int n)
-		{
-			return TTYPEISHEAPARRAYDESC[n];
-		}
-
-		/// <summary>Returns the number of elements (repeats) for a given heap entry at a given row.</summary>
-		public int GetTTYPERowRepeatsHeapEntry(int ttypeindex, int row)
-		{
-			return TTYPEHEAPARRAYNELSPOS[ttypeindex][0, row];
-		}
-
-		/// <summary>TableDataTypes reports the number of columns or repeats in each table entry. Variable repeat entries only report 1...use </summary>
+		/// <summary>TableDataTypes reports the number of columns or repeats in each table entry. Variable repeat (heap data) entries only report 1...use GetTTYPERowRepeatsHeapEntry to get the number of repeats for a given row.</summary>
 		public int[] TableDataRepeats
 		{
 			get { return TREPEATS; }
@@ -1777,7 +1756,7 @@ namespace JPFITS
 			get { return TTYPES; }
 		}
 
-		/// <summary>TableDataLabels reports the units of each table entry, i.e. the TUNITS values.</summary>
+		/// <summary>ExtensionEntryUnits reports the units of each table entry, i.e. the TUNITS values.</summary>
 		public string[] ExtensionEntryUnits
 		{
 			get { return TUNITS; }
@@ -1814,6 +1793,7 @@ namespace JPFITS
 		}
 		#endregion
 
+		#region CONSTRUCTORS
 		/// <summary>Create an empty FITSBinTable object. TTYPE entries may be added later via SetTTYPEEntries or AddTTYPEEntry. An extension name can be added at writetime.</summary>
 		public FITSBinTable()
 		{
@@ -1864,6 +1844,9 @@ namespace JPFITS
 			EATRAWBINTABLEHEADER(header);
 		}
 
+		#endregion
+
+		#region MEMBERS
 		/// <summary>Check if a TTYPE entry exists within the bintable.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		public bool TTYPEEntryExists(string ttypeEntry)
@@ -3556,6 +3539,27 @@ namespace JPFITS
 			HEAPDATA = null;
 		}
 
+		/// <summary>TableDataTypes reports the .NET typecodes for each entry in the table.</summary>
+		public TypeCode GetTableDataTypes(int n)
+		{
+			if (TTYPEISHEAPARRAYDESC[n])
+				return HEAPTCODES[n];
+			else
+				return TCODES[n];
+		}
+
+		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat array.</summary>
+		public bool GetTTYPEIsHeapVariableRepeatEntry(int n)
+		{
+			return TTYPEISHEAPARRAYDESC[n];
+		}
+
+		/// <summary>Returns the number of elements (repeats) for a given heap entry at a given row.</summary>
+		public int GetTTYPERowRepeatsHeapEntry(int ttypeindex, int row)
+		{
+			return TTYPEHEAPARRAYNELSPOS[ttypeindex][0, row];
+		}
+
 		/// <summary>Add an extra key to the extension header. If it is to be a COMMENT, just fill the keyValue with eighteen characters, and the keyComment with 54 characters.</summary>
 		/// <param name="keyName">The name of the key.</param>
 		/// <param name="keyValue">The value of the key. Pass numeric types as a string.</param>
@@ -3772,6 +3776,10 @@ namespace JPFITS
 			fs.Close();
 		}
 
+		#endregion
+
+		#region STATIC
+
 		/// <summary>Returns an array of all binary table extension names in a FITS file. If there are no binary table extensions, returns an empty array.</summary>
 		/// <param name="FileName">The full file name to read from disk.</param>
 		public static string[] GetAllExtensionNames(string FileName)
@@ -3842,5 +3850,7 @@ namespace JPFITS
 			fs.Close();
 			return exists;
 		}
+
+		#endregion
 	}
 }

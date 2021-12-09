@@ -1142,7 +1142,7 @@ namespace JPFITS
 		/// <summary>Convert a (possibly poorly formatted) delimited text file to a double array.
 		/// <para>If the text file is large (>2MB) the program may seem to hang...just let it run until control is returned.</para></summary>
 		/// <param name="fullFileName">File name.</param>
-		/// <param name="delimit">The field delimiter. If unknown or the text is poorly formatted pass empty string.</param>
+		/// <param name="delimit">The field delimiter. If unknown pass empty string.</param>
 		public static double[,] ConvertTxtToDblArray(string fullFileName, string delimit)
 		{
 			StreamReader sr = new StreamReader(fullFileName);
@@ -1780,10 +1780,15 @@ namespace JPFITS
 			return FITSFILEOPS.GETALLEXTENSIONNAMES(FileName, "IMAGE");
 		}
 
-		public static double[,] DeHotPixel(FITSImage image, double sigmaThreshold)
+		/// <summary>Identifies and removes hot pixels from an image. The algorithm is not a simple find and replace, but assesses whether a pixel is part of a source<br />
+		/// with legitimate high values or is a solitary or paired high value which is simply hot.</summary>
+		/// <param name="image">A FITS image with hot pixels.</param>
+		/// <param name="countThreshold">The pixel value above which a pixel might be considered to be hot.</param>
+		/// <returns></returns>
+		public static double[,] DeHotPixel(FITSImage image, double countThreshold)
 		{
 			//sigmaThreshold *= image.Std;
-			sigmaThreshold += image.Median;
+			//countThreshold += image.Median;
 
 			double[,] result = new double[image.Width, image.Height];
 			for (int y = 0; y < image.Height; y++)
@@ -1805,25 +1810,23 @@ namespace JPFITS
 					result[x, y] = image[x, y];
 					npix = 0;
 
-					if (image[x, y] > sigmaThreshold)
+					if (image[x, y] > countThreshold)
 					{
-						//npix++;
-
-						if (image[x - 1, y] > sigmaThreshold)
+						if (image[x - 1, y] > countThreshold)
 							npix++;
-						if (image[x + 1, y] > sigmaThreshold)
+						if (image[x + 1, y] > countThreshold)
 							npix++;
-						if (image[x - 1, y - 1] > sigmaThreshold)
+						if (image[x - 1, y - 1] > countThreshold)
 							npix++;
-						if (image[x, y - 1] > sigmaThreshold)
+						if (image[x, y - 1] > countThreshold)
 							npix++;
-						if (image[x + 1, y - 1] > sigmaThreshold)
+						if (image[x + 1, y - 1] > countThreshold)
 							npix++;
-						if (image[x - 1, y + 1] > sigmaThreshold)
+						if (image[x - 1, y + 1] > countThreshold)
 							npix++;
-						if (image[x, y + 1] > sigmaThreshold)
+						if (image[x, y + 1] > countThreshold)
 							npix++;
-						if (image[x + 1, y + 1] > sigmaThreshold)
+						if (image[x + 1, y + 1] > countThreshold)
 							npix++;
 
 						if (npix <= 2)
@@ -2067,23 +2070,33 @@ namespace JPFITS
 
 			return data;
 		}
+		
 		#endregion
 
 		#region CONSTRUCTORS
 
 		/// <summary>Create a dummy FITSImage object with a simple primary header.</summary>
-		/// <param name="fullFileName">File name. May be anything for this dummy object, but must contain one directory level and an entension.</param>
-		/// <param name="mayContainExtensions">Sets the EXTEND keyword if true.</param>
+		/// <param name="fullFileName">File name. May be anything for this dummy object, but if provided should follow a normal directory structure with file name and extension. Otherwise pass empty string.</param>
+		/// <param name="mayContainExtensions">Sets the EXTEND keyword if true for the dummy header of this FITSImage.</param>
 		public FITSImage(string fullFileName, bool mayContainExtensions)
 		{
 			ISEXTENSION = false;
 			EXTNAME = null;
 
-			int index;
-			FULLFILENAME = fullFileName;
-			index = FULLFILENAME.LastIndexOf("\\");
-			FILENAME = FULLFILENAME.Substring(index + 1);
-			FILEPATH = FULLFILENAME.Substring(0, index + 1);
+			if (fullFileName != "")
+			{
+				int index;
+				FULLFILENAME = fullFileName;
+				index = FULLFILENAME.LastIndexOf("\\");
+				FILENAME = FULLFILENAME.Substring(index + 1);
+				FILEPATH = FULLFILENAME.Substring(0, index + 1);
+			}
+			else
+			{
+				FULLFILENAME = "";
+				FILENAME = "";
+				FILEPATH = "";
+			}
 
 			HEADER = new FITSHeader(mayContainExtensions, null);
 			EATIMAGEHEADER();
@@ -2454,10 +2467,10 @@ namespace JPFITS
 			WORLDCOORDINATESOLUTION = new JPFITS.WorldCoordinateSolution();
 		}
 
-		/// <summary>Create a FITSImage object with extension image data loaded to RAM memory from disk.
+		/// <summary>Create a FITSImage object with extension image data loaded to RAM memory from disk. <br />Useful when extensions are not named with EXTNAME keyword. Will return the image at the extension number if they are named regardless.
 		/// <para>Image data is loaded as double precision independent of storage precision on disk.</para></summary>
 		/// <param name="fullFileName">File name.</param>
-		/// <param name="extensionNumber">The ONE-BASED extension number of the image. Useful when extensions are not named with EXTNAME keyword. Will return the image at the extension number if they are named regardless.</param>
+		/// <param name="extensionNumber">The ONE-BASED extension number of the image.</param>
 		/// <param name="range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass null or Range[0] = -1 to default to full image size.</param>
 		/// <param name="populateHeader">Optionally populate the header - sometimes you just want the data, and can skip reading the non-essential header lines.</param>
 		/// <param name="populateData">Optionally populate the image data array - sometimes you just want the header and don't need the data.</param>

@@ -15,6 +15,7 @@ namespace JPFITS
 	/// <summary>FITSImageSet class is an ArrayList object to hold, manage, and perform operations on a set of FITSImage objects.</summary>
 	public class FITSImageSet
 	{
+		#region PRIVATE
 		private ArrayList FITSLIST;
 		private bool CODIMENSIONAL;
 		private static WaitBar? WAITBAR;
@@ -629,6 +630,9 @@ namespace JPFITS
 			WAITBAR.Close();
 		}
 
+		#endregion
+
+		/// <summary>Constructor. Images can be added via .Add.</summary>
 		public FITSImageSet()
 		{
 			FITSLIST = new ArrayList();

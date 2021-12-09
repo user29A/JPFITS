@@ -24,7 +24,6 @@ namespace JPFITS
 		/// <param name="WinWidth">If it is a small image required, the function will bin if necessary. If no binning desired then set to Int32.Maxvalue.</param>
 		/// <param name="WinHeight">If it is a small image required, the function will bin if necessary. If no binning desired then set to Int32.Maxvalue.</param>
 		/// <param name="invertYaxis">Flip the image vertically...i.e. about the central horizontal axis.</param>
-		/// <returns></returns>
 		public static unsafe Bitmap ArrayToBmp(double[,] image, int scaling, int colour, bool invert, double[] DImCLim, int WinWidth, int WinHeight, bool invertYaxis)
 		{
 			if (image.GetLength(0) > WinWidth * 2 || image.GetLength(1) > WinHeight * 2)

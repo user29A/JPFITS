@@ -32,7 +32,7 @@ namespace JPFITS
 			AppendTxt.Text = (string)REG.GetReg("CCDLAB", "Appendage");
 
 			//get directory
-			DirectoryTxt.Text = (string)REG.GetReg("CCDLAB", "BatchSavePath");
+			DirectoryTxt.Text = IMAGESET.GetCommonDirectory();// (string)REG.GetReg("CCDLAB", "BatchSavePath");
 
 			//get file extension index
 			FileExtension.SelectedIndex = Convert.ToInt32(REG.GetReg("CCDLAB", "FileExtensionIndex"));
@@ -48,7 +48,7 @@ namespace JPFITS
 				if (fbd.ShowDialog() == DialogResult.Cancel)
 					return;
 
-				string dir = fbd.SelectedPath;
+				string dir = fbd.SelectedPath + "\\";
 				DirectoryTxt.Text = dir;
 				REG.SetReg("CCDLAB", "BatchSavePath", dir);
 				UseOrigDirChck.Checked = false;

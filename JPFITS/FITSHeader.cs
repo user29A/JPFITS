@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Collections;
+#nullable enable
 
 namespace JPFITS
 {
@@ -54,21 +55,21 @@ namespace JPFITS
 				HEADERKEYS[i] = new FITSHeaderKey((string)headerlines[i]);
 		}
 
-		/// <summary>GetKeyName returns the key of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
+		/// <summary>GetKeyName returns the key of the primary header line at index. Throws an exception if the index exceeds the number of header lines.</summary>
 		/// <param name="index">The zero-based line number to get the key name from.</param>
 		public string GetKeyName(int index)
 		{
 			return HEADERKEYS[index].Name;
 		}
 
-		/// <summary>GetKeyValue returns the value of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
+		/// <summary>GetKeyValue returns the value of the primary header line at index. Throws an exception if the index exceeds the number of header lines.</summary>
 		/// <param name="index">The zero-based line number to get the key value from.</param>
 		public string GetKeyValue(int index)
 		{
 			return HEADERKEYS[index].Value;
 		}
 
-		/// <summary>GetKeyComment returns the comment of the primary header line at index. Returns empty String if the index exceeds the number of header lines.</summary>
+		/// <summary>GetKeyComment returns the comment of the primary header line at index. Throws an exception if the index exceeds the number of header lines.</summary>
 		/// <param name="index">The zero-based line number to get the key comment from.</param>
 		public string GetKeyComment(int index)
 		{
@@ -79,38 +80,22 @@ namespace JPFITS
 		/// <param name="key">The header key to find the value of.</param>
 		public string GetKeyValue(string key)
 		{
-			string result = "";
-			bool brek = false;
-
 			for (int i = 0; i < this.Length; i++)
-				if (brek)
-					break;
-				else if (key == HEADERKEYS[i].Name)
-				{
-					result = HEADERKEYS[i].Value;
-					brek = true;
-				}
+				if (key == HEADERKEYS[i].Name)
+					return HEADERKEYS[i].Value;
 
-			return result;
+			return "";
 		}
 
 		/// <summary>GetKeyComment returns the comment of the primary header key named Key. Returns empty String if the key is not found.</summary>
 		/// <param name="key">The header key to find the comment of.</param>
 		public string GetKeyComment(string key)
 		{
-			string result = "";
-			bool brek = false;
-
 			for (int i = 0; i < this.Length; i++)
-				if (brek)
-					break;
-				else if (key == HEADERKEYS[i].Name)
-				{
-					result = HEADERKEYS[i].Comment;
-					brek = true;
-				}
+				if (key == HEADERKEYS[i].Name)
+					return HEADERKEYS[i].Comment;
 
-			return result;
+			return "";
 		}
 
 		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key named Key. Returns -1 if the key is not found.</summary>
@@ -118,33 +103,20 @@ namespace JPFITS
 		/// <param name="KeyIsFullLineFormatted">If true then the entire formatted 80-element long line is compared - helpful if multiple keys have the same name or are formatted as comment lines. If false then only the key name is used.</param>
 		public int GetKeyIndex(string key, bool KeyIsFullLineFormatted)
 		{
-			int result = -1;
-			bool brek = false;
-
 			if (!KeyIsFullLineFormatted)
 			{
 				for (int i = 0; i < this.Length; i++)
-					if (brek)
-						break;
-					else if (key == HEADERKEYS[i].Name)
-					{
-						result = i;
-						brek = true;
-					}
+					if (key == HEADERKEYS[i].Name)
+						return i;
 			}
 			else
 			{
 				for (int i = 0; i < this.Length; i++)
-					if (brek)
-						break;
-					else if (key == this[i].GetFullyFomattedFITSLine())
-					{
-						result = i;
-						brek = true;
-					}
+					if (key == this[i].GetFullyFomattedFITSLine())
+						return i;
 			}
 
-			return result;
+			return -1;
 		}
 
 		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key with matching value. Returns -1 if the key and value combination is not found.</summary>
@@ -152,20 +124,12 @@ namespace JPFITS
 		/// <param name="keyvalue">The header key value to find the index of.</param>
 		public int GetKeyIndex(string key, string keyvalue)
 		{
-			int result = -1;
-			bool brek = false;
-
 			for (int i = 0; i < this.Length; i++)
-				if (brek)
-					break;
-				else if (key == HEADERKEYS[i].Name)
+				if (key == HEADERKEYS[i].Name)
 					if (keyvalue == HEADERKEYS[i].Value)
-					{
-						result = i;
-						brek = true;
-					}
+						return i;
 
-			return result;
+			return -1;
 		}
 
 		/// <summary>GetKeyIndex returns the zero-based index in the primary header of the key with matching value and comment. Returns -1 if the key, value and comment combination is not found.</summary>
@@ -174,21 +138,13 @@ namespace JPFITS
 		/// <param name="keycomment">The header key comment to find the index of.</param>
 		public int GetKeyIndex(string key, string keyvalue, string keycomment)
 		{
-			int result = -1;
-			bool brek = false;
-
 			for (int i = 0; i < this.Length; i++)
-				if (brek)
-					break;
-				else if (key == HEADERKEYS[i].Name)
+				if (key == HEADERKEYS[i].Name)
 					if (keyvalue == HEADERKEYS[i].Value)
 						if (keycomment == HEADERKEYS[i].Comment)
-						{
-							result = i;
-							brek = true;
-						}
+							return i;
 
-			return result;
+			return -1;
 		}
 
 		/// <summary>SetKey sets the value of the key. If the key already exists then the value will be replaced but the comment will remain the same.</summary>
@@ -323,7 +279,7 @@ namespace JPFITS
 			UPDATEDISPLAYHEADER = true;
 		}
 
-		/// <summary>Move a fit key line to another position in the header.</summary>
+		/// <summary>Move a key line to another position in the header.</summary>
 		/// <param name="currentIndex">The key at this zero-based index will be moved.</param>
 		/// /// <param name="newIndex">The key at currentIndex index will be moved to this zero-based index position.</param>
 		public void MoveKey(int currentIndex, int newIndex)
