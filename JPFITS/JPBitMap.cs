@@ -9,7 +9,7 @@ using System.Drawing.Imaging;
 namespace JPFITS
 {
 	/// <summary>
-	/// Class for converting image 2D data arrays to bitmaps, including layers three images for color image bitmaps, and single layers as grayscale.
+	/// Class for converting 2D image data arrays to bitmaps, including three layer images for color image bitmaps, and single layers as grayscale.
 	/// </summary>
 	public class JPBitMap
 	{
@@ -18,9 +18,9 @@ namespace JPFITS
 		/// </summary>
 		/// <param name="image">The image data array.</param>
 		/// <param name="scaling">Data scaling: 0 = linear; 1 = square root; 2 = squared; 3 = log.</param>
-		/// <param name="colour">Artificial color mapping: 0 = grayscale; 1 = jet; 2 = winter; 3 = lines.</param>
+		/// <param name="colour">Artificial color mapping: 0 = grayscale; 1 = jet; 2 = winter; 3 = lines (detects contours and edges).</param>
 		/// <param name="invert">Invert tone...i.e. black becomes white.</param>
-		/// <param name="DImCLim">The image contrast limits. A 2-element array which clips the low (element 1) and high (element 2) values when forming the bitmap.</param>
+		/// <param name="DImCLim">The image contrast limits. A 2-element vector which clips the low (element 1) and high (element 2) values of the image array when forming the bitmap. Suggest [mean(image)-0.5*stdv(image) mean(image)+5*stdv(image)]</param>
 		/// <param name="WinWidth">If it is a small image required, the function will bin if necessary. If no binning desired then set to Int32.Maxvalue.</param>
 		/// <param name="WinHeight">If it is a small image required, the function will bin if necessary. If no binning desired then set to Int32.Maxvalue.</param>
 		/// <param name="invertYaxis">Flip the image vertically...i.e. about the central horizontal axis.</param>
@@ -131,6 +131,12 @@ namespace JPFITS
 			return bmp;
 		}
 
+		/// <summary>
+		/// Convert three 2D arrays representing R (reg), G (green), and B (blue) channels to a color image Bitmap. The R,G,B arrays must already be scaled to 24Bpp Bitmap range, i.e. values between 0 - 255.
+		/// </summary>
+		/// <param name="R">The RED channel array</param>
+		/// <param name="G">The GREEN channel array</param>
+		/// <param name="B">The BLUE channel array</param>
 		public static unsafe Bitmap RGBBitMap(double[,] R, double[,] G, double[,] B)
 		{
 			bool codim = true;
@@ -163,9 +169,9 @@ namespace JPFITS
 				{
 					jcounter++;
 
-					bits[istride + j + 0] = (byte)(B[jcounter, i]);   // blue
-					bits[istride + j + 1] = (byte)(G[jcounter, i]); // green
-					bits[istride + j + 2] = (byte)(R[jcounter, i]);   // red
+					bits[istride + j + 0] = (byte)(B[jcounter, i]);// blue
+					bits[istride + j + 1] = (byte)(G[jcounter, i]);// green
+					bits[istride + j + 2] = (byte)(R[jcounter, i]);// red
 				}
 			});
 			bmp.UnlockBits(data);

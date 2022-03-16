@@ -251,6 +251,9 @@ namespace JPFITS
 		public WorldCoordinateSolution(JPFITS.FITSHeader header)
 		{
 			EATHEADERFORWCS(header);
+
+			if (!WCSEXISTS)
+				throw new Exception("Error: WCS keywords not found in specified header '" + header + "'");
 		}
 
 		#endregion

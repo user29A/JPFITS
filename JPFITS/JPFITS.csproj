@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>JPFITS</RootNamespace>
     <AssemblyName>JPFITS</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <TargetFrameworkProfile />
@@ -43,7 +43,7 @@
       <HintPath>..\..\alglib-3.18.0.csharp.hpc\alglib-3.18.0.csharp.hpc\alglib-csharp\lib-csharp-core\alglib318hpc_net2.dll</HintPath>
     </Reference>
     <Reference Include="JPChart">
-      <HintPath>..\..\JPChart\bin\Release\JPChart.dll</HintPath>
+      <HintPath>..\..\JPChart\JPChart\bin\Release\JPChart.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

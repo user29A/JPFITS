@@ -9,7 +9,7 @@ using System.Collections;
 
 namespace JPFITS
 {
-	//<summary>FITSFILEOPS static class for facilitating interaction with FITS binary data on disk through a FileStream.</summary>
+	///<summary>FITSFILEOPS static class for facilitating interaction with FITS data on disk.</summary>
 	public class FITSFILEOPS
 	{
 		/// <summary>Scans the primary header unit and data of a FITS file. Returns false if the file is not a FITS file.</summary>
@@ -271,10 +271,10 @@ namespace JPFITS
 			return extensionfound;
 		}
 
-		/// <summary>Find the FITS extension table of the given type and name. Returns false if the XTENSION type of the specified EXTNAME is not found. If extension_name is found the FileStream fs will be placed at the beginning of the extension's main data table block.</summary>
+		/// <summary>Find the FITS extension table of the given type and position index number. Returns false if the XTENSION type of the specified number is not found. If the index number is found the FileStream fs will be placed at the beginning of the extension's main data table block.</summary>
 		/// <param name="fs">The FileStream of the FITS file.
-		/// <para>If EXTNAME is found the FileStream fs will be placed at the beginning of the extension's main data table block.</para>
-		/// <para>If EXTNAME is NOT found it will be at the end of the file.</para></param>
+		/// <para>If the extension number is found the FileStream fs will be placed at the beginning of the extension's main data table block.</para>
+		/// <para>If the extension number is NOT found it will be at the end of the file.</para></param>
 		/// <param name="extension_type">The XTENSION extension type, either: &quot;BINTABLE&quot;, &quot;TABLE&quot;, or &quot;IMAGE&quot;.</param>
 		/// <param name="extension_number">The ONE-BASED extension number. This can be used when extensions aren't named with the EXTNAME keyword; alternatively if they are named this still returns the XTENSION extension type of the specified number.</param>
 		/// <param name="header_return">Returns the header of the extension as an ArrayList with each 80-character header line being a String^ member of this list. Pass nullptr if not required.</param>

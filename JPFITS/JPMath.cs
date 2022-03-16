@@ -173,6 +173,7 @@ namespace JPFITS
 			private PointD[] POINTS;
 			private double[] VERTEXANGLES = new double[0];
 			private double[] SIDELENGTHS = new double[0];
+			
 			private void SORTTRIANGLE()
 			{
 				PointD[] points = new PointD[3] { POINTS[0], POINTS[1], POINTS[2] };
@@ -251,6 +252,7 @@ namespace JPFITS
 
 				POINTS = new PointD[3] { points[common0], points[common1], points[common2] };
 			}
+			
 			private void MAKEVERTEXANGLES()
 			{
 				VERTEXANGLES = new double[3];
@@ -263,6 +265,7 @@ namespace JPFITS
 				VERTEXANGLES[1] = Math.Acos(-(D02 * D02 - D01 * D01 - D12 * D12) / (2 * D01 * D12));
 				VERTEXANGLES[2] = Math.Acos(-(D01 * D01 - D02 * D02 - D12 * D12) / (2 * D02 * D12));
 			}
+			
 			private void MAKEFIELDVECTORS()
 			{
 				FIELDVECTOR = new PointD(POINTS[2].X - POINTS[1].X, POINTS[2].Y - POINTS[1].Y, SIDELENGTHS[2]);
@@ -5335,7 +5338,6 @@ namespace JPFITS
 
 			//return shift;
 		}
-
 
 		/// <summary>Returns the 2-D array with gradients removed from a specified dimension.</summary>
 		/// <param name="data">The data array to degradient.</param>

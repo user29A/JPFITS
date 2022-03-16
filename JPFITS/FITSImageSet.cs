@@ -995,6 +995,11 @@ namespace JPFITS
 			return first;
 		}
 
+		public void SubtractImage(FITSImage image, bool doParallel, bool fineGrainParallel)
+		{
+
+		}
+
 		/// <summary>Clears the ArrayList FITSImageSet object of all members.</summary>
 		public void Clear()
 		{

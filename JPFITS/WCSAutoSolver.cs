@@ -703,7 +703,7 @@ namespace JPFITS
 		#region CONSTRUCTORS
 		
 		/// <summary>Initializes the WCS_AutoSolver class including performing source extraction on a given FITS image.</summary>
-		/// <param name="WCS_type">The WCS tranformation type. Solution only uses TAN at this time.</param>
+		/// <param name="WCS_type">The WCS transformation type. Solution only uses TAN at this time.</param>
 		/// <param name="Number_of_Points">The number of points N to use to compare image coordinates to catalogue coordinates. Suggest N equals 25 for good correspondence, N equals 50 for poor, N equals 100 for very poor.</param>
 		/// <param name="Fits_Img">The JPFITS.FITSImage containing the primary image data.</param>
 		/// <param name="Image_ROI">The region of interest of the FITS image to search for point sources, of identical size to the FITS image. Pass null or all true for entire image.</param>
@@ -749,10 +749,10 @@ namespace JPFITS
 		}
 
 		/// <summary>Initializes the WCS_AutoSolver class for an existing pair of pixel source and catalogue coordinates.</summary>
-		/// <param name="WCS_type">The WCS tranformation type. Solution only uses TAN at this time.</param>
-		/// <param name="pixels">The source pixel positions in computer graphics coordinates, i.e., origin top left of screen.</param>
+		/// <param name="WCS_type">The WCS transformation type. Solution only uses TAN at this time.</param>
+		/// <param name="pixels">The source pixel positions in computer graphics coordinate orientation, i.e., origin top left of image.</param>
 		/// <param name="zero_based_pixels">If the source pixel positions are zero-based.</param>
-		/// <param name="pixels_tolerance_radius">The tolerance of the source positions, identical to usage as the PSE_kernel_radius in the other contructor. Typically 2 (pixels).</param>
+		/// <param name="pixels_tolerance_radius">The tolerance of the source positions, identical to usage as the PSE_kernel_radius in the other constructor. Typically 2 (pixels).</param>
 		/// <param name="image_width">The 1-based width of the source image from where the source pixels points originate.</param>
 		/// <param name="image_height">The 1-based height of the source image from where the source pixels points originate.</param>
 		/// <param name="wcspoints">The catalogue sky coordinate values, in degrees, corresponding to the region in the image of the source pixel positions.</param>
@@ -817,13 +817,13 @@ namespace JPFITS
 			get { return SOLVING; }
 		}
 
-		/// <summary>Gets the Solving State of the Solver</summary>
+		/// <summary>Gets the Solution State of the Solver</summary>
 		public bool Solved
 		{
 			get { return SOLVED; }
 		}
 
-		/// <summary>Gets Progress of the Solver</summary>
+		/// <summary>Gets Progress percentage of the Solver</summary>
 		public int Progress
 		{
 			get { return PROGRESS; }
@@ -937,11 +937,11 @@ namespace JPFITS
 			return retarray;
 		}
 
-		/// <summary>Queries the Gaia catalogue for entries within a specified region</summary>
+		/// <summary>Queries the Gaia catalogue for entries within a specified region. Returns 0 if the query was successful.</summary>
 		/// <param name="catalogue">A string for the catalogue to query. Options are (case insensitive): "Gaia"</param>
 		/// <param name="ra_deg">A string of the right ascension in degrees.</param>
 		/// <param name="dec_deg">A string of the declination in degrees.</param>
-		/// <param name="result_savepathfilename">The filename to save the catalogue. If saving is not required, pass an empty string.</param>
+		/// <param name="result_savepathfilename">The filename to save the query catalogue. If saving is not required, pass an empty string.</param>
 		/// <param name="radius">A string of the region radius in arcminutes.</param>
 		/// <param name="square">Pass 1 if the region is square, 0 for circle.</param>
 		public static int AstroQuery(string catalogue, string ra_deg, string dec_deg, ref string result_savepathfilename, string radius, string square)
@@ -997,14 +997,14 @@ namespace JPFITS
 			}
 
 			catalogue = catalogue.ToLower();
-			string script = "C:\\ProgramData\\Astrowerks\\CCDLABx64\\astro_query.py";
+			string script = "C:\\ProgramData\\Astrowerks\\CCDLAB\\astro_query.py";
 			MAKEASTROQUERYSCRIPT(script, catalogue);
 
 			if (result_savepathfilename == "")
 			{
-				if (!Directory.Exists("C:\\ProgramData\\Astrowerks\\CCDLABx64\\"))
-					Directory.CreateDirectory("C:\\ProgramData\\Astrowerks\\CCDLABx64\\");
-				result_savepathfilename = "C:\\ProgramData\\Astrowerks\\CCDLABx64\\queryCatalog.fit";
+				if (!Directory.Exists("C:\\ProgramData\\Astrowerks\\CCDLAB\\"))
+					Directory.CreateDirectory("C:\\ProgramData\\Astrowerks\\CCDLAB\\");
+				result_savepathfilename = "C:\\ProgramData\\Astrowerks\\CCDLAB\\queryCatalog.fit";
 			}
 
 			System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo();

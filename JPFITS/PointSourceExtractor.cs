@@ -116,7 +116,7 @@ namespace JPFITS
 
 							lock (SOURCE_BOOLEAN_MAP)
 							{
-								if (!SOURCE_BOOLEAN_MAP[x, y] && IMAGE[x, y] >= PIX_SAT)
+								//if (!SOURCE_BOOLEAN_MAP[x, y] && IMAGE[x, y] >= PIX_SAT)//isn't this redundant?
 								{
 									int Xmin = x, Xmax = x, Ymin = y, Ymax = y;
 									MAPSATURATIONISLAND(x, y, src_index, ref Xmin, ref Xmax, ref Ymin, ref Ymax);
@@ -250,6 +250,11 @@ namespace JPFITS
 									break;
 								}
 
+								/*The minimum radial distance between two sources must be the SSR.
+								When another source is just over (one pixel, say) the SSR from[x, y], its Boolean map which is from the CKR will extend towards[x, y] so that its Boolean map extends within the SSR of[x, y].
+								Thus, it is OK to find some true values in the Boolean map from another source when exploring +-SSR from a given [x, y].
+								However, what wouldn’t be OK is if when exploring the SSR, another source’s Boolean/ index map extends to within less than half of the SSR of[x, y], 
+								because then there would be no way that the radial distance between[x, y] and the other source-center would be at least SSR.*/
 								if (r2 < 0.25 && SOURCE_BOOLEAN_MAP[i, j]) //a source was already found within the source separation
 								{
 									brek = true;
@@ -818,6 +823,7 @@ namespace JPFITS
 			}
 		}
 
+		/// <summary>Gets the volume (total count) of extracted sources.</summary>
 		public double[] Centroids_Volume
 		{
 			get { return CENTROIDS_VOLUME; }
@@ -872,46 +878,55 @@ namespace JPFITS
 			get { return BGWRKR.IsBusy; }
 		}
 
+		/// <summary>Returns the pixel saturation value which was passed when performing the source extraction</summary>
 		public double PixelSaturation
 		{
 			get { return PIX_SAT; }
 		}
 
+		/// <summary>Returns the kernel radius value which was passed when performing the source extraction</summary>
 		public double KernelRadius
 		{
 			get { return KERNEL_RADIUS; }
 		}
 
+		/// <summary>Returns the source separation value which was passed when performing the source extraction</summary>
 		public double SourceSeparation
 		{
 			get { return SOURCE_SEPARATION; }
 		}
 
+		/// <summary>Returns the maximum pixel value which was passed when performing the source extraction</summary>
 		public double PixelMaximum
 		{
 			get { return PIX_MAX; }
 		}
 
+		/// <summary>Returns the minimum pixel value which was passed when performing the source extraction</summary>
 		public double PixelMinimum
 		{
 			get { return PIX_MIN; }
 		}
 
+		/// <summary>Returns the maximum kernel value which was passed when performing the source extraction</summary>
 		public double KernelMaximum
 		{
 			get { return KERNEL_MAX; }
 		}
 
+		/// <summary>Returns the minimum kernel value which was passed when performing the source extraction</summary>
 		public double KernelMinimum
 		{
 			get { return KERNEL_MIN; }
 		}
 
+		/// <summary>Returns whether the background was automatically determined when performing the source extraction.</summary>
 		public bool AutoBackground
 		{
 			get { return AUTO_BG; }
 		}
 
+		/// <summary>Returns whether the point sources were saved when performing the source extraction.</summary>
 		public bool SavePointSources
 		{
 			get { return SAVE_PS; }
@@ -922,6 +937,7 @@ namespace JPFITS
 			string get() { return SAVE_PS_FILENAME; }
 		}*/
 
+		/// <summary>Returns whether a region of interest of the image was only used when performing the source extraction.</summary>
 		public bool SearchROI
 		{
 			get { return SEARCH_ROI; }
@@ -937,7 +953,6 @@ namespace JPFITS
 			get { return NGROUPS; }
 		}
 		#endregion
-
 
 		#region MEMBER METHODS
 		/// <summary>Searches for sources withn a 2D image array.</summary>
@@ -1082,6 +1097,21 @@ namespace JPFITS
 			});
 		}
 
+		/// <summary>Attempt to find N strongest sources in an image.</summary>
+		/// <param name="N">The number of strongest sources to try to find.</param>
+		/// <param name="image">The 2D image array to find sources in.</param>
+		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
+		/// <param name="pix_min">The minimum pixel threshold value (or SN) to consider a potential source.</param>
+		/// <param name="pix_max">The maximum pixel threshold value (or SN) to consider a potential source.</param>
+		/// <param name="kernel_min">The minimum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
+		/// <param name="kernel_max">The maximum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
+		/// <param name="threshholds_as_SN">Treat the thresholds as Signal to Noise instead of pixel values.</param>
+		/// <param name="kernel_radius">The radius (pixels) of the kernel to find sources within. Secondary sources within the radius will be ignored.</param>
+		/// <param name="source_separation">The separation (pixels) between sources. Only the brightest source within the separation radius is kept.</param>
+		/// <param name="auto_background">Automatically determine the local background for potential sources.  Not required if background is known to be zeroed, but should have no effect if used in this case.</param>
+		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
+		/// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
+		/// <param name="show_waitbar">Show a cancellable wait bar.</param>
 		public void Extract_Attempt_N_Sources(int N, double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar)
 		{
 			//JPFITS.FITSImage^ FITS = new FITSImage("", image, true, true);
@@ -1126,7 +1156,10 @@ namespace JPFITS
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
 		/// <para>G(x,y|P) = P(0) * exp( -((x - P(1)).^2 + (y - P(2)).^2 ) / (2*P(3)^2)) + P(4).</para></summary>
-		public void Extract_Source_LSFits_Gaussian_Circular(double[] Pinit, double[] LBnds, double[] UBnds/*bool view,*/)//2-D Circular Gaussian
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3) and P(4) are used, all other parameter initial estimates are determined locally.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Only LBnds(3) and LBnds(4) are used, all other parameter bound estimates are determined locally.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Only UBnds(3) and LBnds(4) are used, all other parameter bound estimates are determined locally.</param>
+		public void Fit_Sources_Gaussian_Circular(double[] Pinit, double[] LBnds, double[] UBnds)
 		{
 			//G = P(0) * exp( -((X-P(1)).^2 + (Y-P(2)).^2 ) / (2*P(3)^2)) + P(4);
 
@@ -1151,7 +1184,10 @@ namespace JPFITS
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
 		/// <para>G(x,y|P) = P(0) * exp( -((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))).^2 / (2*P(4)^2) - ( -(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))).^2 / (2*P(5)^2) ) + P(6).</para></summary>
-		public void Extract_Source_LSFits_Gaussian_Elliptical(double[] Pinit, double[] LBnds, double[] UBnds/*bool view,*/)// 2-D Elliptical Gaussian
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5) and P(6) are used, all other parameter initial estimates are determined locally.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as above.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as above.</param>
+		public void Fit_Sources_Gaussian_Elliptical(double[] Pinit, double[] LBnds, double[] UBnds)
 		{
 			//G = P(0) * exp( -((x-P(1))*cosd(P(3)) + (y-P(2))*sind(P(3))).^2 / (2*P(4)^2) - ( -(x-P(1))*sind(P(3)) + (y-P(2))*cosd(P(3))).^2 / (2*P(5)^2) ) + P(6);
 
@@ -1176,7 +1212,10 @@ namespace JPFITS
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
 		/// <para>M(x,y|P) = P(0) * ( 1 + { (x - P(1))^2 + (y - P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5).</para></summary>
-		public void Extract_Source_LSFits_Moffat_Circular(double[] Pinit, double[] LBnds, double[] UBnds/*bool view,*/)// 2-D Circular Moffat
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5) are used, all other parameter initial estimates are determined locally.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as above.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as above.</param>
+		public void Fit_Sources_Moffat_Circular(double[] Pinit, double[] LBnds, double[] UBnds)
 		{
 			// M = P(0) * ( 1 + { (X-P(1))^2 + (Y-P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5)
 
@@ -1201,7 +1240,10 @@ namespace JPFITS
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
 		/// <para>M(x,y|P) = P(0) * (1 + { ((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))) ^ 2 } / P(4) ^ 2 + { (-(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))) ^ 2 } / P(5) ^ 2) ^ (-P(6)) + P(7).</para></summary>
-		public void Extract_Source_LSFits_Moffat_Elliptical(double[] Pinit, double[] LBnds, double[] UBnds/*bool view,*/)// 2-D Elliptical Moffat
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5),  P(6) and P(7) are used, all other parameter initial estimates are determined locally.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as above.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as above.</param>
+		public void Fit_Sources_Moffat_Elliptical(double[] Pinit, double[] LBnds, double[] UBnds)
 		{
 			//M = P(0) * ( 1 + { ((X-P(1))*cosd(P(3)) + (Y-P(2))*sind(P(3)))^2 } / P(4)^2 + { (-(X-P(1))*sind(P(3)) + (Y-P(2))*cosd(P(3)))^2 } / P(5)^2 ) ^ (-P(6)) + P(7);
 
@@ -1508,10 +1550,13 @@ namespace JPFITS
 
 		#endregion
 
-
 		#region STATIC METHODS
 
-		/// <summary>Gets a sub-array kernel from a primary image given a center position and square half-width radius.</summary>
+		/// <summary>Gets a square sub-array kernel from a primary image given a center position and square half-width radius.</summary>
+		/// <param name="image">The source image to extract the kernel from.</param>
+		/// <param name="x0">The center pixel of the kernel on the horizontal axis of the image.</param>
+		/// <param name="y0">The center pixel of the kernel on the vertical axis of the image.</param>
+		/// <param name="radius">The radius of the kernel.</param>
 		public static double[,] GetKernel(double[,] image, int x0, int y0, int radius)
 		{
 			int width = radius * 2 + 1, kx = -1, x, y, xmin = x0 - radius, ymin = y0 - radius;
@@ -1528,6 +1573,11 @@ namespace JPFITS
 		}
 
 		/// <summary>Determines the [x, y] centroid location of a given kernel.</summary>
+		/// <param name="xdata">The horizontal axis values of the kernel.</param>
+		/// <param name="ydata">The vertical axis values of the kernel.</param>
+		/// <param name="kernel">The kernel to centroid.</param>
+		/// <param name="x_centroid">The weighed mean centroid of the kernel on the horizontal axis.</param>
+		/// <param name="y_centroid">The weighed mean centroid of the kernel on the vertical axis.</param>
 		public static void Centroid(int[] xdata, int[] ydata, double[,] kernel, out double x_centroid, out double y_centroid)
 		{
 			int xw = kernel.GetLength(0);
@@ -1631,8 +1681,8 @@ namespace JPFITS
 
 		#endregion
 
-
 		#region CONSTRUCTORS
+		/// <summary>The default constructor for the class object, used when an image is to be examined for sources.</summary>
 		public PointSourceExtractor()
 		{
 			this.BGWRKR = new BackgroundWorker();
@@ -1644,6 +1694,7 @@ namespace JPFITS
 			WAITBAR = new WaitBar();
 		}
 
+		/// <summary>The constructor for the class object used when an image already has a given list of coordinate locations for sources in the image.</summary>
 		public PointSourceExtractor(double[] XCoords, double[] YCoords)
 		{
 			this.BGWRKR = new BackgroundWorker();
@@ -1662,6 +1713,7 @@ namespace JPFITS
 				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], 0);
 		}
 
+		/// <summary>The constructor for the class object based on a PointSourceExtractor saved from another session.</summary>
 		public PointSourceExtractor(JPFITS.FITSBinTable BinTablePSE)
 		{
 			this.BGWRKR = new BackgroundWorker();
