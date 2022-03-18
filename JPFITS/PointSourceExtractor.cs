@@ -114,64 +114,62 @@ namespace JPFITS
 							if (SOURCE_BOOLEAN_MAP[x, y])
 								continue;
 
-							lock (SOURCE_BOOLEAN_MAP)
+							lock (SOURCE_BOOLEAN_MAP)//if (!SOURCE_BOOLEAN_MAP[x, y] && IMAGE[x, y] >= PIX_SAT)//isn't this redundant?
 							{
-								//if (!SOURCE_BOOLEAN_MAP[x, y] && IMAGE[x, y] >= PIX_SAT)//isn't this redundant?
+								
+								int Xmin = x, Xmax = x, Ymin = y, Ymax = y;
+								MAPSATURATIONISLAND(x, y, src_index, ref Xmin, ref Xmax, ref Ymin, ref Ymax);
+
+								if (Xmax - Xmin == 0)//single pixel, expand to 3 pixels
 								{
-									int Xmin = x, Xmax = x, Ymin = y, Ymax = y;
-									MAPSATURATIONISLAND(x, y, src_index, ref Xmin, ref Xmax, ref Ymin, ref Ymax);
+									Xmin--;
+									Xmax++;
+								}
+								else if (!JPMath.IsEven(Xmax - Xmin))//544-543 = 1 = 2 pixels, so make odd number of pixels...with Xmax I guess
+									Xmax++;
+								if (Ymax - Ymin == 0)//single pixel, expand to 3 pixels
+								{
+									Ymin--;
+									Ymax++;
+								}
+								else if (!JPMath.IsEven(Ymax - Ymin))//544-543 = 1 = 2 pixels, so make odd number of pixels...with Xmax I guess
+									Ymax++;
 
-									if (Xmax - Xmin == 0)//single pixel, expand to 3 pixels
+								double[,] kernel = new double[Xmax - Xmin + 1, Ymax - Ymin + 1];
+								double x_centroid = 0, y_centroid = 0, kernel_sum = 0;
+								for (int i = Xmin; i <= Xmax; i++)
+									for (int j = Ymin; j <= Ymax; j++)
 									{
-										Xmin--;
-										Xmax++;
+										kernel[i - Xmin, j - Ymin] = IMAGE[i, j];
+										x_centroid += (IMAGE[i, j] * (double)(i));
+										y_centroid += (IMAGE[i, j] * (double)(j));
+										kernel_sum += (IMAGE[i, j] /*- bg_est*/);
+										/*IMAGE_KERNEL_BOOL_SOURCE[i, j] = true;
+										IMAGE_KERNEL_INDEX_SOURCE[i, j] = src_index;*/
 									}
-									else if (!JPMath.IsEven(Xmax - Xmin))//544-543 = 1 = 2 pixels, so make odd number of pixels...with Xmax I guess
-										Xmax++;
-									if (Ymax - Ymin == 0)//single pixel, expand to 3 pixels
-									{
-										Ymin--;
-										Ymax++;
-									}
-									else if (!JPMath.IsEven(Ymax - Ymin))//544-543 = 1 = 2 pixels, so make odd number of pixels...with Xmax I guess
-										Ymax++;
+								x_centroid /= kernel_sum;
+								y_centroid /= kernel_sum;
 
-									double[,] kernel = new double[Xmax - Xmin + 1, Ymax - Ymin + 1];
-									double x_centroid = 0, y_centroid = 0, kernel_sum = 0;
-									for (int i = Xmin; i <= Xmax; i++)
-										for (int j = Ymin; j <= Ymax; j++)
-										{
-											kernel[i - Xmin, j - Ymin] = IMAGE[i, j];
-											x_centroid += (IMAGE[i, j] * (double)(i));
-											y_centroid += (IMAGE[i, j] * (double)(j));
-											kernel_sum += (IMAGE[i, j] /*- bg_est*/);
-											/*IMAGE_KERNEL_BOOL_SOURCE[i, j] = true;
-											IMAGE_KERNEL_INDEX_SOURCE[i, j] = src_index;*/
-										}
-									x_centroid /= kernel_sum;
-									y_centroid /= kernel_sum;
+								//MAPSATURATIONISLAND((int)x_centroid, (int)y_centroid, src_index, Xmin, Xmax, Ymin, Ymax);
+								SOURCE_BOOLEAN_MAP[(int)x_centroid, (int)y_centroid] = true;
+								SOURCE_INDEX_MAP[(int)x_centroid, (int)y_centroid] = src_index;
 
-									//MAPSATURATIONISLAND((int)x_centroid, (int)y_centroid, src_index, Xmin, Xmax, Ymin, Ymax);
-									SOURCE_BOOLEAN_MAP[(int)x_centroid, (int)y_centroid] = true;
-									SOURCE_INDEX_MAP[(int)x_centroid, (int)y_centroid] = src_index;
+								src_index++;
+								N_SATURATED++;
+								Xs.Add(x_centroid);
+								Ys.Add(y_centroid);
+								Ks.Add(kernel_sum);
+								Ps.Add(IMAGE[x, y]/*pixel*/);
+								Bs.Add(0.0/*bg_est*/);
 
-									src_index++;
-									N_SATURATED++;
-									Xs.Add(x_centroid);
-									Ys.Add(y_centroid);
-									Ks.Add(kernel_sum);
-									Ps.Add(IMAGE[x, y]/*pixel*/);
-									Bs.Add(0.0/*bg_est*/);
+								if (SAVE_PS)
+								{
+									string file = SAVE_PS_FILENAME;
+									int ind = file.LastIndexOf(".");//for saving PS
+									file = String.Concat(file.Substring(0, ind), "_", Xs.Count.ToString("00000000"), ".fits");
 
-									if (SAVE_PS)
-									{
-										string file = SAVE_PS_FILENAME;
-										int ind = file.LastIndexOf(".");//for saving PS
-										file = String.Concat(file.Substring(0, ind), "_", Xs.Count.ToString("00000000"), ".fits");
-
-										JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
-										f.WriteImage(TypeCode.Double, false);
-									}
+									JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
+									f.WriteImage(TypeCode.Double, false);
 								}
 							}
 						}

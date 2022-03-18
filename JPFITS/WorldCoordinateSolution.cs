@@ -252,8 +252,8 @@ namespace JPFITS
 		{
 			EATHEADERFORWCS(header);
 
-			if (!WCSEXISTS)
-				throw new Exception("Error: WCS keywords not found in specified header '" + header + "'");
+			/*if (!WCSEXISTS)
+				throw new Exception("Error: WCS keywords not found in specified header '" + header + "'");*/
 		}
 
 		#endregion
