@@ -1135,14 +1135,6 @@ namespace JPFITS
 					}
 				}
 
-
-
-
-
-
-
-
-
 				//what is the closest gradient to get NRAintervals intervals on the RA axis
 				double raintervalhrs = raspan / NapproximateIntervals / 15;
 				double raintervalmin = raspan / NapproximateIntervals * 60 / 15;
