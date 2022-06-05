@@ -84,7 +84,7 @@
             this.HeaderContextCopyValuesList,
             this.HeaderContextInsertKeys});
 			this.HeaderContextMenu.Name = "HeaderContextMenu";
-			this.HeaderContextMenu.Size = new System.Drawing.Size(279, 148);
+			this.HeaderContextMenu.Size = new System.Drawing.Size(279, 170);
 			this.HeaderContextMenu.Opening += new System.ComponentModel.CancelEventHandler(this.HeaderContextMenu_Opening);
 			// 
 			// toolStripSeparator2
@@ -140,8 +140,8 @@
 			// 
 			this.CopyIncludeKeyNameHeaderChck.CheckOnClick = true;
 			this.CopyIncludeKeyNameHeaderChck.Name = "CopyIncludeKeyNameHeaderChck";
-			this.CopyIncludeKeyNameHeaderChck.Size = new System.Drawing.Size(211, 22);
-			this.CopyIncludeKeyNameHeaderChck.Text = "Include Key Name Header";
+			this.CopyIncludeKeyNameHeaderChck.Size = new System.Drawing.Size(224, 22);
+			this.CopyIncludeKeyNameHeaderChck.Text = "Include Key Name Header(s)";
 			this.CopyIncludeKeyNameHeaderChck.Click += new System.EventHandler(this.CopyIncludeKeyNameHeaderChck_Click);
 			// 
 			// HeaderContextInsertKeys

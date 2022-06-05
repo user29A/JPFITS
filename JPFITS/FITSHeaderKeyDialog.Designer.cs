@@ -46,7 +46,7 @@
 			this.KeyNameTxt.Location = new System.Drawing.Point(9, 31);
 			this.KeyNameTxt.MaxLength = 8;
 			this.KeyNameTxt.Name = "KeyNameTxt";
-			this.KeyNameTxt.Size = new System.Drawing.Size(56, 21);
+			this.KeyNameTxt.Size = new System.Drawing.Size(67, 21);
 			this.KeyNameTxt.TabIndex = 0;
 			this.KeyNameTxt.TextChanged += new System.EventHandler(this.KeyNameTxt_TextChanged);
 			// 
@@ -64,7 +64,7 @@
 			// 
 			this.label2.AutoSize = true;
 			this.label2.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Underline);
-			this.label2.Location = new System.Drawing.Point(68, 15);
+			this.label2.Location = new System.Drawing.Point(79, 15);
 			this.label2.Name = "label2";
 			this.label2.Size = new System.Drawing.Size(55, 13);
 			this.label2.TabIndex = 89;
@@ -73,7 +73,7 @@
 			// KeyValueTxt
 			// 
 			this.KeyValueTxt.Font = new System.Drawing.Font("Courier New", 9F);
-			this.KeyValueTxt.Location = new System.Drawing.Point(71, 31);
+			this.KeyValueTxt.Location = new System.Drawing.Point(82, 31);
 			this.KeyValueTxt.MaxLength = 18;
 			this.KeyValueTxt.Name = "KeyValueTxt";
 			this.KeyValueTxt.Size = new System.Drawing.Size(136, 21);
@@ -83,7 +83,7 @@
 			// KeyCommentTxt
 			// 
 			this.KeyCommentTxt.Font = new System.Drawing.Font("Courier New", 9F);
-			this.KeyCommentTxt.Location = new System.Drawing.Point(213, 31);
+			this.KeyCommentTxt.Location = new System.Drawing.Point(224, 31);
 			this.KeyCommentTxt.MaxLength = 48;
 			this.KeyCommentTxt.Name = "KeyCommentTxt";
 			this.KeyCommentTxt.Size = new System.Drawing.Size(347, 21);
@@ -93,7 +93,7 @@
 			// 
 			this.label3.AutoSize = true;
 			this.label3.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Underline);
-			this.label3.Location = new System.Drawing.Point(207, 15);
+			this.label3.Location = new System.Drawing.Point(221, 15);
 			this.label3.Name = "label3";
 			this.label3.Size = new System.Drawing.Size(72, 13);
 			this.label3.TabIndex = 90;
@@ -126,7 +126,7 @@
 			this.CommentKeyLineTxt.Location = new System.Drawing.Point(9, 31);
 			this.CommentKeyLineTxt.MaxLength = 80;
 			this.CommentKeyLineTxt.Name = "CommentKeyLineTxt";
-			this.CommentKeyLineTxt.Size = new System.Drawing.Size(550, 21);
+			this.CommentKeyLineTxt.Size = new System.Drawing.Size(562, 21);
 			this.CommentKeyLineTxt.TabIndex = 91;
 			this.CommentKeyLineTxt.Visible = false;
 			// 
@@ -147,7 +147,7 @@
 			this.AcceptButton = this.OKBtn;
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
 			this.CancelButton = this.CancelBtn;
-			this.ClientSize = new System.Drawing.Size(572, 94);
+			this.ClientSize = new System.Drawing.Size(583, 94);
 			this.ControlBox = false;
 			this.Controls.Add(this.CommentKeyLineChck);
 			this.Controls.Add(this.CancelBtn);

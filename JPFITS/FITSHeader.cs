@@ -55,6 +55,13 @@ namespace JPFITS
 				HEADERKEYS[i] = new FITSHeaderKey((string)headerlines[i]);
 		}
 
+		public FITSHeader(FITSHeader header)
+		{
+			HEADERKEYS = new JPFITS.FITSHeaderKey[header.Length];
+			for (int i = 0; i < HEADERKEYS.Length; i++)
+				HEADERKEYS[i] = new FITSHeaderKey(header[i].GetFullyFomattedFITSLine());
+		}
+
 		/// <summary>GetKeyName returns the key of the primary header line at index. Throws an exception if the index exceeds the number of header lines.</summary>
 		/// <param name="index">The zero-based line number to get the key name from.</param>
 		public string GetKeyName(int index)

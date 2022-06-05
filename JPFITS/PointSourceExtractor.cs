@@ -114,9 +114,11 @@ namespace JPFITS
 							if (SOURCE_BOOLEAN_MAP[x, y])
 								continue;
 
-							lock (SOURCE_BOOLEAN_MAP)//if (!SOURCE_BOOLEAN_MAP[x, y] && IMAGE[x, y] >= PIX_SAT)//isn't this redundant?
+							lock (SOURCE_BOOLEAN_MAP)
 							{
-								
+								if (SOURCE_BOOLEAN_MAP[x, y])
+									continue;
+
 								int Xmin = x, Xmax = x, Ymin = y, Ymax = y;
 								MAPSATURATIONISLAND(x, y, src_index, ref Xmin, ref Xmax, ref Ymin, ref Ymax);
 
@@ -125,42 +127,32 @@ namespace JPFITS
 									Xmin--;
 									Xmax++;
 								}
-								else if (!JPMath.IsEven(Xmax - Xmin))//544-543 = 1 = 2 pixels, so make odd number of pixels...with Xmax I guess
-									Xmax++;
 								if (Ymax - Ymin == 0)//single pixel, expand to 3 pixels
 								{
 									Ymin--;
 									Ymax++;
 								}
-								else if (!JPMath.IsEven(Ymax - Ymin))//544-543 = 1 = 2 pixels, so make odd number of pixels...with Xmax I guess
-									Ymax++;
 
 								double[,] kernel = new double[Xmax - Xmin + 1, Ymax - Ymin + 1];
-								double x_centroid = 0, y_centroid = 0, kernel_sum = 0;
+								double x_centroid = 0, y_centroid = 0, kernel_sum = 0, bg_est = 0;
 								for (int i = Xmin; i <= Xmax; i++)
 									for (int j = Ymin; j <= Ymax; j++)
 									{
 										kernel[i - Xmin, j - Ymin] = IMAGE[i, j];
 										x_centroid += (IMAGE[i, j] * (double)(i));
 										y_centroid += (IMAGE[i, j] * (double)(j));
-										kernel_sum += (IMAGE[i, j] /*- bg_est*/);
-										/*IMAGE_KERNEL_BOOL_SOURCE[i, j] = true;
-										IMAGE_KERNEL_INDEX_SOURCE[i, j] = src_index;*/
+										kernel_sum += (IMAGE[i, j] - bg_est);
 									}
 								x_centroid /= kernel_sum;
 								y_centroid /= kernel_sum;
-
-								//MAPSATURATIONISLAND((int)x_centroid, (int)y_centroid, src_index, Xmin, Xmax, Ymin, Ymax);
-								SOURCE_BOOLEAN_MAP[(int)x_centroid, (int)y_centroid] = true;
-								SOURCE_INDEX_MAP[(int)x_centroid, (int)y_centroid] = src_index;
 
 								src_index++;
 								N_SATURATED++;
 								Xs.Add(x_centroid);
 								Ys.Add(y_centroid);
 								Ks.Add(kernel_sum);
-								Ps.Add(IMAGE[x, y]/*pixel*/);
-								Bs.Add(0.0/*bg_est*/);
+								Ps.Add(IMAGE[x, y]);
+								Bs.Add(bg_est);
 
 								if (SAVE_PS)
 								{
@@ -239,10 +231,10 @@ namespace JPFITS
 								double sy = (double)(y - j);
 								double r2 = (sx2 + sy * sy) / SSEP2;
 
-								if (r2 > 1) //outside the source separation circle
+								if (r2 > 1)//outside the source separation circle
 									continue;
 
-								if (IMAGE[i, j] - bg_est > pixel) // max failure, the pixel isn't the maximum in the source separation circle
+								if (IMAGE[i, j] - bg_est > pixel)// max failure, the pixel isn't the maximum in the source separation circle
 								{
 									brek = true;
 									break;
@@ -251,7 +243,7 @@ namespace JPFITS
 								/*The minimum radial distance between two sources must be the SSR.
 								When another source is just over (one pixel, say) the SSR from[x, y], its Boolean map which is from the CKR will extend towards[x, y] so that its Boolean map extends within the SSR of[x, y].
 								Thus, it is OK to find some true values in the Boolean map from another source when exploring +-SSR from a given [x, y].
-								However, what wouldn’t be OK is if when exploring the SSR, another source’s Boolean/ index map extends to within less than half of the SSR of[x, y], 
+								However, what wouldn’t be OK is if when exploring the SSR, another source’s Boolean/index map extends to within less than half of the SSR of[x, y], 
 								because then there would be no way that the radial distance between[x, y] and the other source-center would be at least SSR.*/
 								if (r2 < 0.25 && SOURCE_BOOLEAN_MAP[i, j]) //a source was already found within the source separation
 								{
@@ -265,27 +257,23 @@ namespace JPFITS
 						if (brek)
 							continue;
 
-						//if got to here then x,y is a possible source depending on total sum of kernel
-						double[,] kernel = GetKernel(IMAGE, x, y, KERNEL_RADIUS);
-						double kernel_sum = JPMath.Sum(kernel, false) - (double)(KERNEL_WIDTH * KERNEL_WIDTH) * bg_est;//square kernel sum
-
-						/////do PSF kernel sum????????????????????????????????????????????????????????
-						/*double kernel_psf_sum = 0, n_psf_pixels = 0;
+						//do PSF kernel sum
+						double kernel_psf_sum = 0, n_psf_pixels = 0;
 						for (int i = x - KERNEL_RADIUS; i <= x + KERNEL_RADIUS; i++)
 							for (int j = y - KERNEL_RADIUS; j <= y + KERNEL_RADIUS; j++)
 							{
-								double r2 = double((i - x) * (i - x) + (j - y) * (j - y));
+								double r2 = (double)((i - x) * (i - x) + (j - y) * (j - y));
 								if (r2 > KRAD2)
 									continue;
 
 								kernel_psf_sum += IMAGE[i, j];
 								n_psf_pixels++;
 							}
-						kernel_psf_sum -= (bg_est * n_psf_pixels);*/
+						kernel_psf_sum -= (bg_est * n_psf_pixels);
 
 						if (!THRESHHOLDS_AS_SN)
 						{
-							if (kernel_sum < KERNEL_MIN || kernel_sum > KERNEL_MAX)
+							if (kernel_psf_sum < KERNEL_MIN || kernel_psf_sum > KERNEL_MAX)
 								continue;
 						}
 						else//check as S/N
@@ -295,28 +283,31 @@ namespace JPFITS
 								Nbg = Math.Sqrt((double)(KERNEL_WIDTH * KERNEL_WIDTH));
 							else
 								Nbg = Math.Sqrt(bg_est * (double)(KERNEL_WIDTH * KERNEL_WIDTH));
-							double SNenergy = kernel_sum / Nbg;
-							if (kernel_sum < KERNEL_MIN || kernel_sum > KERNEL_MAX)
+							double SNenergy = kernel_psf_sum / Nbg;
+							if (kernel_psf_sum < KERNEL_MIN || kernel_psf_sum > KERNEL_MAX)
 								continue;
 						}
 
 						//if got to here then must centroid at this pixel
-						double x_centroid, y_centroid;
-						int[] xdata = new int[(KERNEL_WIDTH)];
-						int[] ydata = new int[(KERNEL_WIDTH)];
-						for (int i = -KERNEL_RADIUS; i <= KERNEL_RADIUS; i++)
+						lock (SOURCE_BOOLEAN_MAP)
 						{
-							xdata[i + KERNEL_RADIUS] = x + i;
-							ydata[i + KERNEL_RADIUS] = y + i;
-						}
-						kernel = JPMath.MatrixSubScalar(kernel, bg_est, false);
-						Centroid(xdata, ydata, kernel, out x_centroid, out y_centroid);
+							if (SOURCE_BOOLEAN_MAP[x, y])
+								continue;
 
-						int r_x_cent = (int)Math.Round(x_centroid);
-						int r_y_cent = (int)Math.Round(y_centroid);
+							double x_centroid, y_centroid;
+							int[] xdata = new int[(KERNEL_WIDTH)];
+							int[] ydata = new int[(KERNEL_WIDTH)];
+							for (int i = -KERNEL_RADIUS; i <= KERNEL_RADIUS; i++)
+							{
+								xdata[i + KERNEL_RADIUS] = x + i;
+								ydata[i + KERNEL_RADIUS] = y + i;
+							}
+							double[,] kernel = JPMath.MatrixSubScalar(GetKernel(IMAGE, x, y, KERNEL_RADIUS), bg_est, false);
+							Centroid(xdata, ydata, kernel, out x_centroid, out y_centroid);
 
-						lock(SOURCE_BOOLEAN_MAP)
-						{
+							int r_x_cent = (int)Math.Round(x_centroid);
+							int r_y_cent = (int)Math.Round(y_centroid);						
+
 							for (int ii = r_x_cent - KERNEL_RADIUS; ii <= r_x_cent + KERNEL_RADIUS; ii++)
 							{
 								double sx2 = (double)(r_x_cent - ii);
@@ -339,7 +330,7 @@ namespace JPFITS
 							src_index++;
 							Xs.Add(x_centroid);
 							Ys.Add(y_centroid);
-							Ks.Add(kernel_sum);
+							Ks.Add(kernel_psf_sum);
 							Ps.Add(pixel);
 							Bs.Add(bg_est);
 
@@ -370,7 +361,7 @@ namespace JPFITS
 					CENTROIDS_AMPLITUDE[i] = Convert.ToDouble(Ps[i]);
 					CENTROIDS_VOLUME[i] = Convert.ToDouble(Ks[i]);
 					CENTROIDS_BGESTIMATE[i] = Convert.ToDouble(Bs[i]);
-					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
+					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 				}
 				return;
 			}
@@ -662,7 +653,7 @@ namespace JPFITS
 		[MethodImpl(256)]
 		private bool SAFETOMAPSATURATION(int x, int y)
 		{
-			return (x >= 0) && (x < IMAGEWIDTH) && (y >= 0) && (y < IMAGEHEIGHT) && (IMAGE[x, y] > PIX_SAT) && /*!SOURCE_BOOLEAN_MAP[x, y]*/ (SOURCE_INDEX_MAP[x, y] == -1);
+			return (x >= 0) && (x < IMAGEWIDTH) && (y >= 0) && (y < IMAGEHEIGHT) && (IMAGE[x, y] > PIX_SAT) && /*!SOURCE_BOOLEAN_MAP[x, y] &&*/ (SOURCE_INDEX_MAP[x, y] == -1);
 		}
 
 		[MethodImpl(256)]
@@ -803,7 +794,7 @@ namespace JPFITS
 				N_SRC = CENTROIDS_X.Length;
 				CENTROID_POINTS = new JPMath.PointD[(N_SRC)];
 				for (int i = 0; i < N_SRC; i++)
-					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
+					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 			}
 		}
 
@@ -817,7 +808,7 @@ namespace JPFITS
 				N_SRC = CENTROIDS_Y.Length;
 				CENTROID_POINTS = new JPMath.PointD[(N_SRC)];
 				for (int i = 0; i < N_SRC; i++)
-					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
+					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 			}
 		}
 
@@ -1034,27 +1025,16 @@ namespace JPFITS
 			SAVE_PS = kernel_filename_template != "";
 			SAVE_PS_FILENAME = kernel_filename_template;
 			IMAGE = image;
-			//IMAGE_KERNEL_BOOL_SOURCE = new array<bool, 2>(IMAGE.GetLength(0), IMAGE.GetLength(1));
 			FITTED = false;
-
-			int HW = KERNEL_RADIUS;
 
 			Parallel.For(0, N_SRC, i =>
 			{
 				double[,] kernel = GetKernel(image, (int)XCoords[i], (int)YCoords[i], KERNEL_RADIUS);
-				/*int xmax, ymax;
-				JPMath.Max(kernel, xmax, ymax);
-				if (xmax != KERNEL_RADIUS || ymax != KERNEL_RADIUS)
-				{
-					XCoords[i] += double(xmax - KERNEL_RADIUS);
-					YCoords[i] += double(ymax - KERNEL_RADIUS);
-					kernel = GetKernel(image, (int)XCoords[i], (int)YCoords[i], KERNEL_RADIUS);
-				}*/
 
 				double bg_est = 0;//default
 				if (AUTO_BG)
 				{
-					bg_est = ESTIMATELOCALBACKGROUND((int)XCoords[i], (int)YCoords[i], HW);
+					bg_est = ESTIMATELOCALBACKGROUND((int)XCoords[i], (int)YCoords[i], KERNEL_RADIUS);
 					kernel = JPMath.MatrixAddScalar(kernel, -bg_est, false);
 				}
 
@@ -1062,8 +1042,8 @@ namespace JPFITS
 				double[] ycoords = new double[(KERNEL_WIDTH)];// y coords
 				for (int j = 0; j < KERNEL_WIDTH; j++)
 				{
-					xcoords[j] = (double)((int)XCoords[i] - HW + j);
-					ycoords[j] = (double)((int)YCoords[i] - HW + j);
+					xcoords[j] = (double)((int)XCoords[i] - KERNEL_RADIUS + j);
+					ycoords[j] = (double)((int)YCoords[i] - KERNEL_RADIUS + j);
 				}
 
 				double xweighted = 0, yweighted = 0;
@@ -1081,7 +1061,7 @@ namespace JPFITS
 				CENTROIDS_VOLUME[i] = kernel_sum;
 				CENTROIDS_AMPLITUDE[i] = kernel[KERNEL_RADIUS, KERNEL_RADIUS];
 				CENTROIDS_BGESTIMATE[i] = bg_est;
-				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
+				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 
 				if (SAVE_PS)
 				{
@@ -1095,61 +1075,98 @@ namespace JPFITS
 			});
 		}
 
+		///// <summary>Attempt to find N strongest sources in an image.</summary>
+		///// <param name="N">The number of strongest sources to try to find.</param>
+		///// <param name="image">The 2D image array to find sources in.</param>
+		///// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
+		///// <param name="pix_min">The minimum pixel threshold value (or SN) to consider a potential source.</param>
+		///// <param name="pix_max">The maximum pixel threshold value (or SN) to consider a potential source.</param>
+		///// <param name="kernel_min">The minimum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
+		///// <param name="kernel_max">The maximum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
+		///// <param name="threshholds_as_SN">Treat the thresholds as Signal to Noise instead of pixel values.</param>
+		///// <param name="kernel_radius">The radius (pixels) of the kernel to find sources within. Secondary sources within the radius will be ignored.</param>
+		///// <param name="source_separation">The separation (pixels) between sources. Only the brightest source within the separation radius is kept.</param>
+		///// <param name="auto_background">Automatically determine the local background for potential sources.  Not required if background is known to be zeroed, but should have no effect if used in this case.</param>
+		///// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
+		///// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
+		///// <param name="show_waitbar">Show a cancellable wait bar.</param>
+		//public void Extract_Attempt_N_Sources(int N, double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar)
+		//{
+		//	//JPFITS.FITSImage^ FITS = new FITSImage("", image, true, true);
+
+		//	double immax = JPMath.Max(image, true);
+		//	double pixthresh = immax / 16;
+		//	double div = 2;
+		//	double amp = pixthresh;
+		//	int PSEiters = 0;
+		//	int maxPSEiters = 20;
+		//	int nPSEpts_min = N;
+		//	int nPSEpts_max = N + 1;
+		//	while (this.N_Sources < nPSEpts_min || this.N_Sources > nPSEpts_max)
+		//	{
+		//		PSEiters++;
+		//		if (PSEiters > maxPSEiters)
+		//			break;
+
+		//		if (this.N_SaturatedSources >= nPSEpts_min)
+		//			break;
+
+		//		if (this.N_Sources >= nPSEpts_min)
+		//			break;
+
+		//		Extract_Sources(image, pix_saturation, pixthresh, pix_max, kernel_min, kernel_max, threshholds_as_SN, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar);
+
+		//		if (this.N_Sources < nPSEpts_min)
+		//			pixthresh -= amp / div;
+		//		if (this.N_Sources > nPSEpts_max)
+		//			pixthresh += amp / div;
+		//		div *= 2;
+
+		//		if (pixthresh < pix_min)
+		//		{
+		//			Extract_Sources(image, pix_saturation, pix_min, pix_max, kernel_min, kernel_max, threshholds_as_SN, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar);
+		//			break;
+		//		}
+		//	}
+		//	if (this.N_Sources > nPSEpts_min)
+		//		this.ClipToNBrightest(nPSEpts_min);
+		//}
+
 		/// <summary>Attempt to find N strongest sources in an image.</summary>
-		/// <param name="N">The number of strongest sources to try to find.</param>
+		/// <param name="nBrightestSources">The number of strongest sources to try to find.</param>
 		/// <param name="image">The 2D image array to find sources in.</param>
 		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
-		/// <param name="pix_min">The minimum pixel threshold value (or SN) to consider a potential source.</param>
-		/// <param name="pix_max">The maximum pixel threshold value (or SN) to consider a potential source.</param>
-		/// <param name="kernel_min">The minimum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
-		/// <param name="kernel_max">The maximum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
-		/// <param name="threshholds_as_SN">Treat the thresholds as Signal to Noise instead of pixel values.</param>
 		/// <param name="kernel_radius">The radius (pixels) of the kernel to find sources within. Secondary sources within the radius will be ignored.</param>
 		/// <param name="source_separation">The separation (pixels) between sources. Only the brightest source within the separation radius is kept.</param>
 		/// <param name="auto_background">Automatically determine the local background for potential sources.  Not required if background is known to be zeroed, but should have no effect if used in this case.</param>
 		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
 		/// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
 		/// <param name="show_waitbar">Show a cancellable wait bar.</param>
-		public void Extract_Attempt_N_Sources(int N, double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar)
+		//public void Extract_Attempt_N_Sources(int N, double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar)
+		public void Extract_Attempt_NBrightestSources(int nBrightestSources, double[,] image, double pix_saturation, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar, out int niters)
 		{
-			//JPFITS.FITSImage^ FITS = new FITSImage("", image, true, true);
-
 			double immax = JPMath.Max(image, true);
-			double pixthresh = immax / 16;
-			double div = 2;
-			double amp = pixthresh;
-			int PSEiters = 0;
-			int maxPSEiters = 20;
-			int nPSEpts_min = N;
-			int nPSEpts_max = N + 1;
-			while (this.N_Sources < nPSEpts_min || this.N_Sources > nPSEpts_max)
+			double immed = JPMath.Median(image);
+			double imamp = immax - immed;
+			double div = 8;
+			double pixthresh = imamp / div + immed;
+			niters = 0;
+			int maxiters = 11;
+
+			while (this.N_Sources != nBrightestSources && niters <= maxiters)
 			{
-				PSEiters++;
-				if (PSEiters > maxPSEiters)
+				niters++;
+
+				Extract_Sources(image, pix_saturation, pixthresh, Double.MaxValue, 0, Double.MaxValue, false, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar);
+
+				if (this.N_Sources >= nBrightestSources)
 					break;
 
-				if (this.N_SaturatedSources >= nPSEpts_min)
-					break;
-
-				if (this.N_Sources >= nPSEpts_min)
-					break;
-
-				Extract_Sources(image, pix_saturation, pixthresh, pix_max, kernel_min, kernel_max, threshholds_as_SN, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar);
-
-				if (this.N_Sources < nPSEpts_min)
-					pixthresh -= amp / div;
-				if (this.N_Sources > nPSEpts_max)
-					pixthresh += amp / div;
 				div *= 2;
-
-				if (pixthresh < pix_min)
-				{
-					Extract_Sources(image, pix_saturation, pix_min, pix_max, kernel_min, kernel_max, threshholds_as_SN, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar);
-					break;
-				}
+				pixthresh = imamp / div + immed;
 			}
-			if (this.N_Sources > nPSEpts_min)
-				this.ClipToNBrightest(nPSEpts_min);
+			if (this.N_Sources > nBrightestSources)
+				this.ClipToNBrightest(nBrightestSources);
 		}
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
@@ -1332,11 +1349,7 @@ namespace JPFITS
 
 			int[] indices = new int[N_SRC];
 			for (int i = 0; i < N_SRC; i++)
-			{
-				indices[i] = i; //IMAGE_KERNEL_INDEX_SOURCE[(int)CENTROIDS_X[i], (int)CENTROIDS_Y[i]];
-				if (indices[i] == -1)
-					MessageBox.Show("-1 a " + CENTROIDS_X[i] + " " + Math.Round(CENTROIDS_X[i]) + " " + CENTROIDS_Y[i] + " " + Math.Round(CENTROIDS_Y[i]));
-			}
+				indices[i] = i;
 
 			Array.Sort(volkey, indices);//by increasing brightness
 			Array.Reverse(indices);//by decreasing brightness; now all location at indices at index >= NBright are no longer wanted
@@ -1353,8 +1366,8 @@ namespace JPFITS
 				CENTROIDS_Y[i] = CENTROIDS_Y[indices[i]];
 				CENTROIDS_Y[indices[i]] = dum;
 
-				REMAP((int)(CENTROIDS_X[i]), (int)(CENTROIDS_Y[i]), indices[i], i);
-				REMAP((int)(CENTROIDS_X[indices[i]]), (int)(CENTROIDS_Y[indices[i]]), i, indices[i]);
+				REMAP((int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i]), indices[i], i);
+				REMAP((int)Math.Round(CENTROIDS_X[indices[i]]), (int)Math.Round(CENTROIDS_Y[indices[i]]), i, indices[i]);
 
 				dum = FITS_X[i];
 				FITS_X[i] = FITS_X[indices[i]];
@@ -1438,7 +1451,7 @@ namespace JPFITS
 			}
 
 			for (int i = NBright; i < N_SRC; i++)//all location at indices[i] where i >= NBright are no longer wanted
-				DEMAP((int)CENTROIDS_X[i], (int)CENTROIDS_Y[i], SOURCE_INDEX_MAP[(int)CENTROIDS_X[i], (int)CENTROIDS_Y[i]]);
+				DEMAP((int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i]), SOURCE_INDEX_MAP[(int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i])]);
 
 			Array.Resize(ref CENTROIDS_X, NBright);
 			Array.Resize(ref CENTROIDS_Y, NBright);
@@ -1466,7 +1479,7 @@ namespace JPFITS
 
 			CENTROID_POINTS = new JPMath.PointD[N_SRC];
 			for (int i = 0; i < N_SRC; i++)
-				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
+				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 
 			/*JPFITS.FITSImage^ ff = new FITSImage("C:\\Users\\Joseph E Postma\\Desktop\\test.fits", IMAGE_KERNEL_INDEX_SOURCE, false);
 			ff.WriteFile(TypeCode.Int32);*/
@@ -1749,7 +1762,7 @@ namespace JPFITS
 
 			CENTROID_POINTS = new JPMath.PointD[N_SRC];
 			for (int i = 0; i < N_SRC; i++)
-				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_AMPLITUDE[i]);
+				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 
 			if (BinTablePSE.TTYPEEntryExists("PSE RA (deg)"))
 				CENTROIDS_RA_DEG = BinTablePSE.GetTTYPEEntry("PSE RA (deg)");
@@ -1772,3 +1785,4 @@ namespace JPFITS
 		#endregion
 	}
 }
+

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
 using System.IO;
 using System.Windows.Forms;
@@ -56,9 +57,9 @@ namespace JPFITS
 			}
 			CD1_1 = Convert.ToDouble(header[(int)Math.Round(CD1_1)].Value);
 
-			CTYPEN = new string[(2)];
-			CRPIXN = new double[(2)];
-			CRVALN = new double[(2)];
+			CTYPEN = new string[2];
+			CRPIXN = new double[2];
+			CRVALN = new double[2];
 
 			Parallel.Invoke(
 				() => CTYPEN[0] = header.GetKeyValue("CTYPE1"),
@@ -79,7 +80,7 @@ namespace JPFITS
 			CDMATRIX[1, 1] = CD2_2;
 			SET_CDMATRIXINV();
 
-			CDELTN = new double[(2)];
+			CDELTN = new double[2];
 			CDELTN[0] = Math.Sqrt(CD1_1 * CD1_1 + CD1_2 * CD1_2) * 3600;
 			CDELTN[1] = Math.Sqrt(CD2_1 * CD2_1 + CD2_2 * CD2_2) * 3600;
 
@@ -228,13 +229,6 @@ namespace JPFITS
 				ind = header.GetKeyIndex("WCD2_" + i.ToString("000"), false);
 				if (ind != -1)
 					DVAL2[i - 1] = Convert.ToDouble(header[ind].Value);
-
-				/*CPIX1[i - 1] = Convert.ToDouble(header.GetKeyValue("WCP1_" + i.ToString("000")));
-				CPIX2[i - 1] = Convert.ToDouble(header.GetKeyValue("WCP2_" + i.ToString("000")));
-				CVAL1[i - 1] = Convert.ToDouble(header.GetKeyValue("WCV1_" + i.ToString("000")));
-				CVAL2[i - 1] = Convert.ToDouble(header.GetKeyValue("WCV2_" + i.ToString("000")));
-				DVAL1[i - 1] = Convert.ToDouble(header.GetKeyValue("WCD1_" + i.ToString("000")));
-				DVAL2[i - 1] = Convert.ToDouble(header.GetKeyValue("WCD2_" + i.ToString("000")));*/
 			});
 		}
 
@@ -254,6 +248,44 @@ namespace JPFITS
 
 			/*if (!WCSEXISTS)
 				throw new Exception("Error: WCS keywords not found in specified header '" + header + "'");*/
+		}
+
+		public WorldCoordinateSolution(double cdelt, int imageWidth, int imageHeight, double crvalRA, double crvalDec)
+		{
+			CTYPEN = new string[2];
+			CTYPEN[0] = "RA---TAN";
+			CTYPEN[1] = "DEC--TAN";
+
+			CDELTN = new double[2];
+			CDELTN[0] = cdelt;
+			CDELTN[1] = cdelt;
+
+			CRPIXN = new double[2];
+			CRPIXN[0] = (double)imageWidth / 2;
+			CRPIXN[1] = (double)imageHeight / 2;
+
+			CRVALN = new double[2];
+			CRVALN[0] = crvalRA;
+			CRVALN[1] = crvalDec;
+
+			CDMATRIX = new double[2, 2];
+			CDMATRIX[0, 0] = -cdelt / 3600;
+			CDMATRIX[1, 0] = 0;
+			CDMATRIX[0, 1] = 0;
+			CDMATRIX[1, 1] = -cdelt / 3600;
+
+			CD1_1 = CDMATRIX[0, 0];
+			CD1_2 = CDMATRIX[1, 0];
+			CD2_1 = CDMATRIX[0, 1];
+			CD2_2 = CDMATRIX[1, 1];
+
+			CROTAN = new double[2];
+			CROTAN[0] = 0;
+			CROTAN[1] = 0;
+
+			SET_CDMATRIXINV();
+
+			WCSEXISTS = true;
 		}
 
 		#endregion
@@ -344,12 +376,11 @@ namespace JPFITS
 		#endregion
 
 		#region MEMBERS
-		/// <summary>Invalidates the existing grid so that it can be updated for new display settings.</summary>
-		public void Grid_Invalidate()
+		/// <summary>Recomputes the existing grid so that it can be updated for new display settings.</summary>
+		public void Grid_Refresh()
 		{
 			VALIDWCSGRIDLINES = false;
-
-		}		
+		}
 
 		/// <summary>Gets the one-based row-major element from the CD matrix CDi_j[int i, int j], where i is the row index, and j is the column index.</summary>
 		public double GetCDi_j(int i, int j)
@@ -450,7 +481,7 @@ namespace JPFITS
 		public string GetCTYPEn(int coordinate_Axis)
 		{
 			return CTYPEN[coordinate_Axis - 1];
-		}		
+		}
 
 		/// <summary>Solves the projection parameters for a given list of pixel and coordinate values. Pass nullptr for FITS if writing WCS parameters to a primary header not required.</summary>
 		/// <param name="WCS_Type">The world coordinate solution type. For example: TAN, for tangent-plane or Gnomic projection. Only TAN is currently supported.</param>
@@ -472,12 +503,12 @@ namespace JPFITS
 			CTYPEN[0] = "RA---" + WCS_Type;
 			CTYPEN[1] = "DEC--" + WCS_Type;
 
-			CPIX1 = new double[(X_pix.Length)];
-			CPIX2 = new double[(X_pix.Length)];
-			CVAL1 = new double[(X_pix.Length)];
-			CVAL2 = new double[(X_pix.Length)];
-			DVAL1 = new double[(X_pix.Length)];
-			DVAL2 = new double[(X_pix.Length)];
+			CPIX1 = new double[X_pix.Length];
+			CPIX2 = new double[X_pix.Length];
+			CVAL1 = new double[X_pix.Length];
+			CVAL2 = new double[X_pix.Length];
+			DVAL1 = new double[X_pix.Length];
+			DVAL2 = new double[X_pix.Length];
 			for (int i = 0; i < X_pix.Length; i++)
 			{
 				CPIX1[i] = X_pix[i];
@@ -490,15 +521,15 @@ namespace JPFITS
 				CVAL1[i] = cval1[i];
 				CVAL2[i] = cval2[i];
 			}
-			CRPIXN = new double[(2)];
-			CRVALN = new double[(2)];
+			CRPIXN = new double[2];
+			CRVALN = new double[2];
 			CRPIXN[0] = JPMath.Mean(CPIX1, true);//fix this in the fit boundaries? - NO...let it get the best one...but they should be close
 			CRPIXN[1] = JPMath.Mean(CPIX2, true);//fix this in the fit boundaries? - NO...let it get the best one...but they should be close
 			CRVALN[0] = JPMath.Mean(CVAL1, true);//these are fixed as the coordinate reference value
 			CRVALN[1] = JPMath.Mean(CVAL2, true);//these are fixed as the coordinate reference value
 
-			double[] X_intrmdt = new double[(CPIX1.Length)];//intermediate coords (degrees)
-			double[] Y_intrmdt = new double[(CPIX1.Length)];//intermediate coords (degrees)
+			double[] X_intrmdt = new double[CPIX1.Length];//intermediate coords (degrees)
+			double[] Y_intrmdt = new double[CPIX1.Length];//intermediate coords (degrees)
 			double a0 = CRVALN[0] * Math.PI / 180, d0 = CRVALN[1] * Math.PI / 180, a, d;
 			for (int i = 0; i < CPIX1.Length; i++)
 			{
@@ -513,10 +544,10 @@ namespace JPFITS
 				}
 			}
 
-			double[] P0 = new double[(6)] { 0, 0, 0, 0, CRPIXN[0], CRPIXN[1] };
-			double[] plb = new double[(6)] { -0.1, -0.1, -0.1, -0.1, JPMath.Min(CPIX1, false), JPMath.Min(CPIX2, false) };
-			double[] pub = new double[(6)] { 0.1, 0.1, 0.1, 0.1, JPMath.Max(CPIX1, false), JPMath.Max(CPIX2, false) };
-			double[] scale = new double[(6)] { 1e-6, 1e-6, 1e-6, 1e-6, JPMath.Mean(CPIX1, true), JPMath.Mean(CPIX2, true) };
+			double[] P0 = new double[6] { 0, 0, 0, 0, CRPIXN[0], CRPIXN[1] };
+			double[] plb = new double[6] { -0.1, -0.1, -0.1, -0.1, JPMath.Min(CPIX1, false), JPMath.Min(CPIX2, false) };
+			double[] pub = new double[6] { 0.1, 0.1, 0.1, 0.1, JPMath.Max(CPIX1, false), JPMath.Max(CPIX2, false) };
+			double[] scale = new double[6] { 1e-6, 1e-6, 1e-6, 1e-6, JPMath.Mean(CPIX1, true), JPMath.Mean(CPIX2, true) };
 			JPMath.Fit_WCSTransform2d(X_intrmdt, Y_intrmdt, CPIX1, CPIX2, ref P0, plb, pub, scale);
 
 			CDMATRIX = new double[2, 2];
@@ -531,7 +562,7 @@ namespace JPFITS
 			CD2_1 = CDMATRIX[0, 1];
 			CD2_2 = CDMATRIX[1, 1];
 
-			CDELTN = new double[(2)];
+			CDELTN = new double[2];
 			CDELTN[0] = Math.Sqrt(CD1_1 * CD1_1 + CD1_2 * CD1_2) * 3600;
 			CDELTN[1] = Math.Sqrt(CD2_1 * CD2_1 + CD2_2 * CD2_2) * 3600;
 
@@ -541,8 +572,8 @@ namespace JPFITS
 
 			SET_CDMATRIXINV();
 
-			double[] dxpix = new double[(CPIX1.Length)];
-			double[] dypix = new double[(CPIX1.Length)];
+			double[] dxpix = new double[CPIX1.Length];
+			double[] dypix = new double[CPIX1.Length];
 			double xpix, ypix;
 			for (int i = 0; i < CPIX1.Length; i++)
 			{
@@ -583,8 +614,6 @@ namespace JPFITS
 			CCVALD2 = ccvald2;
 			CCVALS1 = ccvals1;
 			CCVALS2 = ccvals2;
-
-			//MAKEDISPLAYLINES((int)width, (int)height);
 
 			Clear(header);
 			this.CopyTo(header);
@@ -908,63 +937,160 @@ namespace JPFITS
 			return WCSEXISTS;
 		}
 
+		public void Grid_DrawWCSGrid(System.Windows.Forms.PictureBox pictureBox, PaintEventArgs e)
+		{
+			if (!WCSEXISTS)
+				return;
+
+			System.Drawing.Drawing2D.LinearGradientBrush lgbr;
+			Pen RApen;
+			for (int i = 0; i < this.Grid_RightAscensionPoints.Length; i++)
+			{
+				float xbb = this.Grid_RightAscensionPoints[i][0].X;
+				float xtt = this.Grid_RightAscensionPoints[i][this.Grid_RightAscensionPoints[i].Length - 1].X;
+				float ybb = this.Grid_RightAscensionPoints[i][0].Y;
+				float ytt = this.Grid_RightAscensionPoints[i][this.Grid_RightAscensionPoints[i].Length - 1].Y;
+
+				lgbr = new System.Drawing.Drawing2D.LinearGradientBrush(this.Grid_RightAscensionPoints[i][0], this.Grid_RightAscensionPoints[i][this.Grid_RightAscensionPoints[i].Length - 1], Color.Red, Color.Blue);
+				RApen = new System.Drawing.Pen(lgbr);
+
+				e.Graphics.DrawCurve(RApen, this.Grid_RightAscensionPoints[i]);
+			}
+
+			Pen IMAGEWINDOWPEN = new Pen(Color.FromArgb(175, Color.Green));
+			for (int i = 0; i < this.Grid_DeclinationPoints.Length; i++)
+				e.Graphics.DrawCurve(IMAGEWINDOWPEN, this.Grid_DeclinationPoints[i]);
+
+			Brush IMAGEWINDOWBRUSH = new SolidBrush(Color.FromArgb(175, Color.Red));
+			for (int i = 0; i < this.Grid_RightAscensionLabels.Length; i++)
+			{
+				PointF pnt = this.Grid_RightAscensionLabelLocations[i];
+				float angle = -(float)(this.GetCROTAn(1) - 90);
+				if (this.GetCROTAn(1) < 0)
+					angle += 180;
+				DrawRotatedTextAt(e.Graphics, angle, this.Grid_RightAscensionLabels[i], pnt, new Font("Microsoft Sans Serif", 14.0f, FontStyle.Bold), IMAGEWINDOWBRUSH);
+			}
+
+			IMAGEWINDOWBRUSH = new SolidBrush(Color.FromArgb(175, Color.Green));
+			for (int i = 0; i < this.Grid_DeclinationLabels.Length; i++)
+			{
+				PointF pnt = this.Grid_DeclinationLabelLocations[i];
+				float angle = -(float)(this.GetCROTAn(1));
+				if (this.GetCROTAn(1) < -90)
+					angle += 180;
+				DrawRotatedTextAt(e.Graphics, angle, this.Grid_DeclinationLabels[i], pnt, new Font("Microsoft Sans Serif", 14.0f, FontStyle.Bold), IMAGEWINDOWBRUSH);
+			}
+		}
+
+		void DrawRotatedTextAt(Graphics gr, float angle, string txt, PointF point, Font the_font, Brush the_brush)
+		{
+			// Save the graphics state.
+			GraphicsState state = gr.Save();
+			gr.ResetTransform();
+
+			// Rotate.
+			gr.RotateTransform(angle);
+
+			// Translate to desired position. Be sure to append
+			// the rotation so it occurs after the rotation.
+			gr.TranslateTransform(point.X, point.Y, MatrixOrder.Append);
+
+			// Draw the text at the origin.
+			gr.DrawString(txt, the_font, the_brush, 0, 0);
+
+			// Restore the graphics state.
+			gr.Restore(state);
+		}
+
 		/// <summary>Generates arrays of PointF arrays which represent grid lines in Right Ascension and Declination.
 		/// <para>The lines are accessed via Grid_RightAscensionPoints and Grid_DeclinationPoints.</para>
 		/// <para>The sexagesimal labels for each grid line are accessed via Grid_RightAscensionLabels and Grid_DeclinationLabels.</para></summary>
 		/// <param name="imagepixels_width">Image pixels width.</param>
 		/// <param name="imagepixels_height">Image pixels height.</param>
-		/// <param name="xscale">Window pixels per image pixel.</param>
-		/// <param name="yscale">Window pixels per image pixel.</param>
-		public void Grid_MakeWCSGrid(int imagepixels_width, int imagepixels_height, float xscale, float yscale)
+		/// <param name="windowpixels_width">Window pixels width.</param>
+		/// <param name="windowpixels_height">Window pixels height.</param>
+		/// <param name="NapproximateIntervals">Approximate number of intervals in the grid. Suggest 7. Minimum 3.</param>
+		public void Grid_MakeWCSGrid(int imagepixels_width, int imagepixels_height, int windowpixels_width, int windowpixels_height, int NapproximateIntervals)
 		{
+			if (NapproximateIntervals < 3)
+				throw new Exception("Minimum number of grid intervals is 3...you passed: " + NapproximateIntervals);
+
 			if (VALIDWCSGRIDLINES)
 				return;
 			VALIDWCSGRIDLINES = true;
 
 			try
 			{
+				float xscale = (float)windowpixels_width / (float)imagepixels_width;
+				float yscale = (float)windowpixels_height / (float)imagepixels_height;
 				double x, y;
 				string sexx, sexy;
 
 				double fieldcenterRA, fieldcenterDEC;
 				Get_Coordinate((double)imagepixels_width / 2, (double)imagepixels_height / 2, false, "TAN", out fieldcenterRA, out fieldcenterDEC);
 
-				double[] perimeterX = new double[2 * imagepixels_width + 2 * imagepixels_height];
-				double[] perimeterY = new double[2 * imagepixels_width + 2 * imagepixels_height];
-				for (int i = 0; i < imagepixels_width; i++)
+				bool poleinsidepos = false;
+				bool poleinsideneg = false;
+				Get_Pixel(0, 90, "TAN", out x, out y, true);
+				if (x > 0 && y > 0 && x < imagepixels_width && y < imagepixels_height)
+					poleinsidepos = true;
+				if (!poleinsidepos)
 				{
-					perimeterX[i] = (double)i;
-					perimeterY[i] = 0;
+					Get_Pixel(0, -90, "TAN", out x, out y, true);
+					if (x > 0 && y > 0 && x < imagepixels_width && y < imagepixels_height)
+						poleinsideneg = true;
 				}
-				for (int i = imagepixels_width; i < 2 * imagepixels_width; i++)
-				{
-					perimeterX[i] = (double)(i - imagepixels_width);
-					perimeterY[i] = (double)imagepixels_height - 1;
-				}
-				for (int i = 2 * imagepixels_width; i < 2 * imagepixels_width + imagepixels_height; i++)
-				{
-					perimeterX[i] = 0;
-					perimeterY[i] = (double)(i - 2 * imagepixels_width);
-				}
-				for (int i = 2 * imagepixels_width + imagepixels_height; i < 2 * imagepixels_width + 2 * imagepixels_height; i++)
-				{
-					perimeterX[i] = (double)imagepixels_width - 1;
-					perimeterY[i] = (double)(i - 2 * imagepixels_width - imagepixels_height);
-				}
-				double[] perimterRA;
-				double[] perimterDE;
-				Get_Coordinates(perimeterX, perimeterY, true, "TAN", out perimterRA, out perimterDE);
-				double minRA, maxRA, minDE, maxDE;
-				JPMath.MinMax(perimterRA, out minRA, out maxRA, false);
-				JPMath.MinMax(perimterDE, out minDE, out maxDE, false);
-				double raspan = (maxRA - minRA);
-				double despan = (maxDE - minDE);
 
-				int NDecintervals = 7;
+				//top left, top middle, top right, middle left, middle right, bottom left, bottom middle, bottom right
+				double[] crosscornersX = new double[8] { 1, imagepixels_width / 2, imagepixels_width, 1, imagepixels_width, 1, imagepixels_width / 2, imagepixels_width };
+				double[] crosscornersY = new double[8] { 1, 1, 1, imagepixels_height / 2, imagepixels_height / 2, imagepixels_height, imagepixels_height, imagepixels_height };
+				double[] crosscornersRA;
+				double[] crosscornersDE;
+				Get_Coordinates(crosscornersX, crosscornersY, false, "TAN", out crosscornersRA, out crosscornersDE);
+
+				double despan = 0;
+				double minDE, maxDE;
+				JPMath.MinMax(crosscornersDE, out minDE, out maxDE, false);
+				if (!poleinsidepos && !poleinsideneg)
+					despan = maxDE - minDE;
+				else if (poleinsidepos)
+					despan = 90 - minDE;
+				else if (poleinsideneg)
+					despan = 90 + maxDE;
+
+				double raspan = 0;
+				if (poleinsidepos || poleinsideneg)
+					raspan = 360;
+				else//calculate RA sweep
+				{
+					for (int i = 0; i < crosscornersRA.Length - 1; i++)
+						for (int j = i + 1; j < crosscornersRA.Length; j++)
+						{
+							double localspan;
+
+							if (crosscornersRA[i] > crosscornersRA[j])
+								localspan = crosscornersRA[i] - crosscornersRA[j];
+							else
+								localspan = crosscornersRA[j] - crosscornersRA[i];
+
+							if (localspan <= 180 && localspan > raspan)
+								raspan = localspan;
+							else if (localspan > 180)
+							{
+								localspan = 360 - localspan;
+								if (localspan > raspan)
+									raspan = localspan;
+							}
+						}
+					raspan *= 1.05;//to get total field coverage due to feild center being offset usually...this should be enough
+					if (raspan > 360)
+						raspan = 360;
+				}
+
 				//what is the closest gradient to get Nintervals intervals on the dec axis
-				double decintervaldeg = despan / NDecintervals;
-				double decintervalarm = despan / NDecintervals * 60;
-				double decintervalars = despan / NDecintervals * 3600;
+				double decintervaldeg = despan / NapproximateIntervals;
+				double decintervalarm = despan / NapproximateIntervals * 60;
+				double decintervalars = despan / NapproximateIntervals * 3600;
 
 				bool decdeg = false, decarm = false, decars = false;
 
@@ -972,31 +1098,17 @@ namespace JPFITS
 					decars = true;
 				else if (decintervalarm <= 30)
 					decarm = true;
-				else if (decintervaldeg <= 30)
-					decdeg = true;
 				else
-					throw new Exception("declination interval problem...");
+					decdeg = true;
 
 				double decgrad = 0;
 				if (decdeg)
-				{
 					decgrad = ROUNDTOHUMANINTERVAL(decintervaldeg);
-					fieldcenterDEC = Math.Round(fieldcenterDEC / decgrad) * decgrad;
-				}
 				else if (decarm)
-				{
-					decgrad = ROUNDTOHUMANINTERVAL(decintervalarm);
-					fieldcenterDEC = Math.Round(fieldcenterDEC * 60 / decgrad) * decgrad;
-					decgrad /= 60;
-					fieldcenterDEC /= 60;
-				}
+					decgrad = ROUNDTOHUMANINTERVAL(decintervalarm) / 60;
 				else if (decars)
-				{
-					decgrad = ROUNDTOHUMANINTERVAL(decintervalars);
-					fieldcenterDEC = Math.Round(fieldcenterDEC * 3600 / decgrad) * decgrad;
-					decgrad /= 3600;
-					fieldcenterDEC /= 3600;
-				}
+					decgrad = ROUNDTOHUMANINTERVAL(decintervalars) / 3600;
+				fieldcenterDEC = Math.Round(fieldcenterDEC / decgrad) * decgrad;
 
 				int nDECintervalsHW = (int)Math.Ceiling(despan / 2 / decgrad);
 				DEC_LINES = new PointF[nDECintervalsHW * 2 + 1][];
@@ -1008,7 +1120,12 @@ namespace JPFITS
 				for (int i = -nDECintervalsHW; i <= nDECintervalsHW; i++)
 				{
 					DEC_LINES[i + nDECintervalsHW] = new PointF[nDECsweeppointsHW * 2 + 1];
-					DegreeElementstoSexagesimalElements(0, fieldcenterDEC + (double)(i) * decgrad, out sexx, out sexy, ":", 0);
+					double dec = fieldcenterDEC + (double)(i) * decgrad;
+					if (dec > 90)
+						dec = 90 - (dec - 90);
+					else if (dec < -90)
+						dec = -90 - (90 + dec);
+					DegreeElementstoSexagesimalElements(0, dec, out sexx, out sexy, ":", 0);
 					DEC_LABELS[i + nDECintervalsHW] = sexy;
 
 					for (int j = -nDECsweeppointsHW; j <= nDECsweeppointsHW; j++)
@@ -1018,55 +1135,51 @@ namespace JPFITS
 					}
 				}
 
-				int NRAintervals = 7;
+
+
+
+
+
+
+
+
 				//what is the closest gradient to get NRAintervals intervals on the RA axis
-				double raintervaldeg = raspan / NRAintervals;
-				double raintervalarm = raspan / NRAintervals * 60;
-				double raintervalars = raspan / NRAintervals * 3600;
+				double raintervalhrs = raspan / NapproximateIntervals / 15;
+				double raintervalmin = raspan / NapproximateIntervals * 60 / 15;
+				double raintervalsec = raspan / NapproximateIntervals * 3600 / 15;
 
-				bool radeg = false, raarm = false, raars = false;
+				bool rahrs = false, ramin = false, rasec = false;
 
-				if (raintervalars <= 30)
-					raars = true;
-				else if (raintervalarm <= 30)
-					raarm = true;
-				else if (raintervaldeg <= 30)
-					radeg = true;
+				if (raintervalsec <= 30)
+					rasec = true;
+				else if (raintervalmin <= 30)
+					ramin = true;
 				else
-					throw new Exception("right ascension interval problem...");
+					rahrs = true;
 
 				double ragrad = 0;
-				if (radeg)
-				{
-					ragrad = ROUNDTOHUMANINTERVAL(raintervaldeg);
-					fieldcenterRA = Math.Round(fieldcenterRA / ragrad) * ragrad;
-				}
-				else if (raarm)
-				{
-					ragrad = ROUNDTOHUMANINTERVAL(raintervalarm);
-					fieldcenterRA = Math.Round(fieldcenterRA * 60 / ragrad) * ragrad;
-					ragrad /= 60;
-					fieldcenterRA /= 60;
-				}
-				else if (raars)
-				{
-					ragrad = ROUNDTOHUMANINTERVAL(raintervalars);
-					fieldcenterRA = Math.Round(fieldcenterRA * 3600 / ragrad) * ragrad;
-					ragrad /= 3600;
-					fieldcenterRA /= 3600;
-				}
+				if (rahrs)
+					ragrad = ROUNDTOHUMANINTERVAL(raintervalhrs) * 15;
+				else if (ramin)
+					ragrad = ROUNDTOHUMANINTERVAL(raintervalmin) / 60 * 15;
+				else if (rasec)
+					ragrad = ROUNDTOHUMANINTERVAL(raintervalsec) / 3600 * 15;
+				fieldcenterRA = Math.Round(fieldcenterRA / ragrad) * ragrad;
 
 				int nRAintervalsHW = (int)Math.Ceiling(raspan / 2 / ragrad);
 				RAS_LINES = new PointF[nRAintervalsHW * 2 + 1][];
 				RAS_LABELS = new string[RAS_LINES.Length];
 				RAS_LABEL_LOCATIONS = new PointF[RAS_LINES.Length];
 				int nRAsweeppointsHW = 15;
-				double rasweepinterval = 1 * despan / (double)nRAsweeppointsHW;
+				double rasweepinterval = despan / (double)nRAsweeppointsHW;
 
 				for (int i = -nRAintervalsHW; i <= nRAintervalsHW; i++)
 				{
 					RAS_LINES[i + nRAintervalsHW] = new PointF[nRAsweeppointsHW * 2 + 1];
-					DegreeElementstoSexagesimalElements(fieldcenterRA + (double)(i) * ragrad, 0, out sexx, out sexy, ":", 0);
+					double ra = fieldcenterRA + (double)(i) * ragrad;
+					if (ra < 0)
+						ra += 360;
+					DegreeElementstoSexagesimalElements(ra, 0, out sexx, out sexy, ":", 0);
 					RAS_LABELS[i + nRAintervalsHW] = sexx;
 
 					for (int j = -nRAsweeppointsHW; j <= nRAsweeppointsHW; j++)
@@ -1084,9 +1197,12 @@ namespace JPFITS
 					for (int j = 0; j < DEC_LINES[i].Length; j++)
 						DEC_LINES[i][j] = new PointF(DEC_LINES[i][j].X * xscale, DEC_LINES[i][j].Y * yscale);
 
+				int divfact = 2;
+				if (poleinsidepos || poleinsideneg)
+					divfact = 3;
 				for (int i = 0; i < this.Grid_RightAscensionLabels.Length; i++)
 				{
-					int yy = this.Grid_RightAscensionPoints[i].Length / 2;
+					int yy = this.Grid_RightAscensionPoints[i].Length / divfact;
 					PointF pnt = new PointF(this.Grid_RightAscensionPoints[i][yy].X, this.Grid_RightAscensionPoints[i][yy].Y);
 					RAS_LABEL_LOCATIONS[i] = pnt;
 				}
@@ -1109,23 +1225,23 @@ namespace JPFITS
 				return 1;
 			else if (value > 1 && value <= 2)
 			{
-				/*if (value < 1.5)
+				if (value < 1.25)
 					return 1;
-				else*/
+				else
 					return 2;
 			}
 			else if (value > 2 && value <= 5)
 			{
-				/*if (value < 3.5)
+				if (value < 3.5)
 					return 2;
-				else*/
+				else
 					return 5;
 			}
 			else if (value > 5 && value <= 10)
 			{
-				/*if (value < 8)
+				if (value < 7)
 					return 5;
-				else*/
+				else
 					return 10;
 			}
 			else 
@@ -1219,7 +1335,7 @@ namespace JPFITS
 			{
 				int startindex = 0;
 				int lastindex = 1;//lastindex can start at 1 since RA must have at least a single digit
-								  //double raH, raM, raS, decD, decAM, decAS;
+
 				String currchar;
 
 				while (true)//raH
@@ -1497,7 +1613,7 @@ namespace JPFITS
 			double h = Math.Floor(ra_deg / 360 * 24);
 			double m = Math.Floor((ra_deg / 360 * 24 - h) * 60);
 			double s = Math.Round((ra_deg / 360 * 24 - h - m / 60) * 3600, decimals);
-			if (s == 60)//saw this for some reason...
+			if (s == 60)
 			{
 				s = 0;
 				m += 1;
@@ -1507,7 +1623,7 @@ namespace JPFITS
 			double deg = Math.Floor(decdeg);
 			double am = Math.Floor((decdeg - deg) * 60);
 			double ars = Math.Round((decdeg - deg - am / 60) * 3600, decimals);
-			if (ars == 60)//saw this for some reason...
+			if (ars == 60)
 			{
 				ars = 0;
 				am += 1;
@@ -1517,8 +1633,8 @@ namespace JPFITS
 			if (dec_deg < 0)
 				sign = "-";
 
-			ra_sexa = h.ToString("00") + delimitter + m.ToString("00") + delimitter + s.ToString("00.");
-			dec_sexa = sign + deg.ToString("00") + delimitter + am.ToString("00") + delimitter + ars.ToString("00.");
+			ra_sexa = h.ToString("00") + delimitter + m.ToString("00") + delimitter + s.ToString("00.#######");
+			dec_sexa = sign + deg.ToString("00") + delimitter + am.ToString("00") + delimitter + ars.ToString("00.#######");
 		}
 
 		/// <summary>Convert degree coordinates found in the first two columns of a String line into sexigesimal coordinate format.</summary>

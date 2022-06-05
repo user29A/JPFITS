@@ -6592,6 +6592,7 @@ namespace JPFITS
 			Parallel.For(0, data.GetLength(0), opts, i =>
 			{
 				for (int j = 0; j < data.GetLength(1); j++)
+				{
 					if (data[i, j] < locmin)
 					{
 						lock (locker)
@@ -6600,7 +6601,7 @@ namespace JPFITS
 								locmin = data[i, j];
 						}
 					}
-					else if (data[i, j] > locmax)
+					if (data[i, j] > locmax)
 					{
 						lock (locker)
 						{
@@ -6608,6 +6609,7 @@ namespace JPFITS
 								locmax = data[i, j];
 						}
 					}
+				}
 			});
 
 			min = locmin;
@@ -6637,7 +6639,7 @@ namespace JPFITS
 							locmin = data[i];
 					}
 				}
-				else if (data[i] > locmax)
+				if (data[i] > locmax)
 				{
 					lock (locker)
 					{

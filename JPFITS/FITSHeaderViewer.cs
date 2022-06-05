@@ -8,7 +8,7 @@ namespace JPFITS
 	{
 		private JPFITS.FITSHeader HEADER;
 		private JPFITS.FITSImageSet IMAGESET;
-		private int IMAGESETHEADERINDEX;
+		private int IMAGESETHEADERINDEX = -1;
 
 		public FITSHeaderViewer(JPFITS.FITSHeader header)
 		{
@@ -61,7 +61,10 @@ namespace JPFITS
 
 		public void UpdateImageSetHeaderIndex(int index)
 		{
-			if (index < 0 || index >= IMAGESET.Count)
+			//if (index < 0 || index >= IMAGESET.Count)
+			//	return;
+
+			if (index == IMAGESETHEADERINDEX)
 				return;
 
 			IMAGESETHEADERINDEX = index;
@@ -275,56 +278,59 @@ namespace JPFITS
 
 		private void HeaderKeysListBox_KeyDown(System.Object sender, System.Windows.Forms.KeyEventArgs e)
 		{
-			if (e.KeyCode == Keys.Delete)
-			{
-				if (IMAGESET != null && IMAGESET.Count > 1)
-				{
-					DialogResult res = MessageBox.Show("Delete selected key(s) from all headers (YES), or only current header (NO)?", "Warning", MessageBoxButtons.YesNoCancel);
-					if (res == DialogResult.Cancel)
-						return;
-					else if (res == DialogResult.Yes)
-						HeaderContextApplyAll.Checked = true;
-					else
-						HeaderContextApplyAll.Checked = false;
-				}
+			//if (e.KeyCode == Keys.Delete)
+			//{
+			//	if (HeaderKeysListBox.SelectedIndices.Count == 0)
+			//		return;
 
-				HeaderContextRemoveKeys.PerformClick();
-				return;
-			}
+			//	DialogResult res = DialogResult.No;
+			//	if (IMAGESET.Count > 1)
+			//		res = MessageBox.Show("Delete selected key(s) from all headers (YES), or only current header (NO)?", "Warning...", MessageBoxButtons.YesNoCancel);
+				
+			//	if (res == DialogResult.Cancel)
+			//		return;
+			//	else if (res == DialogResult.Yes)
+			//		HeaderContextApplyAll.Checked = true;
+			//	else
+			//		HeaderContextApplyAll.Checked = false;
 
-			if (e.Control && e.KeyCode == Keys.C)//copy
-			{
-				String copy = "";
-				for (int i = 0; i < HeaderKeysListBox.SelectedIndices.Count; i++)
-					copy += HEADER[(int)HeaderKeysListBox.SelectedIndices[i]].GetFullyFomattedFITSLine() + Environment.NewLine;
+			//	HeaderContextRemoveKeys.PerformClick();
+			//	return;
+			//}
 
-				if (copy.Length > 0)
-					Clipboard.SetText(copy);
+			//if (e.Control && e.KeyCode == Keys.C)//copy
+			//{
+			//	if (HeaderKeysListBox.SelectedIndices.Count == 0)
+			//		return;
 
-				return;
-			}
+			//	String copy = "";
+			//	for (int i = 0; i < HeaderKeysListBox.SelectedIndices.Count; i++)
+			//		copy += HEADER[(int)HeaderKeysListBox.SelectedIndices[i]].GetFullyFomattedFITSLine() + Environment.NewLine;
 
-			if (e.Control && e.KeyCode == Keys.V)//paste
-			{
-				if (HeaderKeysListBox.SelectedIndices.Count == 0)
-					return;
+			//	if (copy.Length > 0)
+			//		Clipboard.SetText(copy);
 
-				String paste = Clipboard.GetText();
-				if (paste == null || paste.Length == 0)
-					return;
+			//	return;
+			//}
 
-				if (!JPMath.IsInteger((double)(paste.Length) / 80))
-					return;
+			//if (e.Control && e.KeyCode == Keys.V)//paste
+			//{
+			//	String paste = Clipboard.GetText();
+			//	if (paste == null || paste.Length == 0)
+			//		return;
 
-				int index = HeaderKeysListBox.SelectedIndices[HeaderKeysListBox.SelectedIndices.Count - 1];
-				FITSHeaderKey key;
-				int nlines = paste.Length / 80;
-				for (int i = 0; i < nlines; i++)
-				{
-					key = new FITSHeaderKey(paste.Substring(i * 80, 80));
-					HEADER.AddKey(key, index + 1 + i);
-				}
-			}
+			//	if (!JPMath.IsInteger((double)(paste.Length) / 80))
+			//		return;
+
+			//	int index = HeaderKeysListBox.SelectedIndices[HeaderKeysListBox.SelectedIndices.Count - 1];
+			//	FITSHeaderKey key;
+			//	int nlines = paste.Length / 80;
+			//	for (int i = 0; i < nlines; i++)
+			//	{
+			//		key = new FITSHeaderKey(paste.Substring(i * 80, 80));
+			//		HEADER.AddKey(key, index + 1 + i);
+			//	}
+			//}
 		}
 
 		private void EditCopyfromFileBtn_Click(object sender, EventArgs e)

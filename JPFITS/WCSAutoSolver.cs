@@ -28,7 +28,7 @@ namespace JPFITS
 		private double[]? CAT_CVAL1s;
 		private double[]? CAT_CVAL2s;
 		private double[]? CAT_MAGs;
-		private JPMath.PointD[]? PIX_PTS;
+		private JPMath.PointD[]? PSE_PTS;
 		private JPMath.PointD[]? CAT_PTS;
 		private int PROGRESS, IMAGE_WIDTH, IMAGE_HEIGHT, N_POINTS, PSE_KERNEL_RADIUS, PSE_SEP_RADIUS, N_MATCHES_STOP, PERC_MATCHES_STOP;
 		private double SCALE_INIT, SCALE_LB, SCALE_UB, ROTATION_INIT, ROTATION_LB, ROTATION_UB, WCS_VERTEX_TOL, PIX_SAT;
@@ -43,6 +43,9 @@ namespace JPFITS
 		//WaitBar WAITBAR;
 		BackgroundWorker BGWRKR;
 		private WCSAutoSolverReportingForm? WCSARF;
+		double DIV;
+		int NITERS, MAXITERS;
+		double IMMAX, IMMED, IMAMP, PIXTHRESH;
 
 		private void BGWRKR_DoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
 		{
@@ -92,46 +95,30 @@ namespace JPFITS
 				IMAGE_WIDTH = FITS_IMG.Width;
 				IMAGE_HEIGHT = FITS_IMG.Height;
 
-				BGWRKR.ReportProgress(0, Environment.NewLine + "Searching '" + FITS_IMG.FileName + "' for " + N_POINTS + " point sources...");
-				double max = FITS_IMG.Max;
-				double thresh = max / 256;
-				double dv = 2;
-				double am = thresh;
-				int iters = 0;
-				int maxiters = 15;
-
-				while (PSE.N_Sources < N_POINTS || PSE.N_Sources > N_POINTS + 1)
+				BGWRKR.ReportProgress(0, Environment.NewLine + "Searching '" + FITS_IMG.FileName + "' for " + N_POINTS + " point sources...");				
+				while (NITERS <= MAXITERS)
 				{
-					if (CANCELLED)
-						return;
+					NITERS++;
 
-					iters++;
-					if (iters > maxiters)
+					PSE.Extract_Sources(FITS_IMG.Image, PIX_SAT, PIXTHRESH, Double.MaxValue, 0, Double.MaxValue, false, PSE_KERNEL_RADIUS, PSE_SEP_RADIUS, AUTO_BACKGROUND, "", IMAGE_ROI, false);
+
+					BGWRKR.ReportProgress(0, "Found " + PSE.N_Sources + " point sources on iteration " + NITERS);
+
+					if (PSE.N_Sources >= N_POINTS)
 						break;
 
-					if (PSE.N_SaturatedSources >= N_POINTS || PSE.N_Sources >= N_POINTS)
-						break;
-
-					PSE.Extract_Sources(FITS_IMG.Image, PIX_SAT, thresh, Double.MaxValue, 0, Double.MaxValue, false, PSE_KERNEL_RADIUS, PSE_SEP_RADIUS, AUTO_BACKGROUND, "", IMAGE_ROI, false);
-
-					if (PSE.N_Sources < N_POINTS)
-						thresh -= am / dv;
-					if (PSE.N_Sources > N_POINTS + 1)
-						thresh += am / dv;
-					dv *= 2;
-
-					BGWRKR.ReportProgress(0, "Found " + PSE.N_Sources + " point sources on iteration " + maxiters);
+					DIV *= 2;
+					PIXTHRESH = IMAMP / DIV + IMMED;
 				}
 				if (PSE.N_Sources > N_POINTS)
 					PSE.ClipToNBrightest(N_POINTS);
-
-				BGWRKR.ReportProgress(0, Environment.NewLine + "Stopped searching on iteration " + maxiters + " with " + PSE.N_Sources + " point sources");
+				BGWRKR.ReportProgress(0, "Stopped searching on iteration " + NITERS + " with " + PSE.N_Sources + " point sources");
 
 				//turn the PSE results into points
 				BGWRKR.ReportProgress(0, Environment.NewLine + "Making point source points...");
-				PIX_PTS = new JPMath.PointD[(PSE.N_Sources)];
-				for (int i = 0; i < PIX_PTS.Length; i++)
-					PIX_PTS[i] = new JPMath.PointD(IMAGE_WIDTH - 1 - PSE.Centroids_X[i], IMAGE_HEIGHT - 1 - PSE.Centroids_Y[i], PSE.Centroids_Volume[i]);
+				PSE_PTS = new JPMath.PointD[PSE.N_Sources];
+				for (int i = 0; i < PSE_PTS.Length; i++)
+					PSE_PTS[i] = new JPMath.PointD(IMAGE_WIDTH - 1 - PSE.Centroids_X[i], IMAGE_HEIGHT - 1 - PSE.Centroids_Y[i], PSE.Centroids_Volume[i]);
 
 				//now run the auto solver by returning from run worker compeleted
 				return;
@@ -152,22 +139,22 @@ namespace JPFITS
 			//get pixel initial conditions and bounadries, and CRVAL values
 			BGWRKR.ReportProgress(0, "Determining pixel initial conditions and boundaries, and sky coordinate references...");
 			double crpix1_init = 0, crpix2_init = 0, crpix1_lb = Double.MaxValue, crpix1_ub = Double.MinValue, crpix2_lb = Double.MaxValue, crpix2_ub = Double.MinValue, crval1 = 0, crval2 = 0;
-			for (int i = 0; i < PIX_PTS.Length; i++)
+			for (int i = 0; i < PSE_PTS.Length; i++)
 			{
-				PIX_PTS[i] = new JPMath.PointD(IMAGE_WIDTH - 1 - PSE.Centroids_X[i], IMAGE_HEIGHT - 1 - PSE.Centroids_Y[i], PSE.Centroids_Volume[i]);
-				crpix1_init += PIX_PTS[i].X;
-				crpix2_init += PIX_PTS[i].Y;
-				if (crpix1_ub < PIX_PTS[i].X)
-					crpix1_ub = PIX_PTS[i].X;
-				if (crpix1_lb > PIX_PTS[i].X)
-					crpix1_lb = PIX_PTS[i].X;
-				if (crpix2_ub < PIX_PTS[i].Y)
-					crpix2_ub = PIX_PTS[i].Y;
-				if (crpix2_lb > PIX_PTS[i].Y)
-					crpix2_lb = PIX_PTS[i].Y;
+				PSE_PTS[i] = new JPMath.PointD(IMAGE_WIDTH - 1 - PSE.Centroids_X[i], IMAGE_HEIGHT - 1 - PSE.Centroids_Y[i], PSE.Centroids_Volume[i]);
+				crpix1_init += PSE_PTS[i].X;
+				crpix2_init += PSE_PTS[i].Y;
+				if (crpix1_ub < PSE_PTS[i].X)
+					crpix1_ub = PSE_PTS[i].X;
+				if (crpix1_lb > PSE_PTS[i].X)
+					crpix1_lb = PSE_PTS[i].X;
+				if (crpix2_ub < PSE_PTS[i].Y)
+					crpix2_ub = PSE_PTS[i].Y;
+				if (crpix2_lb > PSE_PTS[i].Y)
+					crpix2_lb = PSE_PTS[i].Y;
 			}
-			crpix1_init /= (double)PIX_PTS.Length;//the reference value initial guesses can be the means
-			crpix2_init /= (double)PIX_PTS.Length;
+			crpix1_init /= (double)PSE_PTS.Length;//the reference value initial guesses can be the means
+			crpix2_init /= (double)PSE_PTS.Length;
 
 			for (int i = 0; i < CAT_PTS.Length; i++)
 			{
@@ -183,14 +170,14 @@ namespace JPFITS
 
 			//make PSE triangles
 			BGWRKR.ReportProgress(0, "Making point source triangles...");
-			int nPSEtriangles = PIX_PTS.Length * (PIX_PTS.Length - 1) * (PIX_PTS.Length - 2) / 6;
+			int nPSEtriangles = PSE_PTS.Length * (PSE_PTS.Length - 1) * (PSE_PTS.Length - 2) / 6;
 			JPMath.Triangle[] PSEtriangles = new JPMath.Triangle[(nPSEtriangles)];
 			int c = 0;
-			for (int i = 0; i < PIX_PTS.Length - 2; i++)
-				for (int j = i + 1; j < PIX_PTS.Length - 1; j++)
-					for (int k = j + 1; k < PIX_PTS.Length; k++)
+			for (int i = 0; i < PSE_PTS.Length - 2; i++)
+				for (int j = i + 1; j < PSE_PTS.Length - 1; j++)
+					for (int k = j + 1; k < PSE_PTS.Length; k++)
 					{
-						PSEtriangles[c] = new JPMath.Triangle(PIX_PTS[i], PIX_PTS[j], PIX_PTS[k]/*, true*/);
+						PSEtriangles[c] = new JPMath.Triangle(PSE_PTS[i], PSE_PTS[j], PSE_PTS[k]/*, true*/);
 						c++;
 					}
 
@@ -251,7 +238,7 @@ namespace JPFITS
 			DATE = DateTime.Now;
 			TimeSpan ts = new TimeSpan();
 			int prog = 0, threadnum = 0;
-			ulong ncompares = 0, nfalse_sols = 0;
+			ulong ncompares = 0, nfalsepositives = 0, nfalsefalses = 0;
 			bool compare_fieldvectors = ROTATION_LB != -Math.PI && ROTATION_UB != Math.PI;
 
 			ParallelOptions opts  = new ParallelOptions();
@@ -271,14 +258,13 @@ namespace JPFITS
 				if (SOLVED || CANCELLED)
 					loopState.Stop();
 
-				ulong ncompareslocal = 0;
-				ulong nfalse_solslocal = 0;
+				ulong ncompareslocal = 0, nfalsepositives_local = 0, nfalsefalses_local = 0;
 				//create these here so that each thread when parallel has own copy
-				double[] xpix_triplet = new double[(3)];
-				double[] ypix_triplet = new double[(3)];
-				double[] Xintrmdt_triplet = new double[(3)];
-				double[] Yintrmdt_triplet = new double[(3)];
-				double[] P0 = new double[(4)];
+				double[] xpix_triplet = new double[3];
+				double[] ypix_triplet = new double[3];
+				double[] Xintrmdt_triplet = new double[3];
+				double[] Yintrmdt_triplet = new double[3];
+				double[] P0 = new double[4];
 				double[] PLB = plb;
 				double[] PUB = pub;
 				double minlength2, maxlength2;
@@ -320,19 +306,22 @@ namespace JPFITS
 						if (CATtriangles_intrmdt[j].GetSideLength(2) < minlength2 || CATtriangles_intrmdt[j].GetSideLength(2) > maxlength2)
 							continue;
 
-						if (compare_fieldvectors)
-						{
-							double theta = Math.Atan2(PSEtriangles[i].FieldVector.X * CATtriangles_intrmdt[j].FieldVector.Y - PSEtriangles[i].FieldVector.Y * CATtriangles_intrmdt[j].FieldVector.X, PSEtriangles[i].FieldVector.X * CATtriangles_intrmdt[j].FieldVector.X + PSEtriangles[i].FieldVector.Y * CATtriangles_intrmdt[j].FieldVector.Y);
+						//this is the angle subtended between the two field vectors of the PSE and intermediate triangles...in the correct direction
+						double theta = Math.Atan2(PSEtriangles[i].FieldVector.X * CATtriangles_intrmdt[j].FieldVector.Y - PSEtriangles[i].FieldVector.Y * CATtriangles_intrmdt[j].FieldVector.X, PSEtriangles[i].FieldVector.X * CATtriangles_intrmdt[j].FieldVector.X + PSEtriangles[i].FieldVector.Y * CATtriangles_intrmdt[j].FieldVector.Y);
 
-							if (theta > ROTATION_UB || theta < ROTATION_LB)
+						if (compare_fieldvectors)//if a rotation estimate has been provided
+						{
+							//if the angle between the field vectors is smaller/larger than the estimate and bounds, then continue – not the correct triangles to fit given the rotation bounds estimate
+							if (theta > (ROTATION_UB + WCS_VERTEX_TOL) || theta < (ROTATION_LB - WCS_VERTEX_TOL))//+- WCS_VERTEX_TOL to bounds to provide tolerance when bounds are equal
 								continue;
-						}
-						else
-						{
-							double theta = Math.Atan2(PSEtriangles[i].FieldVector.X * CATtriangles_intrmdt[j].FieldVector.Y - PSEtriangles[i].FieldVector.Y * CATtriangles_intrmdt[j].FieldVector.X, PSEtriangles[i].FieldVector.X * CATtriangles_intrmdt[j].FieldVector.X + PSEtriangles[i].FieldVector.Y * CATtriangles_intrmdt[j].FieldVector.Y);
 
-							PLB[1] = theta - 2;
-							PUB[1] = theta + 2;
+							P0[1] = ROTATION_INIT;//if here, then reset the fitter’s rotation parameter to initial estimate provided (others reset below)...//reset P0 for j'th iteration
+						}
+						else//no rotation estimate provided, so we can make our own
+						{
+							P0[1] = theta;//set the initial rotation to the angle between the field vectors...//reset P0 for j'th iteration
+							PLB[1] = theta - WCS_VERTEX_TOL;// provide some tolerance bounds
+							PUB[1] = theta + WCS_VERTEX_TOL;// provide some tolerance bounds
 						}
 
 						Xintrmdt_triplet[0] = CATtriangles_intrmdt[j].GetVertex(0).X;
@@ -344,7 +333,7 @@ namespace JPFITS
 
 						//reset P0 for j'th iteration
 						P0[0] = SCALE_INIT;
-						P0[1] = ROTATION_INIT;
+						//P0[1] = ROTATION_INIT;//done above in if (compare_fieldvectors)
 						P0[2] = crpix1_init;
 						P0[3] = crpix2_init;
 
@@ -362,7 +351,10 @@ namespace JPFITS
 						}
 
 						if (N_pt_matches != 3)//not a possible solution
+						{
+							nfalsefalses_local++;
 							continue;
+						}
 
 						//need to check if the other CAT points match the PSE pts
 						N_pt_matches = 0;
@@ -374,7 +366,7 @@ namespace JPFITS
 							int x = (int)Math.Round((double)IMAGE_WIDTH - 1 - (1 / P0[0] * (Math.Cos(-P0[1]) * X_int - Math.Sin(-P0[1]) * Y_int) + P0[2]));
 							int y = (int)Math.Round((double)IMAGE_HEIGHT - 1 - (1 / P0[0] * (Math.Sin(-P0[1]) * X_int + Math.Cos(-P0[1]) * Y_int) + P0[3]));
 
-							if (x > 0 && y > 0 && x < IMAGE_WIDTH && y < IMAGE_HEIGHT && PSE.SourceBooleanMap[x, y]/* && PSE.SourceIndexMap[x, y] < PSE.N_Sources*/)
+							if (x > 0 && y > 0 && x < IMAGE_WIDTH && y < IMAGE_HEIGHT && PSE.SourceBooleanMap[x, y])
 								N_pt_matches++;
 						}
 						if (N_pt_matches >= N_MATCHES_STOP || N_pt_matches * 100 / CATpts_intrmdt.Length >= PERC_MATCHES_STOP)
@@ -389,13 +381,14 @@ namespace JPFITS
 							threadnum = Thread.CurrentThread.ManagedThreadId;
 						}
 						else
-							nfalse_solslocal++;
+							nfalsepositives_local++;
 					}
 				}
 				lock (locker)
 				{
 					ncompares += ncompareslocal;
-					nfalse_sols += nfalse_solslocal;
+					nfalsepositives += nfalsepositives_local;
+					nfalsefalses += nfalsefalses_local;
 				}
 			});
 
@@ -412,7 +405,8 @@ namespace JPFITS
 			BGWRKR.ReportProgress(0, "Field Rotation: " + Math.Round(p01 * 180 / 3.14159265, 3));
 			BGWRKR.ReportProgress(0, "N Pt. Matches: " + total_pt_matches + " (" + (total_pt_matches * 100 / CATpts_intrmdt.Length).ToString("00.0") + "%)");
 			BGWRKR.ReportProgress(0, "N Comparisons: " + ncompares.ToString("0.00e00") + " (" + Math.Round((double)(ncompares * 100) / (double)(PSEtriangles.Length) / (double)(CATtriangles_intrmdt.Length), 1) + "%)");
-			BGWRKR.ReportProgress(0, "N False Postives: " + nfalse_sols);
+			BGWRKR.ReportProgress(0, "N False Postives: " + nfalsepositives);
+			BGWRKR.ReportProgress(0, "N False Falses: " + nfalsefalses);
 			BGWRKR.ReportProgress(0, "Thread: " + threadnum);
 			BGWRKR.ReportProgress(0, "Completed in: " + ts.Minutes.ToString() + "m" + ((double)(ts.Seconds) + (double)ts.Milliseconds / 1000).ToString() + "s");
 			BGWRKR.ReportProgress(0, "Comparisons per Second: " + (ncompares / ts.TotalSeconds).ToString("0.00e00") + Environment.NewLine);
@@ -434,7 +428,7 @@ namespace JPFITS
 				int x = (int)Math.Round((double)IMAGE_WIDTH - 1 - (1 / p00 * (Math.Cos(-p01) * X_int - Math.Sin(-p01) * Y_int) + p02));
 				int y = (int)Math.Round((double)IMAGE_HEIGHT - 1 - (1 / p00 * (Math.Sin(-p01) * X_int + Math.Cos(-p01) * Y_int) + p03));
 
-				if (x > 0 && y > 0 && x < IMAGE_WIDTH && y < IMAGE_HEIGHT && PSE.SourceBooleanMap[x, y]/* && PSE.SourceIndexMap[x, y] < PSE.N_Sources*/)
+				if (x > 0 && y > 0 && x < IMAGE_WIDTH && y < IMAGE_HEIGHT && PSE.SourceBooleanMap[x, y])
 				{
 					int index = PSE.SourceIndexMap[x, y];
 					cpix1[c] = PSE.Centroids_X[index];
@@ -477,44 +471,29 @@ namespace JPFITS
 
 			if (CANCELLED)
 				return;
-
+			
 			BGWRKR.ReportProgress(0, "Refining solution...");
-			PSE = new JPFITS.PointSourceExtractor();
-			double immax = FITS_IMG.Max;
-			double pixthresh = immax / 256;
-			double div = 2;
-			double amp = pixthresh;
-			int PSEiters = 0;
-			int maxPSEiters = 15;
 			N_POINTS *= 3;
-			BGWRKR.ReportProgress(0, "Searching for " + N_POINTS + " point sources..." + Environment.NewLine);
-
-			while (PSE.N_Sources < N_POINTS || PSE.N_Sources > N_POINTS + 1)
+			NITERS = 0;
+			PSE = new JPFITS.PointSourceExtractor();
+			BGWRKR.ReportProgress(0, Environment.NewLine + "Searching '" + FITS_IMG.FileName + "' for " + N_POINTS + " point sources...");
+			while (NITERS <= MAXITERS)
 			{
-				if (CANCELLED)
-					return;
+				NITERS++;
 
-				PSEiters++;
-				if (PSEiters > maxPSEiters)
+				PSE.Extract_Sources(FITS_IMG.Image, PIX_SAT, PIXTHRESH, Double.MaxValue, 0, Double.MaxValue, false, PSE_KERNEL_RADIUS, PSE_SEP_RADIUS, AUTO_BACKGROUND, "", IMAGE_ROI, false);
+
+				BGWRKR.ReportProgress(0, "Found " + PSE.N_Sources + " point sources on iteration " + NITERS);
+
+				if (PSE.N_Sources >= N_POINTS)
 					break;
 
-				if (PSE.N_SaturatedSources >= N_POINTS || PSE.N_Sources >= N_POINTS)
-					break;
-
-				PSE.Extract_Sources(FITS_IMG.Image, PIX_SAT, pixthresh, Double.MaxValue, 0, Double.MaxValue, false, PSE_KERNEL_RADIUS, PSE_SEP_RADIUS, AUTO_BACKGROUND, "", IMAGE_ROI, false);
-
-				if (PSE.N_Sources < N_POINTS)
-					pixthresh -= amp / div;
-				if (PSE.N_Sources > N_POINTS + 1)
-					pixthresh += amp / div;
-				div *= 2;
-
-				BGWRKR.ReportProgress(0, "Found " + PSE.N_Sources + " point sources on iteration " + PSEiters);
+				DIV *= 2;
+				PIXTHRESH = IMAMP / DIV + IMMED;
 			}
 			if (PSE.N_Sources > N_POINTS)
 				PSE.ClipToNBrightest(N_POINTS);
-			N_POINTS = PSE.N_Sources;
-			BGWRKR.ReportProgress(0, Environment.NewLine + "Stopped searching on iteration " + PSEiters + " with " + N_POINTS + " point sources");
+			BGWRKR.ReportProgress(0, "Stopped searching on iteration " + NITERS + " with " + PSE.N_Sources + " point sources");
 
 			if (CANCELLED)
 				return;
@@ -531,12 +510,12 @@ namespace JPFITS
 				cval2[i] = CAT_CVAL2s[i];
 			}
 
-			//get the wcs pixel locations
+			//get the catlaogue pixel locations
 			cpix1 = new double[(N_POINTS)];
 			cpix2 = new double[(N_POINTS)];
 			WCS.Get_Pixels(cval1, cval2, "TAN", out cpix1, out cpix2, true);
 
-			//check for WCS pixels which fall onto PSE pixels
+			//check for catlaogue pixels which fall onto PSE pixels
 			int nmatches = 0;
 			bool[] match = new bool[(N_POINTS)];
 			int[] matchinds = new int[(N_POINTS)];
@@ -545,7 +524,7 @@ namespace JPFITS
 				int x = (int)Math.Round(cpix1[i]);
 				int y = (int)Math.Round(cpix2[i]);
 				if (x > 0 && x < IMAGE_WIDTH && y > 0 && y < IMAGE_HEIGHT)
-					if (PSE.SourceBooleanMap[x, y]/* && PSE.SourceIndexMap[x, y] < PSE.N_Sources*/)
+					if (PSE.SourceBooleanMap[x, y])
 					{
 						nmatches++;
 						match[i] = true;
@@ -637,9 +616,7 @@ namespace JPFITS
 
 			SOLVING = false;
 			if (WCSARF != null)
-			{
 				WCSARF.CancelBtn.DialogResult = DialogResult.OK;
-			}
 		}
 
 		private static void MAKEASTROQUERYSCRIPT(string script_filename, string catalogue)
@@ -698,10 +675,69 @@ namespace JPFITS
 			sw.Close();
 		}
 
+		private static void MAKEGAIADR3QUERYNSCRIPT(string script_filename)
+		{
+			string script = "";
+			script += "import argparse" + Environment.NewLine;
+			script += "import sys" + Environment.NewLine;
+			script += "from astroquery.simbad import Simbad" + Environment.NewLine;
+			script += "from astropy.coordinates import SkyCoord" + Environment.NewLine;
+			script += "import astropy.units as u" + Environment.NewLine;
+			script += "from astroquery.gaia import Gaia" + Environment.NewLine;
+
+			script += "ra = float(sys.argv[1])" + Environment.NewLine;
+			script += "dec = float(sys.argv[2])" + Environment.NewLine;
+			script += "filename = str(sys.argv[3])" + Environment.NewLine;
+			script += "radius = float(sys.argv[4])" + Environment.NewLine;
+			script += "square = int(sys.argv[5])" + Environment.NewLine;
+			script += "number = int(sys.argv[6])" + Environment.NewLine;
+			script += "sortfilt = str(sys.argv[7])" + Environment.NewLine;
+
+			script += "radvals = radius * u.arcmin" + Environment.NewLine;
+			script += "if square == 1:" + Environment.NewLine;
+			script += "    radvals = radvals * 2;" + Environment.NewLine;
+
+			script += "coords = SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg), frame='fk5')" + Environment.NewLine;
+
+			script += "jobstr = \"SELECT TOP {0} * FROM gaiaedr3.gaia_source\\n\".format(number)" + Environment.NewLine;
+			script += "jobstr += \"WHERE 1=CONTAINS(POINT('ICRS', gaiaedr3.gaia_source.ra,gaiaedr3.gaia_source.dec),\"" + Environment.NewLine;
+
+			script += "if square == 1:" + Environment.NewLine;
+			script += "    jobstr += \"BOX('ICRS',{0},{1},{2},{2}))\\n\".format(coords.ra.deg,coords.dec.deg,radvals.to(u.deg).value)" + Environment.NewLine;
+			script += "else:" + Environment.NewLine;
+			script += "    jobstr += \"CIRCLE('ICRS',{0},{1},{2}))\\n\".format(coords.ra.deg,coords.dec.deg,radvals.to(u.deg).value)" + Environment.NewLine;
+			script += "if sortfilt == \"bp\":" + Environment.NewLine;
+			script += "    jobstr += \"ORDER by gaiaedr3.gaia_source.phot_bp_mean_mag ASC\"" + Environment.NewLine;
+			script += "elif sortfilt == \"rp\":" + Environment.NewLine;
+			script += "    jobstr += \"ORDER by gaiaedr3.gaia_source.phot_rp_mean_mag ASC\"" + Environment.NewLine;
+			script += "else:" + Environment.NewLine;
+			script += "    jobstr += \"ORDER by gaiaedr3.gaia_source.phot_g_mean_mag ASC\"" + Environment.NewLine;
+
+			script += "print(\"Launching job query to Gaia archive\")" + Environment.NewLine;
+			script += "print(jobstr)" + Environment.NewLine;
+			script += "print(\" \")" + Environment.NewLine;
+			script += "print(\"Waiting for query results...\")" + Environment.NewLine;
+			script += "job = Gaia.launch_job_async(jobstr, dump_to_file = False)" + Environment.NewLine;
+			script += "print(job)" + Environment.NewLine;
+			script += "results = job.get_results()" + Environment.NewLine;
+			script += "removelist = []" + Environment.NewLine;
+
+			//Strip object columns from FITS table
+			script += "for col in results.columns:" + Environment.NewLine;
+			script += "    if results[col].dtype == 'object' :" + Environment.NewLine;
+			script += "        removelist += [col]" + Environment.NewLine;
+			script += "results.remove_columns(removelist)" + Environment.NewLine;
+			script += "results.write(filename, overwrite = True, format = 'fits')";
+
+			StreamWriter sw = new StreamWriter(script_filename);
+			sw.Write(script);
+			sw.Close();
+		}
+
 		#endregion
 
 		#region CONSTRUCTORS
-		
+
 		/// <summary>Initializes the WCS_AutoSolver class including performing source extraction on a given FITS image.</summary>
 		/// <param name="WCS_type">The WCS transformation type. Solution only uses TAN at this time.</param>
 		/// <param name="Number_of_Points">The number of points N to use to compare image coordinates to catalogue coordinates. Suggest N equals 25 for good correspondence, N equals 50 for poor, N equals 100 for very poor.</param>
@@ -746,6 +782,14 @@ namespace JPFITS
 			SOLVED = false;
 			PSE = new JPFITS.PointSourceExtractor();
 			WCS = new JPFITS.WorldCoordinateSolution();
+
+			DIV = 8;
+			NITERS = 0;
+			MAXITERS = 11;
+			IMMAX = FITS_IMG.Max;
+			IMMED = FITS_IMG.Median;
+			IMAMP = IMMAX - IMMED;
+			PIXTHRESH = IMAMP / DIV + IMMED;
 		}
 
 		/// <summary>Initializes the WCS_AutoSolver class for an existing pair of pixel source and catalogue coordinates.</summary>
@@ -766,7 +810,7 @@ namespace JPFITS
 			this.BGWRKR.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
 
 			WCS_TYPE = WCS_type;
-			PIX_PTS = pixels;
+			PSE_PTS = pixels;
 			ZERO_BASED_PIX = zero_based_pixels;
 			PSE_KERNEL_RADIUS = pixels_tolerance_radius;
 			IMAGE_WIDTH = image_width;
@@ -894,12 +938,12 @@ namespace JPFITS
 		/// <summary>Conditions the traingle array so that all threads begin with the brightest triangles.</summary>
 		/// <param name="triarray">An array of triangles.</param>
 		/// <param name="Nthreads">The number of threads to condition the array for.</param>
-		/// <param name="ascending">Brightness is ascending values (i.e. magnitudes) = true, otherwise brightness is descending values (i.e. counts) = false.</param>
-		public static JPMath.Triangle[] ConditionTriangleArrayBrightnessThreads(JPMath.Triangle[] triarray, int Nthreads, bool ascending)
+		/// <param name="invertNumericBrightness">Magnitudes = true, otherwise counts = false.</param>
+		public static JPMath.Triangle[] ConditionTriangleArrayBrightnessThreads(JPMath.Triangle[] triarray, int Nthreads, bool invertNumericBrightness)
 		{
 			//reformat traingle arrays for threading
 			int Ntris = triarray.Length;
-			double[] trivals = new double[(Ntris)];
+			double[] trivals = new double[Ntris];
 
 			Parallel.For(0, Ntris, i =>
 			{
@@ -908,7 +952,7 @@ namespace JPFITS
 
 			Array.Sort(trivals, triarray);
 
-			if (!ascending)
+			if (!invertNumericBrightness)
 				Array.Reverse(triarray);
 
 			if (Nthreads == 1)
@@ -932,19 +976,125 @@ namespace JPFITS
 					triarray[i + j * dim1] = temptris[j, i];
 			});
 
-			JPMath.Triangle[] retarray = new JPMath.Triangle[(Ntris)];
+			JPMath.Triangle[] retarray = new JPMath.Triangle[Ntris];
 			Array.Copy(triarray, retarray, Ntris);
 			return retarray;
 		}
 
+		///// <summary>Queries the Gaia catalogue for entries within a specified region. Returns 0 if the query was successful.</summary>
+		///// <param name="catalogue">A string for the catalogue to query. Options are (case insensitive): "Gaia"</param>
+		///// <param name="ra_deg">A string of the right ascension in degrees.</param>
+		///// <param name="dec_deg">A string of the declination in degrees.</param>
+		///// <param name="result_savepathfilename">The filename to save the query catalogue. If saving is not required, pass an empty string.</param>
+		///// <param name="radius">A string of the region radius in arcminutes.</param>
+		///// <param name="square">Pass 1 if the region is square, 0 for circle.</param>
+		//public static int AstroQuery(string catalogue, string ra_deg, string dec_deg, ref string result_savepathfilename, string radius, string square)
+		//{
+		//	string pypath = (string)REG.GetReg("CCDLAB", "PythonExePath");
+
+		//	if (pypath == null || !File.Exists(pypath))
+		//	{
+		//		string[] dirsappdata = Directory.GetDirectories(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "*Python*", SearchOption.AllDirectories);
+		//		string[] dirsprogdata = Directory.GetDirectories("C:\\Program Files\\", "*Python*", SearchOption.TopDirectoryOnly);
+
+		//		ArrayList locs = new ArrayList();
+
+		//		for (int i = 0; i < dirsappdata.Length; i++)
+		//		{
+		//			string[] files = Directory.GetFiles(dirsappdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
+		//			if (files.Length == 1)
+		//				locs.Add(files[0]);
+		//		}
+		//		for (int i = 0; i < dirsprogdata.Length; i++)
+		//		{
+		//			string[] files = Directory.GetFiles(dirsprogdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
+		//			if (files.Length == 1)
+		//				locs.Add(files[0]);
+		//		}
+
+		//		if (locs.Count == 0)
+		//		{
+		//			if (MessageBox.Show("Is Python installed? Please show me where your Python installation is located, OK? \r\n\r\nIf Python is not installed, please gather it from:\r\n\r\n https://www.python.org/downloads/windows/", "I cannot find python.exe", MessageBoxButtons.OKCancel) == DialogResult.Cancel)
+		//				return -2;
+
+		//			OpenFileDialog ofd = new OpenFileDialog();
+		//			ofd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+		//			ofd.Filter = "Executable|*.exe;";
+		//			if (ofd.ShowDialog() == DialogResult.Cancel)
+		//				return -2;
+
+		//			pypath = ofd.FileName;
+		//		}
+		//		else
+		//		{
+		//			pypath = (string)locs[0];
+		//			DateTime date = File.GetCreationTimeUtc((string)locs[0]);
+		//			for (int i = 0; i < locs.Count; i++)
+		//				if (File.GetCreationTimeUtc((string)locs[i]) > date)
+		//				{
+		//					date = File.GetCreationTimeUtc((string)locs[i]);
+		//					pypath = (string)locs[i];
+		//				}
+		//		}
+
+		//		REG.SetReg("CCDLAB", "PythonExePath", pypath);
+		//	}
+
+		//	catalogue = catalogue.ToLower();
+		//	string script = "C:\\ProgramData\\Astrowerks\\CCDLAB\\astro_query.py";
+		//	MAKEASTROQUERYSCRIPT(script, catalogue);
+
+		//	if (result_savepathfilename == "")
+		//	{
+		//		if (!Directory.Exists("C:\\ProgramData\\Astrowerks\\CCDLAB\\"))
+		//			Directory.CreateDirectory("C:\\ProgramData\\Astrowerks\\CCDLAB\\");
+		//		result_savepathfilename = "C:\\ProgramData\\Astrowerks\\CCDLAB\\queryCatalog.fit";
+		//	}
+
+		//	System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo();
+		//	psi.FileName = pypath;
+		//	psi.Arguments = String.Format("\"" + script + "\"" + " {0} {1} {2} {3} {4}", ra_deg, dec_deg, "\"" + result_savepathfilename + "\"", radius, square);
+
+		//	/*psi.UseShellExecute = false;//??????
+		//	psi.CreateNoWindow = true;//????
+		//	psi.RedirectStandardError = true;
+		//	psi.RedirectStandardOutput = true;
+		//	string errs = "";
+		//	string res = "";*/
+
+		//	System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
+		//	proc.WaitForExit();
+		//	int res = proc.ExitCode;
+		//	if (res != 0)
+		//		return res;
+
+		//	/*errs = proc.StandardError.ReadToEnd();
+		//	res = proc.StandardOutput.ReadToEnd();
+		//	MessageBox.Show(errs + "\r\n" + res);*/
+
+		//	/*array<string>^ ExtensionEntryLabels = FITSBinTable.GetExtensionEntryLabels(result_savepathfilename, "");
+		//	array<TypeCode>^ ExtensionEntryDataTypes = FITSBinTable.GetExtensionEntryDataTypes(result_savepathfilename, "");
+		//	array<string>^ ExtensionEntryDataUnits = FITSBinTable.GetExtensionEntryUnits(result_savepathfilename, "");
+		//	array<double, 2>^ table = FITSBinTable.GetExtensionEntries(result_savepathfilename, "", ExtensionEntryLabels);
+		//	FITSImage fits = new FITSImage(result_savepathfilename, null, true, true, false, false);
+		//	fits.WriteFile(TypeCode.Double, false);
+		//	array<string>^ exkeys = new array<string>(2) { "RA", "DEC" };
+		//	array<string>^ exvals = new array<string>(2) { ra_deg.ToString(), dec_deg.ToString() };
+		//	array<string>^ excoms = new array<string>(2) { "Right Ascension of query field center, degrees", "Declination of query field center, degrees" };
+		//	FITSBinTable.WriteExtension(result_savepathfilename, "", true, ExtensionEntryLabels, ExtensionEntryDataTypes, ExtensionEntryDataUnits, exkeys, exvals, excoms, table);*/
+
+		//	return res;
+		//}
+
 		/// <summary>Queries the Gaia catalogue for entries within a specified region. Returns 0 if the query was successful.</summary>
-		/// <param name="catalogue">A string for the catalogue to query. Options are (case insensitive): "Gaia"</param>
 		/// <param name="ra_deg">A string of the right ascension in degrees.</param>
 		/// <param name="dec_deg">A string of the declination in degrees.</param>
-		/// <param name="result_savepathfilename">The filename to save the query catalogue. If saving is not required, pass an empty string.</param>
+		/// <param name="result_savepathfilename">The filename to save the catalogue query FITS binary table.</param>
 		/// <param name="radius">A string of the region radius in arcminutes.</param>
 		/// <param name="square">Pass 1 if the region is square, 0 for circle.</param>
-		public static int AstroQuery(string catalogue, string ra_deg, string dec_deg, ref string result_savepathfilename, string radius, string square)
+		/// <param name="N">Number of entries for the region to return.</param>
+		/// <param name="sortfilter">The Gaia filter to sort the return by: bp, g, or rp.</param>
+		public static int GaiaDR3QueryN(string ra_deg, string dec_deg, string result_savepathfilename, string radius, string square, string N, string sortfilter)
 		{
 			string pypath = (string)REG.GetReg("CCDLAB", "PythonExePath");
 
@@ -996,37 +1146,38 @@ namespace JPFITS
 				REG.SetReg("CCDLAB", "PythonExePath", pypath);
 			}
 
-			catalogue = catalogue.ToLower();
-			string script = "C:\\ProgramData\\Astrowerks\\CCDLAB\\astro_query.py";
-			MAKEASTROQUERYSCRIPT(script, catalogue);
+			if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\"))
+				Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\");
+			
+			string script = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\GaiaDR3QueryN.py";
+			MAKEGAIADR3QUERYNSCRIPT(script);
 
 			if (result_savepathfilename == "")
 			{
-				if (!Directory.Exists("C:\\ProgramData\\Astrowerks\\CCDLAB\\"))
-					Directory.CreateDirectory("C:\\ProgramData\\Astrowerks\\CCDLAB\\");
-				result_savepathfilename = "C:\\ProgramData\\Astrowerks\\CCDLAB\\queryCatalog.fit";
+				if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\"))
+					Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\");
+				result_savepathfilename = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\GaiaDR3Query.fit";
 			}
 
 			System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo();
 			psi.FileName = pypath;
-			psi.Arguments = String.Format("\"" + script + "\"" + " {0} {1} {2} {3} {4}", ra_deg, dec_deg, "\"" + result_savepathfilename + "\"", radius, square);
+			psi.Arguments = String.Format("\"" + script + "\"" + " {0} {1} {2} {3} {4} {5} {6}", ra_deg, dec_deg, "\"" + result_savepathfilename + "\"", radius, square, N, sortfilter);
 
 			/*psi.UseShellExecute = false;//??????
 			psi.CreateNoWindow = true;//????
 			psi.RedirectStandardError = true;
-			psi.RedirectStandardOutput = true;
-			string errs = "";
-			string res = "";*/
+			psi.RedirectStandardOutput = true;*/
 
 			System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
 			proc.WaitForExit();
 			int res = proc.ExitCode;
 			if (res != 0)
+			{
+				/*string stderr = proc.StandardError.ReadToEnd();
+				string stdout = proc.StandardOutput.ReadToEnd();
+				MessageBox.Show(stderr + "\r\n" + stdout);*/
 				return res;
-
-			/*errs = proc.StandardError.ReadToEnd();
-			res = proc.StandardOutput.ReadToEnd();
-			MessageBox.Show(errs + "\r\n" + res);*/
+			}			
 
 			/*array<string>^ ExtensionEntryLabels = FITSBinTable.GetExtensionEntryLabels(result_savepathfilename, "");
 			array<TypeCode>^ ExtensionEntryDataTypes = FITSBinTable.GetExtensionEntryDataTypes(result_savepathfilename, "");
