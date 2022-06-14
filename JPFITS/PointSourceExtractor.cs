@@ -653,7 +653,7 @@ namespace JPFITS
 		[MethodImpl(256)]
 		private bool SAFETOMAPSATURATION(int x, int y)
 		{
-			return (x >= 0) && (x < IMAGEWIDTH) && (y >= 0) && (y < IMAGEHEIGHT) && (IMAGE[x, y] > PIX_SAT) && /*!SOURCE_BOOLEAN_MAP[x, y] &&*/ (SOURCE_INDEX_MAP[x, y] == -1);
+			return (x >= 0) && (x < IMAGEWIDTH) && (y >= 0) && (y < IMAGEHEIGHT) && (IMAGE[x, y] >= PIX_SAT) && /*!SOURCE_BOOLEAN_MAP[x, y] &&*/ (SOURCE_INDEX_MAP[x, y] == -1);
 		}
 
 		[MethodImpl(256)]

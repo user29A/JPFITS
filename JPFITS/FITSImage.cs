@@ -1607,7 +1607,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Reads an N-dimensional array and returns the results as a double array. User may reorginize the array based on the return variable axis lengths vector nAxisN.</summary>
-		/// <param name="nAxisN">An declared, but not instantiated, int vector to return the axis lengths for each axis.</param>
+		/// <param name="nAxisN">A declared, but not instantiated, int vector to return the axis lengths for each axis.</param>
 		public static double[] ReadPrimaryNDimensionalData(string fullFileName, out int[] nAxisN)
 		{
 			FileStream fs = new FileStream(fullFileName, FileMode.Open);

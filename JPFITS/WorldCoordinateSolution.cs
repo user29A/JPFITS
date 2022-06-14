@@ -376,6 +376,35 @@ namespace JPFITS
 		#endregion
 
 		#region MEMBERS
+
+		///// <summary>Rotate the WCS solution about the reference.</summary>
+		///// <param name="degreeAngle">The angle, in degrees, to rotate the transormation matrix parameters by./></param>
+		///// <param name="viaCPIXCVALrotResolve"></param>
+		//public void RotateWCS(double degreeAngle, bool viaCPIXCVALrotResolve)
+		//{
+		//	if (!viaCPIXCVALrotResolve) 
+		//	{
+		//		CDMATRIX[0, 0] = -CDELTN[0] / 3600 * Math.Cos((CROTAN[0] + degreeAngle) * Math.PI / 180);
+		//		CDMATRIX[1, 0] = CDELTN[1] / 3600 * Math.Sin((CROTAN[0] + degreeAngle) * Math.PI / 180);
+		//		CDMATRIX[0, 1] = CDELTN[0] / 3600 * Math.Sin((CROTAN[1] + degreeAngle) * Math.PI / 180);
+		//		CDMATRIX[1, 1] = -CDELTN[1] / 3600 * Math.Cos((CROTAN[1] + degreeAngle) * Math.PI / 180);
+
+		//		CD1_1 = CDMATRIX[0, 0];
+		//		CD1_2 = CDMATRIX[1, 0];
+		//		CD2_1 = CDMATRIX[0, 1];
+		//		CD2_2 = CDMATRIX[1, 1];
+
+		//		SET_CDMATRIXINV();
+
+		//		CROTAN[0] += degreeAngle;
+		//		CROTAN[1] += degreeAngle;
+		//	}
+		//	else
+		//	{
+
+		//	}
+		//}
+
 		/// <summary>Recomputes the existing grid so that it can be updated for new display settings.</summary>
 		public void Grid_Refresh()
 		{
