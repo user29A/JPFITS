@@ -975,23 +975,22 @@ namespace JPFITS
 		/// <summary>Gets the common directory of a series of file names, based on their file paths.</summary>
 		public static string GetCommonDirectory(string[] filelist)
 		{
-			string first = Path.GetDirectoryName(filelist[0]) + "\\";
+			string first = filelist[0];
 			for (int i = 1; i < filelist.Length; i++)
 			{
 				string second = filelist[i];
 				int N = first.Length;
 				for (int j = 0; j < second.Length; j++)
 				{
-					if (j == N)
-						break;
-					if (first[j] != second[j])
+					if (j == N || first[j] != second[j])
 					{
 						first = first.Substring(0, j);
-						first = first.Substring(0, first.LastIndexOf("\\"));
 						break;
 					}
 				}
 			}
+			if (!Directory.Exists(first))
+				first = first.Substring(0, first.LastIndexOf("\\"));
 			return first;
 		}
 

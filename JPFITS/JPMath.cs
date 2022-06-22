@@ -78,11 +78,12 @@ namespace JPFITS
 				return ((P1.X - P0.X) * (P2.Y - P0.Y) - (P2.X - P0.X) * (P1.Y - P0.Y));
 			}
 
-			public static void PolygonInteriorPointsRegion(bool[,] region, PointD[] polygon, int Xmin, int Ymin, int Xmax, int Ymax)
+			public static bool[,] PolygonInteriorPointsRegion(int regionXSize, int regionYSize, PointD[] polygon, int Xmin, int Ymin, int Xmax, int Ymax)
 			{
-				PointD P;
+				bool[,] region = new bool[regionXSize, regionYSize];
 				Parallel.For(Xmin, Xmax + 1, x =>
 				{
+					PointD P;
 					for (int y = Ymin; y <= Ymax; y++)
 					{
 						P = new PointD((double)(x), (double)(y), 0);
@@ -97,13 +98,14 @@ namespace JPFITS
 							}
 							else
 								if (polygon[i + 1].Y <= P.Y)
-								if (ISLEFT(polygon[i], polygon[i + 1], P) < 0)
-									wn--;
+									if (ISLEFT(polygon[i], polygon[i + 1], P) < 0)
+										wn--;
 
 						if (wn != 0)
 							region[x, y] = true;
 					}
 				});
+				return region;
 			}			
 		}
 

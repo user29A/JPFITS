@@ -619,61 +619,61 @@ namespace JPFITS
 				WCSARF.CancelBtn.DialogResult = DialogResult.OK;
 		}
 
-		private static void MAKEASTROQUERYSCRIPT(string script_filename, string catalogue)
-		{
-			string script = "";
-			script += "import argparse" + Environment.NewLine;
-			script += "import sys" + Environment.NewLine;
-			script += "from astroquery.simbad import Simbad" + Environment.NewLine;
-			script += "from astropy.coordinates import SkyCoord" + Environment.NewLine;
-			script += "import astropy.units as u" + Environment.NewLine;
-			if (catalogue == "gaia")
-				script += "from astroquery.gaia import Gaia" + Environment.NewLine;
+		//private static void MAKEASTROQUERYSCRIPT(string script_filename, string catalogue)
+		//{
+		//	string script = "";
+		//	script += "import argparse" + Environment.NewLine;
+		//	script += "import sys" + Environment.NewLine;
+		//	script += "from astroquery.simbad import Simbad" + Environment.NewLine;
+		//	script += "from astropy.coordinates import SkyCoord" + Environment.NewLine;
+		//	script += "import astropy.units as u" + Environment.NewLine;
+		//	if (catalogue == "gaia")
+		//		script += "from astroquery.gaia import Gaia" + Environment.NewLine;
 
-			script += "ra = float(sys.argv[1])" + Environment.NewLine;
-			script += "dec = float(sys.argv[2])" + Environment.NewLine;
-			script += "filename = str(sys.argv[3])" + Environment.NewLine;
-			script += "radius = float(sys.argv[4])" + Environment.NewLine;
-			script += "square = float(sys.argv[5])" + Environment.NewLine;
+		//	script += "ra = float(sys.argv[1])" + Environment.NewLine;
+		//	script += "dec = float(sys.argv[2])" + Environment.NewLine;
+		//	script += "filename = str(sys.argv[3])" + Environment.NewLine;
+		//	script += "radius = float(sys.argv[4])" + Environment.NewLine;
+		//	script += "square = float(sys.argv[5])" + Environment.NewLine;
 
-			script += "radvals = radius * u.arcmin" + Environment.NewLine;
-			script += "if square == 1:" + Environment.NewLine;
-			script += "    radvals = radvals * 2;" + Environment.NewLine;
+		//	script += "radvals = radius * u.arcmin" + Environment.NewLine;
+		//	script += "if square == 1:" + Environment.NewLine;
+		//	script += "    radvals = radvals * 2;" + Environment.NewLine;
 
-			script += "coords = SkyCoord(ra = ra, dec = dec, unit = (u.deg, u.deg), frame = 'fk5')" + Environment.NewLine;
+		//	script += "coords = SkyCoord(ra = ra, dec = dec, unit = (u.deg, u.deg), frame = 'fk5')" + Environment.NewLine;
 
-			if (catalogue == "gaia")
-			{
-				script += "jobstr = \"SELECT * FROM gaiadr2.gaia_source\"" + Environment.NewLine;
-				script += "jobstr += \" WHERE CONTAINS(POINT('ICRS', gaiadr2.gaia_source.ra,gaiadr2.gaia_source.dec),\"" + Environment.NewLine;
-			}
-			script += "if square == 1:" + Environment.NewLine;
-			script += "    jobstr += \"BOX('ICRS',{0},{1},{2},{2}))=1;\".format(coords.ra.deg, coords.dec.deg, radvals.to(u.deg).value)" + Environment.NewLine;
-			script += "else:" + Environment.NewLine;
-			script += "    jobstr += \"CIRCLE('ICRS',{0},{1},{2}))=1;\".format(coords.ra.deg, coords.dec.deg, radvals.to(u.deg).value)" + Environment.NewLine;
+		//	if (catalogue == "gaia")
+		//	{
+		//		script += "jobstr = \"SELECT * FROM gaiadr2.gaia_source\"" + Environment.NewLine;
+		//		script += "jobstr += \" WHERE CONTAINS(POINT('ICRS', gaiadr2.gaia_source.ra,gaiadr2.gaia_source.dec),\"" + Environment.NewLine;
+		//	}
+		//	script += "if square == 1:" + Environment.NewLine;
+		//	script += "    jobstr += \"BOX('ICRS',{0},{1},{2},{2}))=1;\".format(coords.ra.deg, coords.dec.deg, radvals.to(u.deg).value)" + Environment.NewLine;
+		//	script += "else:" + Environment.NewLine;
+		//	script += "    jobstr += \"CIRCLE('ICRS',{0},{1},{2}))=1;\".format(coords.ra.deg, coords.dec.deg, radvals.to(u.deg).value)" + Environment.NewLine;
 
-			if (catalogue == "gaia")
-				script += "print(\"Launching job query to Gaia archive\")" + Environment.NewLine;
-			script += "print(jobstr)" + Environment.NewLine;
-			script += "print(\" \")" + Environment.NewLine;
-			script += "print(\"Waiting for query results...\")" + Environment.NewLine;
-			if (catalogue == "gaia")
-				script += "job = Gaia.launch_job_async(jobstr, dump_to_file = False)" + Environment.NewLine;
-			script += "print(job)" + Environment.NewLine;
-			script += "results = job.get_results()" + Environment.NewLine;
-			script += "removelist = []" + Environment.NewLine;
+		//	if (catalogue == "gaia")
+		//		script += "print(\"Launching job query to Gaia archive\")" + Environment.NewLine;
+		//	script += "print(jobstr)" + Environment.NewLine;
+		//	script += "print(\" \")" + Environment.NewLine;
+		//	script += "print(\"Waiting for query results...\")" + Environment.NewLine;
+		//	if (catalogue == "gaia")
+		//		script += "job = Gaia.launch_job_async(jobstr, dump_to_file = False)" + Environment.NewLine;
+		//	script += "print(job)" + Environment.NewLine;
+		//	script += "results = job.get_results()" + Environment.NewLine;
+		//	script += "removelist = []" + Environment.NewLine;
 
-			//Strip object columns from FITS table
-			script += "for col in results.columns:" + Environment.NewLine;
-			script += "    if results[col].dtype == 'object' :" + Environment.NewLine;
-			script += "        removelist += [col]" + Environment.NewLine;
-			script += "results.remove_columns(removelist)" + Environment.NewLine;
-			script += "results.write(filename, overwrite = True, format = 'fits')";
+		//	//Strip object columns from FITS table
+		//	script += "for col in results.columns:" + Environment.NewLine;
+		//	script += "    if results[col].dtype == 'object' :" + Environment.NewLine;
+		//	script += "        removelist += [col]" + Environment.NewLine;
+		//	script += "results.remove_columns(removelist)" + Environment.NewLine;
+		//	script += "results.write(filename, overwrite = True, format = 'fits')";
 
-			StreamWriter sw = new StreamWriter(script_filename);
-			sw.Write(script);
-			sw.Close();
-		}
+		//	StreamWriter sw = new StreamWriter(script_filename);
+		//	sw.Write(script);
+		//	sw.Close();
+		//}
 
 		private static void MAKEGAIADR3QUERYNSCRIPT(string script_filename)
 		{
@@ -717,12 +717,17 @@ namespace JPFITS
 			script += "print(jobstr)" + Environment.NewLine;
 			script += "print(\" \")" + Environment.NewLine;
 			script += "print(\"Waiting for query results...\")" + Environment.NewLine;
-			script += "job = Gaia.launch_job_async(jobstr, dump_to_file = False)" + Environment.NewLine;
+			script += "try:" + Environment.NewLine;
+			script += "    job = Gaia.launch_job_async(jobstr, dump_to_file = False)" + Environment.NewLine;
+			script += "except:" + Environment.NewLine;
+			script += "    print(job)" + Environment.NewLine;
+			script += "    print(\"Press enter to continue...\")" + Environment.NewLine;
+			script += "    input()" + Environment.NewLine;
 			script += "print(job)" + Environment.NewLine;
 			script += "results = job.get_results()" + Environment.NewLine;
-			script += "removelist = []" + Environment.NewLine;
 
 			//Strip object columns from FITS table
+			script += "removelist = []" + Environment.NewLine;
 			script += "for col in results.columns:" + Environment.NewLine;
 			script += "    if results[col].dtype == 'object' :" + Environment.NewLine;
 			script += "        removelist += [col]" + Environment.NewLine;
@@ -1177,18 +1182,7 @@ namespace JPFITS
 				string stdout = proc.StandardOutput.ReadToEnd();
 				MessageBox.Show(stderr + "\r\n" + stdout);*/
 				return res;
-			}			
-
-			/*array<string>^ ExtensionEntryLabels = FITSBinTable.GetExtensionEntryLabels(result_savepathfilename, "");
-			array<TypeCode>^ ExtensionEntryDataTypes = FITSBinTable.GetExtensionEntryDataTypes(result_savepathfilename, "");
-			array<string>^ ExtensionEntryDataUnits = FITSBinTable.GetExtensionEntryUnits(result_savepathfilename, "");
-			array<double, 2>^ table = FITSBinTable.GetExtensionEntries(result_savepathfilename, "", ExtensionEntryLabels);
-			FITSImage fits = new FITSImage(result_savepathfilename, null, true, true, false, false);
-			fits.WriteFile(TypeCode.Double, false);
-			array<string>^ exkeys = new array<string>(2) { "RA", "DEC" };
-			array<string>^ exvals = new array<string>(2) { ra_deg.ToString(), dec_deg.ToString() };
-			array<string>^ excoms = new array<string>(2) { "Right Ascension of query field center, degrees", "Declination of query field center, degrees" };
-			FITSBinTable.WriteExtension(result_savepathfilename, "", true, ExtensionEntryLabels, ExtensionEntryDataTypes, ExtensionEntryDataUnits, exkeys, exvals, excoms, table);*/
+			}
 
 			return res;
 		}
