@@ -61,6 +61,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AstraCarta.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="AstraCarta.Designer.cs">
+      <DependentUpon>AstraCarta.cs</DependentUpon>
+    </Compile>
     <Compile Include="FITSBinTable.cs" />
     <Compile Include="FitsBinTableViewer.cs">
       <SubType>Form</SubType>
@@ -142,6 +148,9 @@
     <Compile Include="WorldCoordinateSolution.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="AstraCarta.resx">
+      <DependentUpon>AstraCarta.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="FITSFinder.resx">
       <DependentUpon>FITSFinder.cs</DependentUpon>
     </EmbeddedResource>

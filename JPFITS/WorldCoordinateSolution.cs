@@ -870,8 +870,8 @@ namespace JPFITS
 				header.SetKey("CROTA2", CROTAN[1].ToString("F8"), "WCS field rotation angle on axis 2 (degrees)", true, -1);
 				header.SetKey("CCVALD1", CCVALD1.ToString("F8"), "WCS field center on axis 1 (degrees)", true, -1);
 				header.SetKey("CCVALD2", CCVALD2.ToString("F8"), "WCS field center on axis 2 (degrees)", true, -1);
-				header.SetKey("CCVALS1", CCVALS1, "WCS field center on axis 1 (sexigesimal h m s)", true, -1);
-				header.SetKey("CCVALS2", CCVALS2, "WCS field center on axis 2 (sexigesimal d am as)", true, -1);
+				header.SetKey("CCVALS1", CCVALS1, "WCS field center on axis 1 (sexagesimal h m s)", true, -1);
+				header.SetKey("CCVALS2", CCVALS2, "WCS field center on axis 2 (sexagesimal d am as)", true, -1);
 				header.SetKey("CPIX1RM", CPIX1RM.ToString("G"), "Mean of WCS residuals on axis 1 (pixels)", true, -1);
 				header.SetKey("CPIX1RS", CPIX1RS.ToString("G"), "Standard dev of WCS residuals on axis 1 (pixels)", true, -1);
 				header.SetKey("CVAL1RM", CVAL1RM.ToString("G"), "Mean of WCS residuals on axis 1 (arcsec)", true, -1);
@@ -906,10 +906,10 @@ namespace JPFITS
 				num = 1;
 				for (int i = 0; i < CPIX1.Length; i++)
 				{
-					header.SetKey("WCP1_" + num.ToString("000"), CPIX1[i].ToString("F5"), "WCS coordinate pixel on axis 1", true, -1);
-					header.SetKey("WCP2_" + num.ToString("000"), CPIX2[i].ToString("F5"), "WCS coordinate pixel on axis 2", true, -1);
-					header.SetKey("WCV1_" + num.ToString("000"), CVAL1[i].ToString("F8"), "WCS coordinate value on axis 1 (degrees)", true, -1);
-					header.SetKey("WCV2_" + num.ToString("000"), CVAL2[i].ToString("F8"), "WCS coordinate value on axis 2 (degrees)", true, -1);
+					header.SetKey("WCP1_" + num.ToString("000"), CPIX1[i].ToString("F5"), "PSE coordinate pixel on axis 1", true, -1);
+					header.SetKey("WCP2_" + num.ToString("000"), CPIX2[i].ToString("F5"), "PSE coordinate pixel on axis 2", true, -1);
+					header.SetKey("WCV1_" + num.ToString("000"), CVAL1[i].ToString("F8"), "CAT coordinate value on axis 1 (degrees)", true, -1);
+					header.SetKey("WCV2_" + num.ToString("000"), CVAL2[i].ToString("F8"), "CAT coordinate value on axis 2 (degrees)", true, -1);
 					header.SetKey("WCD1_" + num.ToString("000"), DVAL1[i].ToString("F8"), "WCS coordinate delta on axis 1 (arcsec)", true, -1);
 					header.SetKey("WCD2_" + num.ToString("000"), DVAL2[i].ToString("F8"), "WCS coordinate delta on axis 2 (arcsec)", true, -1);
 					num++;

@@ -1187,6 +1187,107 @@ namespace JPFITS
 			return res;
 		}
 
+		public static int AstraCarta(double ra_deg, double dec_deg, double scale, int pixwidth, int pixheight, string shape, double buffer, string outdir, string outname, string filter, int nquery, bool showplot, bool forcenew, out string result_savepathfilename)
+		{
+			result_savepathfilename = "";
+			string pypath = (string)REG.GetReg("CCDLAB", "PythonExePath");
+
+			if (pypath == null || !File.Exists(pypath))
+			{
+				string[] dirsappdata = Directory.GetDirectories(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "*Python*", SearchOption.AllDirectories);
+				string[] dirsprogdata = Directory.GetDirectories("C:\\Program Files\\", "*Python*", SearchOption.TopDirectoryOnly);
+
+				ArrayList locs = new ArrayList();
+
+				for (int i = 0; i < dirsappdata.Length; i++)
+				{
+					string[] files = Directory.GetFiles(dirsappdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
+					if (files.Length == 1)
+						locs.Add(files[0]);
+				}
+				for (int i = 0; i < dirsprogdata.Length; i++)
+				{
+					string[] files = Directory.GetFiles(dirsprogdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
+					if (files.Length == 1)
+						locs.Add(files[0]);
+				}
+
+				if (locs.Count == 0)
+				{
+					if (MessageBox.Show("Is Python installed? Please show me where your Python installation is located, OK? \r\n\r\nIf Python is not installed, please gather it from:\r\n\r\n https://www.python.org/downloads/windows/", "I cannot find python.exe", MessageBoxButtons.OKCancel) == DialogResult.Cancel)
+						return -2;
+
+					OpenFileDialog ofd = new OpenFileDialog();
+					ofd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+					ofd.Filter = "Executable|*.exe;";
+					if (ofd.ShowDialog() == DialogResult.Cancel)
+						return -2;
+
+					pypath = ofd.FileName;
+				}
+				else
+				{
+					pypath = (string)locs[0];
+					DateTime date = File.GetCreationTimeUtc((string)locs[0]);
+					for (int i = 0; i < locs.Count; i++)
+						if (File.GetCreationTimeUtc((string)locs[i]) > date)
+						{
+							date = File.GetCreationTimeUtc((string)locs[i]);
+							pypath = (string)locs[i];
+						}
+				}
+
+				REG.SetReg("CCDLAB", "PythonExePath", pypath);
+			}
+
+			/*string script = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\Astrowerks\\CCDLAB\\AstraCarta.py";
+			System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo();
+			psi.FileName = pypath;
+			
+			string argstring = String.Format("\"" + script + "\"" + " -ra {0} -dec {1} -scale {2} -pixwidth {3} -pixheight {4} -shape {5} -buffer {6} -outdir {7} -outname {8} -filter {9} -nquery {10} -fitsout", ra_deg, dec_deg, scale, pixwidth, pixheight, "\"" + shape + "\"", buffer, "\"" + outdir + "\"", "\"" + outname + "\"", "\"" + filter + "\"", nquery);
+			if (showplot)
+				argstring += " -imageshow";
+
+			psi.Arguments = argstring;*/
+
+			string argstring = String.Format("-ra {0} -dec {1} -scale {2} -pixwidth {3} -pixheight {4} -shape {5} -buffer {6} -outdir {7} -outname {8} -filter {9} -nquery {10} -fitsout", ra_deg, dec_deg, scale, pixwidth, pixheight, "\"" + shape + "\"", buffer, "\"" + outdir + "\"", "\"" + outname + "\"", "\"" + filter + "\"", nquery);
+			if (showplot)
+				argstring += " -imageshow";
+			if (forcenew)
+				argstring += " -forcenew";
+			System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "astracarta " + argstring);
+
+			psi.UseShellExecute = false;
+			psi.CreateNoWindow = true;
+			psi.RedirectStandardError = true;
+			psi.RedirectStandardOutput = true;
+			System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
+			proc.WaitForExit();
+			int res = proc.ExitCode;
+
+			string stdout = proc.StandardOutput.ReadToEnd().Trim();
+			string stderr = proc.StandardError.ReadToEnd().Trim();
+
+			if (stderr != "")
+			{
+				MessageBox.Show(stderr + "\r\n\r\n" + stdout, "Error...");
+				return res;
+			}
+
+			result_savepathfilename = stdout;
+
+			int c = 0;
+			string test = result_savepathfilename;
+			while (!File.Exists(test))
+			{
+				c++;
+				test = result_savepathfilename.Substring(c);
+			}
+			result_savepathfilename = test;
+
+			return res;
+		}
+
 		#endregion
 	}
 }

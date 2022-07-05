@@ -7658,6 +7658,62 @@ namespace JPFITS
 			return result;
 		}
 
+		// jd = date2JD(date, utime);
+		// Convert Calendar Date &Univeral Time to Julian Day Number
+		// -date is the year - month - date string = '2000-03-20' for example
+		// -utime is the universal time string = '04:15:16' for example
+		public static double DateToJD(string date, string utime, out double yearpointyear)
+		{
+			//%#days in each month for a LEAP year
+			double[] monthsly = new double[12] { 0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30 };
+
+			//%#days in each month for a NON-LEAP year
+			double[] monthsnly = new double[12] { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30 };
+
+			//% reference Julian Date on 2000 - 01 - 01 @ 0.0hrs
+			double JD2000UT00 = 2451544.5;
+
+			//% get year, month, day
+			string[] splitdate = date.Split(new string[] { "-", ":" }, StringSplitOptions.RemoveEmptyEntries);
+			double year = Convert.ToDouble(splitdate[0]);
+			double month = Convert.ToDouble(splitdate[1]);
+			double day = Convert.ToDouble(splitdate[2]);
+
+			//number of leap years since &including 2000
+			double Nly = Math.Floor((year - 1 - 2000) / 4) + 1;
+
+			//number of non-leap years since 2000
+			double Nnly = year - 2000 - Nly;
+
+			double[] months;
+			//is this year - date a leap year ?
+			if (Math.IEEERemainder(year - 2000, 4) == 0)
+				months = monthsly;
+			else
+				months = monthsnly;
+
+			double Ndays = 366 * Nly + 365 * Nnly + day - 1;
+			double yeardays = JPMath.Sum(months, false) + 31;
+			yearpointyear = year + (day - 1) / yeardays;
+			for (int i = 0; i < month; i++)
+			{
+				Ndays += months[i];
+				yearpointyear += (months[i] / yeardays);
+			}
+
+			string[] splittime = utime.Split(new string[] { "-", ":" }, StringSplitOptions.RemoveEmptyEntries);
+			double t = Convert.ToDouble(splittime[0]) / 24 + Convert.ToDouble(splittime[1]) / 24 / 60 + Convert.ToDouble(splittime[2]) / 24 / 3600;
+			yearpointyear += (t / yeardays);
+
+			return JD2000UT00 + Ndays + t;
+		}
+
+		public static double DateToJD(string date, string utime)
+		{
+			double outyear;
+			return DateToJD(date, utime, out outyear);
+		}
+
 		#endregion
 
 		#region MATH
