@@ -7658,20 +7658,22 @@ namespace JPFITS
 			return result;
 		}
 
-		// jd = date2JD(date, utime);
-		// Convert Calendar Date &Univeral Time to Julian Day Number
-		// -date is the year - month - date string = '2000-03-20' for example
-		// -utime is the universal time string = '04:15:16' for example
+		/// <summary>
+		/// Convert Calendar Date post-1583 C.E. and Univeral Time to Julian Day Number
+		/// </summary>
+		/// <param name="date">Big-endian year, month, day string = '2000-03-20' or '2000:03:20' for example</param>
+		/// <param name="utime">Universal time string = '04-15-16' or '04:15:16' for example</param>
+		/// <param name="yearpointyear">Get the year time as a year.year float value</param>
 		public static double DateToJD(string date, string utime, out double yearpointyear)
 		{
 			//%#days in each month for a LEAP year
-			double[] monthsly = new double[12] { 0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30 };
+			double[] monthLYdays = new double[12] { 0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30 };
 
 			//%#days in each month for a NON-LEAP year
-			double[] monthsnly = new double[12] { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30 };
+			double[] monthCYdays = new double[12] { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30 };
 
-			//% reference Julian Date on 2000 - 01 - 01 @ 0.0hrs
-			double JD2000UT00 = 2451544.5;
+			//% reference Julian Date on 1583-01-01 @ 0.0hrs
+			double JD1583UT00 = 2299238.5;
 
 			//% get year, month, day
 			string[] splitdate = date.Split(new string[] { "-", ":" }, StringSplitOptions.RemoveEmptyEntries);
@@ -7679,39 +7681,62 @@ namespace JPFITS
 			double month = Convert.ToDouble(splitdate[1]);
 			double day = Convert.ToDouble(splitdate[2]);
 
-			//number of leap years since &including 2000
-			double Nly = Math.Floor((year - 1 - 2000) / 4) + 1;
+			//count the number of leap years and years since J2000
+			double Nleapyears = 0, Ncommonyears = 0, yeardays = 365;
+			double[] monthdays = monthCYdays;
+			if (YearIsLeap(year))
+			{
+				monthdays = monthLYdays;
+				yeardays = 366;
+			}
+			for (int i = 1583; i < year; i++)
+			{
+				if (YearIsLeap((double)i))
+					Nleapyears++;
+				else
+					Ncommonyears++;
+			}
 
-			//number of non-leap years since 2000
-			double Nnly = year - 2000 - Nly;
-
-			double[] months;
-			//is this year - date a leap year ?
-			if (Math.IEEERemainder(year - 2000, 4) == 0)
-				months = monthsly;
-			else
-				months = monthsnly;
-
-			double Ndays = 366 * Nly + 365 * Nnly + day - 1;
-			double yeardays = JPMath.Sum(months, false) + 31;
+			double Ndays = 366 * Nleapyears + 365 * Ncommonyears + day - 1;
 			yearpointyear = year + (day - 1) / yeardays;
 			for (int i = 0; i < month; i++)
 			{
-				Ndays += months[i];
-				yearpointyear += (months[i] / yeardays);
+				Ndays += monthdays[i];
+				yearpointyear += (monthdays[i] / yeardays);
 			}
 
 			string[] splittime = utime.Split(new string[] { "-", ":" }, StringSplitOptions.RemoveEmptyEntries);
 			double t = Convert.ToDouble(splittime[0]) / 24 + Convert.ToDouble(splittime[1]) / 24 / 60 + Convert.ToDouble(splittime[2]) / 24 / 3600;
 			yearpointyear += (t / yeardays);
 
-			return JD2000UT00 + Ndays + t;
+			return JD1583UT00 + Ndays + t;
 		}
 
+		/// <summary>
+		/// Convert Calendar Date post-1583 C.E. and Univeral Time to Julian Day Number
+		/// </summary>
+		/// <param name="date">Big-endian year, month, day string = '2000-03-20' or '2000:03:20' for example</param>
+		/// <param name="utime">Universal time string = '04-15-16' or '04:15:16' for example</param>
 		public static double DateToJD(string date, string utime)
 		{
 			double outyear;
 			return DateToJD(date, utime, out outyear);
+		}
+
+		/// <summary>
+		/// Check if year post-1583 C.E. is a leap year
+		/// </summary>
+		/// <param name="year"></param>
+		public static bool YearIsLeap(double year)
+		{
+			if (Math.IEEERemainder(year, 4) != 0)
+				return false;
+			else if (Math.IEEERemainder(year, 100) != 0)
+				return true;
+			else if (Math.IEEERemainder(year, 400) != 0)
+				return false;
+			else
+				return true;
 		}
 
 		#endregion
