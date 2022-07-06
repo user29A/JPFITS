@@ -62,21 +62,44 @@ namespace JPFITS
 			if (n != -1)
 				BufferTextBox.Text = (string)values[n];
 
+			RAOffsetTextBox.Text = "";
+			n = keys.IndexOf("-offsetra");
+			if (n != -1)
+				RAOffsetTextBox.Text = (string)values[n];
+
+			DecOffsetTextBox.Text = "";
+			n = keys.IndexOf("-offsetdec");
+			if (n != -1)
+				DecOffsetTextBox.Text = (string)values[n];
+
 			NameTextBox.Text = "";
 			n = keys.IndexOf("-outname");
 			if (n != -1)
-				//NameTextBox.Text = (string)values[n] + "_AstraCarta";
 				NameTextBox.Text = string.Join("_", ((string)values[n]).Split(Path.GetInvalidFileNameChars())) + "_AstraCarta";
 
-			CatalogueDrop.SelectedIndex = 0;
 			n = keys.IndexOf("-catalogue");
-			if (n != -1)
-				/*CatalogueDrop.Text = (string)values[n]*/;
-				//do catalogue stuff
+			if (n == -1)
+				CatalogueDrop.SelectedIndex = 0;
+			else if ((string)values[n] == "GaiaDR3")
+				CatalogueDrop.SelectedIndex = 0;
+			else
+			{
+				MessageBox.Show("Catalogue: '" + (string)values[n] + "' not recognized...");
+				return;
+			}
 
-			FilterDrop.SelectedIndex = 1;
 			n = keys.IndexOf("-filter");
-			if (n != -1)
+			if (n == -1)
+			{
+				if (CatalogueDrop.SelectedIndex != 0)
+				{
+					MessageBox.Show("No default filter for catalogue '" + CatalogueDrop.SelectedItem.ToString() + "'. Please specify the filter.");
+					return;
+				}
+				FilterDrop.SelectedIndex = 1;//gaiadr3 g
+			}
+			else if (CatalogueDrop.SelectedIndex == 0)//gaiadr3
+			{
 				if ((string)values[n] == "bp")
 					FilterDrop.SelectedIndex = 0;
 				else if ((string)values[n] == "g")
@@ -85,8 +108,15 @@ namespace JPFITS
 					FilterDrop.SelectedIndex = 2;
 				else
 				{
-
+					MessageBox.Show("Filter: '" + (string)values[n] + "' not recognized for catalogue '" + CatalogueDrop.SelectedItem.ToString() + "'");
+					return;
 				}
+			}
+			else
+			{
+				MessageBox.Show("Filter: '" + (string)values[n] + "' not recognized...");
+				return;
+			}
 			//do filter stuff
 
 			n = keys.IndexOf("-maglimit");
@@ -185,6 +215,10 @@ namespace JPFITS
 				CANCELLED = true;
 				ExecuteBtn.Text = "Execute";
 				ExecuteBtn.Enabled = false;
+				PROC.Kill();
+				PROC.Close();
+				BGWrkr.CancelAsync();
+
 				return;
 			}
 			ERROR = false;
@@ -197,6 +231,10 @@ namespace JPFITS
 			argstring += String.Format("-pixheight {0} ", HeightTextBox.Text);
 			if (BufferTextBox.Text != "")
 				argstring += String.Format("-buffer {0} ", BufferTextBox.Text);
+			if (RAOffsetTextBox.Text != "")
+				argstring += String.Format("-offsetra {0} ", RAOffsetTextBox.Text);
+			if (DecOffsetTextBox.Text != "")
+				argstring += String.Format("-offsetdec {0} ", DecOffsetTextBox.Text);
 			if (NameTextBox.Text != "")
 				argstring += String.Format("-outname {0} ", "\"" + NameTextBox.Text + "\"");
 			argstring += String.Format("-catalogue {0} ", "\"" + CatalogueDrop.SelectedItem.ToString() + "\"");
@@ -262,44 +300,12 @@ namespace JPFITS
 					BGWrkr.ReportProgress(0, "Error: " + ERR + "\r\n");
 					if (ERR.Contains("\'astracarta\' is not recognized"))
 					{
-						//MessageTextBox.AppendText("Installing AstroQuery..." + "\r\n");
-						//MessageTextBox.AppendText(">>pip install astroquery --upgrade" + "\r\n");
-						//MessageTextBox.AppendText(">>Please wait..." + "\r\n");
-						//PSI = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip install astroquery --upgrade");
-						//PSI.UseShellExecute = false;
-						//PSI.CreateNoWindow = true;
-						//PSI.RedirectStandardError = true;
-						//PSI.RedirectStandardOutput = true;
-						//PROC = System.Diagnostics.Process.Start(PSI);
-						//PROC.WaitForExit();
-						//MessageTextBox.AppendText(PROC.StandardError.ReadToEnd() + "\r\n");
-						//MessageTextBox.AppendText(PROC.StandardOutput.ReadToEnd() + "\r\n");
-
-						//MessageTextBox.AppendText("Installing matplotlib..." + "\r\n");
-						//MessageTextBox.AppendText(">>pip install matplotlib --upgrade" + "\r\n");
-						//MessageTextBox.AppendText(">>Please wait..." + "\r\n");
-						//PSI = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip install matplotlib --upgrade");
-						//PSI.UseShellExecute = false;
-						//PSI.CreateNoWindow = true;
-						//PSI.RedirectStandardError = true;
-						//PSI.RedirectStandardOutput = true;
-						//PROC = System.Diagnostics.Process.Start(PSI);
-						//PROC.WaitForExit();
-						//MessageTextBox.AppendText(PROC.StandardError.ReadToEnd() + "\r\n");
-						//MessageTextBox.AppendText(PROC.StandardOutput.ReadToEnd() + "\r\n");
-
 						BGWrkr.ReportProgress(0, "Installing AstraCarta..." + "\r\n");
 						BGWrkr.ReportProgress(0, ">>pip install astracarta" + "\r\n");
 						BGWrkr.ReportProgress(0, ">>Please wait one minute..." + "\r\n");
 						PSI = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip install astracarta --upgrade");
-						//PSI.UseShellExecute = false;
-						//PSI.CreateNoWindow = true;
-						//PSI.RedirectStandardError = true;
-						//PSI.RedirectStandardOutput = true;
 						PROC = System.Diagnostics.Process.Start(PSI);
 						PROC.WaitForExit();
-						//MessageTextBox.AppendText(PROC.StandardError.ReadToEnd() + "\r\n");
-						//MessageTextBox.AppendText(PROC.StandardOutput.ReadToEnd() + "\r\n");
 
 						if (CANCELLED)
 							return;
@@ -321,6 +327,10 @@ namespace JPFITS
 								pathchange = true;
 							}
 						}
+
+						if (CANCELLED)
+							return;
+
 						PSI = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "python -c \"import os, sys; print(os.path.dirname(sys.executable))\"");
 						PSI.UseShellExecute = false;
 						PSI.CreateNoWindow = true;
@@ -391,13 +401,19 @@ namespace JPFITS
 				PERFORMEXECUTE = false;
 
 				if (CANCELLED)
+				{
+					MessageTextBox.AppendText("Cancelled...\r\n");
 					return;
+				}
 
 				ExecuteBtn.PerformClick();
 				return;
 			}
 			if (CANCELLED)
+			{
+				MessageTextBox.AppendText("Cancelled...\r\n");
 				return;
+			}
 
 			if (SaveTableChck.Checked && !ERROR)
 			{
@@ -438,6 +454,8 @@ namespace JPFITS
 
 		private void AstraCarta_Load(object sender, EventArgs e)
 		{
+			VersionBGWrkr.RunWorkerAsync("versioncheck");
+
 			if (!OPENFROMARGS)
 			{
 				CatalogueDrop.SelectedIndex = Convert.ToInt32(REG.GetReg("AstraCarta", "CatalogueDrop"));
@@ -467,9 +485,7 @@ namespace JPFITS
 			else
 			{
 				ExecuteBtn.PerformClick();
-			}
-
-			VersionBGWrkr.RunWorkerAsync("versioncheck");
+			}			
 		}
 
 		private void CatalogueDrop_SelectedIndexChanged(object sender, EventArgs e)
@@ -573,13 +589,13 @@ namespace JPFITS
 				string versout = versproc.StandardOutput.ReadToEnd();
 				CURVERS = versout.Substring(versout.IndexOf("INSTALLED:"), versout.IndexOf("LATEST:") - versout.IndexOf("INSTALLED:")).Replace("INSTALLED:", "").Trim();
 				LATVERS = versout.Substring(versout.IndexOf("LATEST:")).Replace("LATEST:", "").Trim();
-				//MessageBox.Show("\'" + curvers + "\'" + "\r\n\r\n" + "\'" + latvers + "\'");
 
 				if (LATVERS != CURVERS)
 				{
 					CloseOnCompleteChck.Checked = false;
 					UpdatMenuBtn.Visible = true;
 					UpdatMenuBtn.BackColor = System.Drawing.Color.PaleVioletRed;
+					Refresh();
 				}
 			}
 
@@ -598,15 +614,11 @@ namespace JPFITS
 				MessageTextBox.AppendText("Updating AstraCarta. Please wait a moment..." + "\r\n");
 				MessageTextBox.AppendText(">>pip install astracarta --upgrade" + "\r\n");
 				System.Diagnostics.ProcessStartInfo verspsi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip install astracarta --upgrade");
-				/*verspsi.UseShellExecute = false;
-				verspsi.CreateNoWindow = true;
-				verspsi.RedirectStandardError = true;
-				verspsi.RedirectStandardOutput = true;*/
 				System.Diagnostics.Process versproc = new System.Diagnostics.Process();
 				versproc = System.Diagnostics.Process.Start(verspsi);
 				versproc.WaitForExit();
-				//MessageTextBox.AppendText(versproc.StandardOutput.ReadToEnd());
 				UpdatMenuBtn.BackColor = System.Drawing.SystemColors.Control;
+				UpdatMenuBtn.Visible = false;
 				MessageTextBox.AppendText("AstraCarta updated to version: " + LATVERS + "\r\n");
 			}
 		}

@@ -1240,16 +1240,6 @@ namespace JPFITS
 				REG.SetReg("CCDLAB", "PythonExePath", pypath);
 			}
 
-			/*string script = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\Astrowerks\\CCDLAB\\AstraCarta.py";
-			System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo();
-			psi.FileName = pypath;
-			
-			string argstring = String.Format("\"" + script + "\"" + " -ra {0} -dec {1} -scale {2} -pixwidth {3} -pixheight {4} -shape {5} -buffer {6} -outdir {7} -outname {8} -filter {9} -nquery {10} -fitsout", ra_deg, dec_deg, scale, pixwidth, pixheight, "\"" + shape + "\"", buffer, "\"" + outdir + "\"", "\"" + outname + "\"", "\"" + filter + "\"", nquery);
-			if (showplot)
-				argstring += " -imageshow";
-
-			psi.Arguments = argstring;*/
-
 			string argstring = String.Format("-ra {0} -dec {1} -scale {2} -pixwidth {3} -pixheight {4} -shape {5} -buffer {6} -outdir {7} -outname {8} -filter {9} -nquery {10} -fitsout", ra_deg, dec_deg, scale, pixwidth, pixheight, "\"" + shape + "\"", buffer, "\"" + outdir + "\"", "\"" + outname + "\"", "\"" + filter + "\"", nquery);
 			if (showplot)
 				argstring += " -imageshow";

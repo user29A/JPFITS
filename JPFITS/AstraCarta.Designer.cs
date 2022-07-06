@@ -77,12 +77,16 @@
 			this.MainMenu = new System.Windows.Forms.MenuStrip();
 			this.LoadMenuBtn = new System.Windows.Forms.ToolStripMenuItem();
 			this.SaveMenuBtn = new System.Windows.Forms.ToolStripMenuItem();
+			this.UpdatMenuBtn = new System.Windows.Forms.ToolStripMenuItem();
 			this.CloseOnCompleteChck = new System.Windows.Forms.CheckBox();
 			this.BGWrkr = new System.ComponentModel.BackgroundWorker();
 			this.WorkTimer = new System.Windows.Forms.Timer(this.components);
 			this.OverwriteChck = new System.Windows.Forms.CheckBox();
-			this.UpdatMenuBtn = new System.Windows.Forms.ToolStripMenuItem();
 			this.VersionBGWrkr = new System.ComponentModel.BackgroundWorker();
+			this.RAOffsetTextBox = new System.Windows.Forms.TextBox();
+			this.label18 = new System.Windows.Forms.Label();
+			this.DecOffsetTextBox = new System.Windows.Forms.TextBox();
+			this.label19 = new System.Windows.Forms.Label();
 			this.MainMenu.SuspendLayout();
 			this.SuspendLayout();
 			// 
@@ -123,7 +127,7 @@
 			this.RATextBox.Name = "RATextBox";
 			this.RATextBox.Size = new System.Drawing.Size(100, 20);
 			this.RATextBox.TabIndex = 3;
-			this.toolTip1.SetToolTip(this.RATextBox, "degree.degree or sexagesimal");
+			this.toolTip1.SetToolTip(this.RATextBox, "degree.degree");
 			this.RATextBox.TextChanged += new System.EventHandler(this.NumericTextBox_TextChanged);
 			// 
 			// DecTextBox
@@ -132,7 +136,7 @@
 			this.DecTextBox.Name = "DecTextBox";
 			this.DecTextBox.Size = new System.Drawing.Size(100, 20);
 			this.DecTextBox.TabIndex = 5;
-			this.toolTip1.SetToolTip(this.DecTextBox, "degree.degree or sexagesimal");
+			this.toolTip1.SetToolTip(this.DecTextBox, "degree.degree");
 			this.DecTextBox.TextChanged += new System.EventHandler(this.NumericTextBox_TextChanged);
 			// 
 			// label2
@@ -164,10 +168,11 @@
 			// 
 			// toolTip1
 			// 
-			this.toolTip1.AutomaticDelay = 250;
-			this.toolTip1.AutoPopDelay = 5000;
-			this.toolTip1.InitialDelay = 250;
-			this.toolTip1.ReshowDelay = 50;
+			this.toolTip1.AutomaticDelay = 100;
+			this.toolTip1.AutoPopDelay = 8000;
+			this.toolTip1.InitialDelay = 100;
+			this.toolTip1.ReshowDelay = 20;
+			this.toolTip1.ShowAlways = true;
 			// 
 			// WidthTextBox
 			// 
@@ -246,7 +251,6 @@
 			this.EntriesTextBox.Name = "EntriesTextBox";
 			this.EntriesTextBox.Size = new System.Drawing.Size(409, 20);
 			this.EntriesTextBox.TabIndex = 23;
-			this.toolTip1.SetToolTip(this.EntriesTextBox, "output file name");
 			// 
 			// DirectoryTextBox
 			// 
@@ -254,7 +258,6 @@
 			this.DirectoryTextBox.Name = "DirectoryTextBox";
 			this.DirectoryTextBox.Size = new System.Drawing.Size(268, 20);
 			this.DirectoryTextBox.TabIndex = 43;
-			this.toolTip1.SetToolTip(this.DirectoryTextBox, "output file name");
 			this.DirectoryTextBox.Click += new System.EventHandler(this.DirectoryTextBox_Click);
 			// 
 			// NQueryTextBox
@@ -263,7 +266,7 @@
 			this.NQueryTextBox.Name = "NQueryTextBox";
 			this.NQueryTextBox.Size = new System.Drawing.Size(52, 20);
 			this.NQueryTextBox.TabIndex = 17;
-			this.toolTip1.SetToolTip(this.NQueryTextBox, "degrees");
+			this.toolTip1.SetToolTip(this.NQueryTextBox, "Number of sources to request");
 			this.NQueryTextBox.TextChanged += new System.EventHandler(this.NumericTextBox_TextChanged);
 			// 
 			// label4
@@ -541,6 +544,14 @@
 			this.SaveMenuBtn.Size = new System.Drawing.Size(43, 20);
 			this.SaveMenuBtn.Text = "Save";
 			// 
+			// UpdatMenuBtn
+			// 
+			this.UpdatMenuBtn.Name = "UpdatMenuBtn";
+			this.UpdatMenuBtn.Size = new System.Drawing.Size(57, 20);
+			this.UpdatMenuBtn.Text = "Update";
+			this.UpdatMenuBtn.Visible = false;
+			this.UpdatMenuBtn.Click += new System.EventHandler(this.UpdatMenuBtn_Click);
+			// 
 			// CloseOnCompleteChck
 			// 
 			this.CloseOnCompleteChck.Location = new System.Drawing.Point(348, 450);
@@ -576,19 +587,45 @@
 			this.OverwriteChck.UseVisualStyleBackColor = true;
 			this.OverwriteChck.CheckedChanged += new System.EventHandler(this.OverwriteChck_CheckedChanged);
 			// 
-			// UpdatMenuBtn
-			// 
-			this.UpdatMenuBtn.Name = "UpdatMenuBtn";
-			this.UpdatMenuBtn.Size = new System.Drawing.Size(57, 20);
-			this.UpdatMenuBtn.Text = "Update";
-			this.UpdatMenuBtn.Visible = false;
-			this.UpdatMenuBtn.Click += new System.EventHandler(this.UpdatMenuBtn_Click);
-			// 
 			// VersionBGWrkr
 			// 
 			this.VersionBGWrkr.WorkerReportsProgress = true;
 			this.VersionBGWrkr.WorkerSupportsCancellation = true;
 			this.VersionBGWrkr.DoWork += new System.ComponentModel.DoWorkEventHandler(this.VersionBGWrkr_DoWork);
+			// 
+			// RAOffsetTextBox
+			// 
+			this.RAOffsetTextBox.Location = new System.Drawing.Point(222, 190);
+			this.RAOffsetTextBox.Name = "RAOffsetTextBox";
+			this.RAOffsetTextBox.Size = new System.Drawing.Size(29, 20);
+			this.RAOffsetTextBox.TabIndex = 49;
+			this.toolTip1.SetToolTip(this.RAOffsetTextBox, "arcminutes");
+			// 
+			// label18
+			// 
+			this.label18.AutoSize = true;
+			this.label18.Location = new System.Drawing.Point(155, 193);
+			this.label18.Name = "label18";
+			this.label18.Size = new System.Drawing.Size(56, 13);
+			this.label18.TabIndex = 48;
+			this.label18.Text = "RA Offset:";
+			// 
+			// DecOffsetTextBox
+			// 
+			this.DecOffsetTextBox.Location = new System.Drawing.Point(222, 216);
+			this.DecOffsetTextBox.Name = "DecOffsetTextBox";
+			this.DecOffsetTextBox.Size = new System.Drawing.Size(29, 20);
+			this.DecOffsetTextBox.TabIndex = 51;
+			this.toolTip1.SetToolTip(this.DecOffsetTextBox, "arcminutes");
+			// 
+			// label19
+			// 
+			this.label19.AutoSize = true;
+			this.label19.Location = new System.Drawing.Point(155, 219);
+			this.label19.Name = "label19";
+			this.label19.Size = new System.Drawing.Size(61, 13);
+			this.label19.TabIndex = 50;
+			this.label19.Text = "Dec Offset:";
 			// 
 			// AstraCarta
 			// 
@@ -596,6 +633,10 @@
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.CancelButton = this.EscapeBtn;
 			this.ClientSize = new System.Drawing.Size(435, 523);
+			this.Controls.Add(this.DecOffsetTextBox);
+			this.Controls.Add(this.label19);
+			this.Controls.Add(this.RAOffsetTextBox);
+			this.Controls.Add(this.label18);
 			this.Controls.Add(this.OverwriteChck);
 			this.Controls.Add(this.NQueryTextBox);
 			this.Controls.Add(this.CloseOnCompleteChck);
@@ -716,5 +757,9 @@
 		public System.Windows.Forms.CheckBox OverwriteChck;
 		private System.Windows.Forms.ToolStripMenuItem UpdatMenuBtn;
 		private System.ComponentModel.BackgroundWorker VersionBGWrkr;
+		public System.Windows.Forms.TextBox RAOffsetTextBox;
+		private System.Windows.Forms.Label label18;
+		public System.Windows.Forms.TextBox DecOffsetTextBox;
+		private System.Windows.Forms.Label label19;
 	}
 }

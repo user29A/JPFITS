@@ -7659,7 +7659,7 @@ namespace JPFITS
 		}
 
 		/// <summary>
-		/// Convert Calendar Date post-1583 C.E. and Univeral Time to Julian Day Number
+		/// Convert Calendar Date post-1583 A.D. and Univeral Time to Julian Day Number
 		/// </summary>
 		/// <param name="date">Big-endian year, month, day string = '2000-03-20' or '2000:03:20' for example</param>
 		/// <param name="utime">Universal time string = '04-15-16' or '04:15:16' for example</param>
@@ -7713,7 +7713,7 @@ namespace JPFITS
 		}
 
 		/// <summary>
-		/// Convert Calendar Date post-1583 C.E. and Univeral Time to Julian Day Number
+		/// Convert Calendar Date post-1583 A.D. and Univeral Time to Julian Day Number
 		/// </summary>
 		/// <param name="date">Big-endian year, month, day string = '2000-03-20' or '2000:03:20' for example</param>
 		/// <param name="utime">Universal time string = '04-15-16' or '04:15:16' for example</param>
@@ -7724,7 +7724,7 @@ namespace JPFITS
 		}
 
 		/// <summary>
-		/// Check if year post-1583 C.E. is a leap year
+		/// Check if year post-1583 A.D. is a leap year
 		/// </summary>
 		/// <param name="year"></param>
 		public static bool YearIsLeap(double year)
