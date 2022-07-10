@@ -353,7 +353,7 @@ namespace JPFITS
 						{
 							System.Drawing.Color bc = MessageTextBox.BackColor;
 							MessageTextBox.BackColor = System.Drawing.Color.Red;
-							MessageBox.Show("WE HAD TO INSTALL ASTRACARTA AND ITS DEPENDENCIES, AND UPDATE THE ENVIRONMENT PATH VARIABLE.\r\n\r\nPLEASE RESTART YOUR SYSTEM FOR THE PATH ENVIRONMENT VARIABLE TO UPDATE");
+							MessageBox.Show("WE HAD TO UPDATE THE ENVIRONMENT PATH VARIABLE FOR PYTHON.\r\n\r\nIF A PATH ERROR IS FOUND WHEN RE-TRYING, PLEASE RESTART YOUR SYSTEM FOR THE PATH ENVIRONMENT VARIABLE TO UPDATE");
 							MessageTextBox.BackColor = bc;
 							this.Close();
 							return;
@@ -369,7 +369,7 @@ namespace JPFITS
 					{
 						CloseOnCompleteChck.Checked = false;
 						ERROR = true;
-						BGWrkr.ReportProgress(0, "ERROR (A): Unhandled error. Please contact support." + "\r\n");
+						BGWrkr.ReportProgress(0, "ERROR (A): Unhandled error. Please see the message box and contact support." + "\r\n");
 						return;
 					}
 				}
@@ -377,7 +377,7 @@ namespace JPFITS
 				{
 					CloseOnCompleteChck.Checked = false;
 					ERROR = true;
-					BGWrkr.ReportProgress(0, "ERROR (B): Unhandled error. Please contact support." + "\r\n");
+					BGWrkr.ReportProgress(0, "ERROR (B): Unknown error. Please contact support." + "\r\n");
 					return;
 				}
 
@@ -396,22 +396,23 @@ namespace JPFITS
 			if (!ExecuteBtn.Enabled)
 				ExecuteBtn.Enabled = true;
 
+			if (CANCELLED)
+			{
+				PERFORMEXECUTE = false;
+				MessageTextBox.AppendText("Cancelled...\r\n");
+				return;
+			}
+			if (ERROR)
+			{
+				ERROR = false;
+				return;
+			}
+
 			if (PERFORMEXECUTE)
 			{
 				PERFORMEXECUTE = false;
 
-				if (CANCELLED)
-				{
-					MessageTextBox.AppendText("Cancelled...\r\n");
-					return;
-				}
-
 				ExecuteBtn.PerformClick();
-				return;
-			}
-			if (CANCELLED)
-			{
-				MessageTextBox.AppendText("Cancelled...\r\n");
 				return;
 			}
 
@@ -437,8 +438,6 @@ namespace JPFITS
 				catch
 				{
 					CloseOnCompleteChck.Checked = false;
-					ERROR = true;
-
 					MessageTextBox.AppendText("File name parsing error:" + "\r\n" + OUTFILE);
 				}
 			}
