@@ -369,7 +369,7 @@ namespace JPFITS
 					{
 						CloseOnCompleteChck.Checked = false;
 						ERROR = true;
-						BGWrkr.ReportProgress(0, "ERROR (A): Unhandled error. Please see the message box and contact support." + "\r\n");
+						BGWrkr.ReportProgress(0, "ERROR (A): Unhandled error. Please see the message box..." + "\r\n");
 						return;
 					}
 				}
@@ -377,11 +377,18 @@ namespace JPFITS
 				{
 					CloseOnCompleteChck.Checked = false;
 					ERROR = true;
-					BGWrkr.ReportProgress(0, "ERROR (B): Unknown error. Please contact support." + "\r\n");
+					BGWrkr.ReportProgress(0, "ERROR (B): Unknown error." + "\r\n");
 					return;
 				}
-
-			BGWrkr.ReportProgress(0, "Ouput: " + OUTFILE + "\r\n");
+			else
+			{
+				BGWrkr.ReportProgress(0, "Ouput: " + OUTFILE + "\r\n");
+				if (!OUTFILE.Contains("Ouput: Found"))
+				{
+					ERROR = true;
+					BGWrkr.ReportProgress(0, "ERROR (C): Unknown error. Please see the message box..." + "\r\n");
+				}
+			}		
 		}
 
 		private void BGWrkr_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -402,8 +409,10 @@ namespace JPFITS
 				MessageTextBox.AppendText("Cancelled...\r\n");
 				return;
 			}
+
 			if (ERROR)
 			{
+				PERFORMEXECUTE = false;
 				ERROR = false;
 				return;
 			}
@@ -416,7 +425,7 @@ namespace JPFITS
 				return;
 			}
 
-			if (SaveTableChck.Checked && !ERROR)
+			if (SaveTableChck.Checked)
 			{
 				try
 				{
