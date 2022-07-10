@@ -377,17 +377,12 @@ namespace JPFITS
 				{
 					CloseOnCompleteChck.Checked = false;
 					ERROR = true;
-					BGWrkr.ReportProgress(0, "ERROR (B): Unknown error." + "\r\n");
+					BGWrkr.ReportProgress(0, "ERROR (B): Unknown error. Is Python >= v. 3.10 installed?" + "\r\n");
 					return;
 				}
 			else
 			{
-				BGWrkr.ReportProgress(0, "Ouput: " + OUTFILE + "\r\n");
-				if (!OUTFILE.Contains("Ouput: Found"))
-				{
-					ERROR = true;
-					BGWrkr.ReportProgress(0, "ERROR (C): Unknown error. Please see the message box..." + "\r\n");
-				}
+				BGWrkr.ReportProgress(0, OUTFILE + "\r\n");
 			}		
 		}
 
@@ -600,7 +595,7 @@ namespace JPFITS
 		{
 			if ((string)e.Argument == "versioncheck")
 			{
-				System.Diagnostics.ProcessStartInfo verspsi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip index versions astracarta");
+				System.Diagnostics.ProcessStartInfo verspsi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "py --version");
 				verspsi.UseShellExecute = false;
 				verspsi.CreateNoWindow = true;
 				verspsi.RedirectStandardError = true;
@@ -608,8 +603,41 @@ namespace JPFITS
 				System.Diagnostics.Process versproc = new System.Diagnostics.Process();
 				versproc = System.Diagnostics.Process.Start(verspsi);
 				versproc.WaitForExit();
-
 				string versout = versproc.StandardOutput.ReadToEnd();
+				if (versout.Trim() == "")
+				{
+					MessageBox.Show("No Python found. Please install Python version 3.10 or greater on your machine first. Thank you!" + "\r\n\r\nMAKE SURE to CHECK \"Add Python 3.10 to PATH;\r\nCustomize Installation->Next\r\nCHECK Install for all users.", "Error...");
+					this.DialogResult = DialogResult.Cancel;
+					this.Close();
+					return;
+				}
+				else
+				{
+					bool update = false;
+					string[] splitvers = versout.Replace("Python ","").Trim().Split(new string[] { "." }, StringSplitOptions.RemoveEmptyEntries);
+					if (Convert.ToInt32(splitvers[0]) < 3)
+						update = true;
+					else if (Convert.ToInt32(splitvers[0]) == 3 && Convert.ToInt32(splitvers[1]) < 10)
+						update = true;
+					if (update)
+					{
+						MessageBox.Show("Please install Python version 3.10 or greater on your machine first. Thank you!" + "\r\n\r\nCurrent Version: Python " + splitvers[0] + "." + splitvers[1], "Error...");
+						this.DialogResult = DialogResult.Cancel;
+						this.Close();
+						return;
+					}
+				}
+
+				verspsi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip index versions astracarta");
+				verspsi.UseShellExecute = false;
+				verspsi.CreateNoWindow = true;
+				verspsi.RedirectStandardError = true;
+				verspsi.RedirectStandardOutput = true;
+				versproc = new System.Diagnostics.Process();
+				versproc = System.Diagnostics.Process.Start(verspsi);
+				versproc.WaitForExit();
+				versout = versproc.StandardOutput.ReadToEnd();
+
 				CURVERS = versout.Substring(versout.IndexOf("INSTALLED:"), versout.IndexOf("LATEST:") - versout.IndexOf("INSTALLED:")).Replace("INSTALLED:", "").Trim();
 				LATVERS = versout.Substring(versout.IndexOf("LATEST:")).Replace("LATEST:", "").Trim();
 
