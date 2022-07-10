@@ -606,6 +606,7 @@ namespace JPFITS
 				string versout = versproc.StandardOutput.ReadToEnd();
 				if (versout.Trim() == "")
 				{
+					ERROR = true;
 					MessageBox.Show("No Python found. Please install Python version 3.10 or greater on your machine first. Thank you!" + "\r\n\r\nMAKE SURE to CHECK \"Add Python 3.10 to PATH;\r\nCustomize Installation->Next\r\nCHECK Install for all users.", "Error...");
 					this.DialogResult = DialogResult.Cancel;
 					this.Close();
@@ -621,6 +622,7 @@ namespace JPFITS
 						update = true;
 					if (update)
 					{
+						ERROR = true;
 						MessageBox.Show("Please install Python version 3.10 or greater on your machine first. Thank you!" + "\r\n\r\nCurrent Version: Python " + splitvers[0] + "." + splitvers[1], "Error...");
 						this.DialogResult = DialogResult.Cancel;
 						this.Close();
