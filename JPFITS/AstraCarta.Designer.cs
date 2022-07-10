@@ -46,9 +46,12 @@
 			this.NameTextBox = new System.Windows.Forms.TextBox();
 			this.PMEpochTextBox = new System.Windows.Forms.TextBox();
 			this.PMLimitTextBox = new System.Windows.Forms.TextBox();
+			this.NQueryTextBox = new System.Windows.Forms.TextBox();
+			this.RAOffsetTextBox = new System.Windows.Forms.TextBox();
+			this.DecOffsetTextBox = new System.Windows.Forms.TextBox();
+			this.FITSTableChck = new System.Windows.Forms.CheckBox();
 			this.EntriesTextBox = new System.Windows.Forms.TextBox();
 			this.DirectoryTextBox = new System.Windows.Forms.TextBox();
-			this.NQueryTextBox = new System.Windows.Forms.TextBox();
 			this.label4 = new System.Windows.Forms.Label();
 			this.label5 = new System.Windows.Forms.Label();
 			this.label6 = new System.Windows.Forms.Label();
@@ -60,7 +63,6 @@
 			this.label10 = new System.Windows.Forms.Label();
 			this.ShapeDrop = new System.Windows.Forms.ComboBox();
 			this.label11 = new System.Windows.Forms.Label();
-			this.FITSTableChck = new System.Windows.Forms.CheckBox();
 			this.ShowImageChck = new System.Windows.Forms.CheckBox();
 			this.SaveImageChck = new System.Windows.Forms.CheckBox();
 			this.SilentChck = new System.Windows.Forms.CheckBox();
@@ -83,9 +85,7 @@
 			this.WorkTimer = new System.Windows.Forms.Timer(this.components);
 			this.OverwriteChck = new System.Windows.Forms.CheckBox();
 			this.VersionBGWrkr = new System.ComponentModel.BackgroundWorker();
-			this.RAOffsetTextBox = new System.Windows.Forms.TextBox();
 			this.label18 = new System.Windows.Forms.Label();
-			this.DecOffsetTextBox = new System.Windows.Forms.TextBox();
 			this.label19 = new System.Windows.Forms.Label();
 			this.MainMenu.SuspendLayout();
 			this.SuspendLayout();
@@ -245,6 +245,43 @@
 			this.toolTip1.SetToolTip(this.PMLimitTextBox, "mas per year");
 			this.PMLimitTextBox.TextChanged += new System.EventHandler(this.NumericTextBox_TextChanged);
 			// 
+			// NQueryTextBox
+			// 
+			this.NQueryTextBox.Location = new System.Drawing.Point(371, 328);
+			this.NQueryTextBox.Name = "NQueryTextBox";
+			this.NQueryTextBox.Size = new System.Drawing.Size(52, 20);
+			this.NQueryTextBox.TabIndex = 17;
+			this.toolTip1.SetToolTip(this.NQueryTextBox, "Number of sources to request");
+			this.NQueryTextBox.TextChanged += new System.EventHandler(this.NumericTextBox_TextChanged);
+			// 
+			// RAOffsetTextBox
+			// 
+			this.RAOffsetTextBox.Location = new System.Drawing.Point(222, 190);
+			this.RAOffsetTextBox.Name = "RAOffsetTextBox";
+			this.RAOffsetTextBox.Size = new System.Drawing.Size(29, 20);
+			this.RAOffsetTextBox.TabIndex = 49;
+			this.toolTip1.SetToolTip(this.RAOffsetTextBox, "arcminutes");
+			// 
+			// DecOffsetTextBox
+			// 
+			this.DecOffsetTextBox.Location = new System.Drawing.Point(222, 216);
+			this.DecOffsetTextBox.Name = "DecOffsetTextBox";
+			this.DecOffsetTextBox.Size = new System.Drawing.Size(29, 20);
+			this.DecOffsetTextBox.TabIndex = 51;
+			this.toolTip1.SetToolTip(this.DecOffsetTextBox, "arcminutes");
+			// 
+			// FITSTableChck
+			// 
+			this.FITSTableChck.AutoSize = true;
+			this.FITSTableChck.Location = new System.Drawing.Point(11, 473);
+			this.FITSTableChck.Name = "FITSTableChck";
+			this.FITSTableChck.Size = new System.Drawing.Size(79, 17);
+			this.FITSTableChck.TabIndex = 24;
+			this.FITSTableChck.Text = "FITS Table";
+			this.toolTip1.SetToolTip(this.FITSTableChck, "Save as FITS binary table. CSV is default.");
+			this.FITSTableChck.UseVisualStyleBackColor = true;
+			this.FITSTableChck.CheckedChanged += new System.EventHandler(this.FITSTableChck_CheckedChanged);
+			// 
 			// EntriesTextBox
 			// 
 			this.EntriesTextBox.Location = new System.Drawing.Point(11, 424);
@@ -259,15 +296,6 @@
 			this.DirectoryTextBox.Size = new System.Drawing.Size(268, 20);
 			this.DirectoryTextBox.TabIndex = 43;
 			this.DirectoryTextBox.Click += new System.EventHandler(this.DirectoryTextBox_Click);
-			// 
-			// NQueryTextBox
-			// 
-			this.NQueryTextBox.Location = new System.Drawing.Point(371, 328);
-			this.NQueryTextBox.Name = "NQueryTextBox";
-			this.NQueryTextBox.Size = new System.Drawing.Size(52, 20);
-			this.NQueryTextBox.TabIndex = 17;
-			this.toolTip1.SetToolTip(this.NQueryTextBox, "Number of sources to request");
-			this.NQueryTextBox.TextChanged += new System.EventHandler(this.NumericTextBox_TextChanged);
 			// 
 			// label4
 			// 
@@ -379,17 +407,6 @@
 			this.label11.Size = new System.Drawing.Size(50, 13);
 			this.label11.TabIndex = 22;
 			this.label11.Text = "Rotation:";
-			// 
-			// FITSTableChck
-			// 
-			this.FITSTableChck.AutoSize = true;
-			this.FITSTableChck.Location = new System.Drawing.Point(11, 473);
-			this.FITSTableChck.Name = "FITSTableChck";
-			this.FITSTableChck.Size = new System.Drawing.Size(79, 17);
-			this.FITSTableChck.TabIndex = 24;
-			this.FITSTableChck.Text = "FITS Table";
-			this.FITSTableChck.UseVisualStyleBackColor = true;
-			this.FITSTableChck.CheckedChanged += new System.EventHandler(this.FITSTableChck_CheckedChanged);
 			// 
 			// ShowImageChck
 			// 
@@ -593,14 +610,6 @@
 			this.VersionBGWrkr.WorkerSupportsCancellation = true;
 			this.VersionBGWrkr.DoWork += new System.ComponentModel.DoWorkEventHandler(this.VersionBGWrkr_DoWork);
 			// 
-			// RAOffsetTextBox
-			// 
-			this.RAOffsetTextBox.Location = new System.Drawing.Point(222, 190);
-			this.RAOffsetTextBox.Name = "RAOffsetTextBox";
-			this.RAOffsetTextBox.Size = new System.Drawing.Size(29, 20);
-			this.RAOffsetTextBox.TabIndex = 49;
-			this.toolTip1.SetToolTip(this.RAOffsetTextBox, "arcminutes");
-			// 
 			// label18
 			// 
 			this.label18.AutoSize = true;
@@ -609,14 +618,6 @@
 			this.label18.Size = new System.Drawing.Size(56, 13);
 			this.label18.TabIndex = 48;
 			this.label18.Text = "RA Offset:";
-			// 
-			// DecOffsetTextBox
-			// 
-			this.DecOffsetTextBox.Location = new System.Drawing.Point(222, 216);
-			this.DecOffsetTextBox.Name = "DecOffsetTextBox";
-			this.DecOffsetTextBox.Size = new System.Drawing.Size(29, 20);
-			this.DecOffsetTextBox.TabIndex = 51;
-			this.toolTip1.SetToolTip(this.DecOffsetTextBox, "arcminutes");
 			// 
 			// label19
 			// 
@@ -631,7 +632,6 @@
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.CancelButton = this.EscapeBtn;
 			this.ClientSize = new System.Drawing.Size(435, 523);
 			this.Controls.Add(this.DecOffsetTextBox);
 			this.Controls.Add(this.label19);
@@ -685,15 +685,16 @@
 			this.Controls.Add(this.MainMenu);
 			this.Controls.Add(this.EscapeBtn);
 			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+			this.KeyPreview = true;
 			this.MainMenuStrip = this.MainMenu;
 			this.Margin = new System.Windows.Forms.Padding(2);
 			this.MaximizeBox = false;
 			this.MinimizeBox = false;
 			this.Name = "AstraCarta";
-			this.ShowIcon = false;
 			this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
 			this.Text = "AstraCarta";
 			this.Load += new System.EventHandler(this.AstraCarta_Load);
+			this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.AstraCarta_KeyDown);
 			this.MainMenu.ResumeLayout(false);
 			this.MainMenu.PerformLayout();
 			this.ResumeLayout(false);

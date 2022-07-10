@@ -303,7 +303,7 @@ namespace JPFITS
 						BGWrkr.ReportProgress(0, "Installing AstraCarta..." + "\r\n");
 						BGWrkr.ReportProgress(0, ">>pip install astracarta" + "\r\n");
 						BGWrkr.ReportProgress(0, ">>Please wait one minute..." + "\r\n");
-						PSI = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip install astracarta --upgrade");
+						PSI = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip install astracarta");
 						PROC = System.Diagnostics.Process.Start(PSI);
 						PROC.WaitForExit();
 
@@ -515,6 +515,16 @@ namespace JPFITS
 		private void SaveTableChck_CheckedChanged(object sender, EventArgs e)
 		{
 			REG.SetReg("AstraCarta", "SaveTableChck", SaveTableChck.Checked);
+
+			if (SaveTableChck.Checked)
+				FITSTableChck.Enabled = true;
+			else
+				FITSTableChck.Enabled = false;
+
+			if (!SaveTableChck.Checked && !SaveImageChck.Checked)
+				OverwriteChck.Enabled = false;
+			else
+				OverwriteChck.Enabled = true;
 		}
 
 		private void FITSTableChck_CheckedChanged(object sender, EventArgs e)
@@ -530,6 +540,11 @@ namespace JPFITS
 		private void SaveImageChck_CheckedChanged(object sender, EventArgs e)
 		{
 			REG.SetReg("AstraCarta", "SaveImageChck", SaveImageChck.Checked);
+
+			if (!SaveTableChck.Checked && !SaveImageChck.Checked)
+				OverwriteChck.Enabled = false;
+			else
+				OverwriteChck.Enabled = true;
 		}
 
 		private void ForceNewChck_CheckedChanged(object sender, EventArgs e)
@@ -626,6 +641,12 @@ namespace JPFITS
 		private void UpdatMenuBtn_Click(object sender, EventArgs e)
 		{
 			VersionBGWrkr.RunWorkerAsync("update");
+		}
+
+		private void AstraCarta_KeyDown(object sender, KeyEventArgs e)
+		{
+			if (e.KeyCode == Keys.Escape)
+				this.Close();
 		}
 	}
 }
