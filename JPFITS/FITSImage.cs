@@ -253,6 +253,7 @@ namespace JPFITS
 				this.Header.SetKey("NAXIS2", NAXIS2.ToString(), false, 0);
 			}
 		}
+
 		private void EATIMAGEHEADER()
 		{
 			BITPIX = Convert.ToInt32(HEADER.GetKeyValue("BITPIX"));
@@ -281,6 +282,7 @@ namespace JPFITS
 			if (BSCALE == -1)
 				BSCALE = 1;
 		}
+
 		private void WRITEIMAGE(TypeCode prec, bool do_parallel)
 		{
 			//try
@@ -1783,12 +1785,19 @@ namespace JPFITS
 		/// <summary>Identifies and removes hot pixels from an image. The algorithm is not a simple find and replace, but assesses whether a pixel is part of a source<br />
 		/// with legitimate high values or is a solitary or paired high value which is simply hot.</summary>
 		/// <param name="image">A FITS image with hot pixels.</param>
-		/// <param name="countThreshold">The pixel value above which a pixel might be considered to be hot.</param>
-		/// <returns></returns>
-		public static double[,] DeHotPixel(FITSImage image, double countThreshold)
+		/// <param name="countThreshold">The pixel value above which a pixel might be considered to be hot. Recommend background + 5*sigma of the background noise stdv...NOT a high "hot" value.</param>
+		/// <param name="Nhot">The maximum number of hot pixels in a hot pixel cluster. Recommend 1-3.</param>
+		/// <param name="doParallel">Perform array scan with parallelism.</param>
+		public static double[,] DeHotPixel(FITSImage image, double countThreshold, int Nhot, bool doParallel)
 		{
-			//sigmaThreshold *= image.Std;
-			//countThreshold += image.Median;
+			ParallelOptions opts = new ParallelOptions();
+			if (doParallel)
+				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
+			else
+				opts.MaxDegreeOfParallelism = 1;
+
+			if (countThreshold == 0)
+				countThreshold = image.Median + image.Std * 8;
 
 			double[,] result = new double[image.Width, image.Height];
 			for (int y = 0; y < image.Height; y++)
@@ -1802,9 +1811,10 @@ namespace JPFITS
 				result[x, image.Height - 1] = image[x, image.Height - 1];
 			}
 
-
-			int npix = 0;
-			for (int y = 1; y < image.Height - 1; y++)
+			//for (int y = 1; y < image.Height - 1; y++)
+			Parallel.For(1, image.Height - 1, opts, y => 
+			{
+				int npix = 0;
 				for (int x = 1; x < image.Width - 1; x++)
 				{
 					result[x, y] = image[x, y];
@@ -1812,6 +1822,8 @@ namespace JPFITS
 
 					if (image[x, y] > countThreshold)
 					{
+						npix++;
+
 						if (image[x - 1, y] > countThreshold)
 							npix++;
 						if (image[x + 1, y] > countThreshold)
@@ -1829,10 +1841,11 @@ namespace JPFITS
 						if (image[x + 1, y + 1] > countThreshold)
 							npix++;
 
-						if (npix <= 2)
+						if (npix <= Nhot)
 							result[x, y] = JPMath.Median(new double[8] { image[x - 1, y], image[x + 1, y], image[x - 1, y - 1], image[x, y - 1], image[x + 1, y - 1], image[x - 1, y + 1], image[x, y + 1], image[x + 1, y + 1] });
 					}
 				}
+			});
 
 			return result;
 		}

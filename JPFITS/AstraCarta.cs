@@ -351,10 +351,7 @@ namespace JPFITS
 						}
 						if (pathchange)
 						{
-							System.Drawing.Color bc = MessageTextBox.BackColor;
-							MessageTextBox.BackColor = System.Drawing.Color.Red;
-							MessageBox.Show("WE HAD TO UPDATE THE ENVIRONMENT PATH VARIABLE FOR PYTHON.\r\n\r\nIF A PATH ERROR IS FOUND WHEN RE-TRYING, PLEASE RESTART YOUR SYSTEM FOR THE PATH ENVIRONMENT VARIABLE TO UPDATE");
-							MessageTextBox.BackColor = bc;
+							MessageBox.Show("WE HAD TO UPDATE THE ENVIRONMENT PATH VARIABLE FOR PYTHON.\r\n\r\nPLEASE RESTART CCDLAB FOR THE PATH ENVIRONMENT VARIABLE TO UPDATE");
 							this.Close();
 							return;
 						}
@@ -623,7 +620,7 @@ namespace JPFITS
 					if (update)
 					{
 						ERROR = true;
-						MessageBox.Show("Please install Python version 3.10 or greater on your machine first. Thank you!" + "\r\n\r\nCurrent Version: Python " + splitvers[0] + "." + splitvers[1], "Error...");
+						MessageBox.Show("Please install Python version 3.10 or greater on your machine first. Thank you!" + "\r\n\r\nCurrent Version: Python " + splitvers[0] + "." + splitvers[1] + "\r\n\r\nMAKE SURE to CHECK \"Add Python 3.10 to PATH;\r\nCustomize Installation->Next\r\nCHECK Install for all users.", "Error...");
 						this.DialogResult = DialogResult.Cancel;
 						this.Close();
 						return;
@@ -639,6 +636,12 @@ namespace JPFITS
 				versproc = System.Diagnostics.Process.Start(verspsi);
 				versproc.WaitForExit();
 				versout = versproc.StandardOutput.ReadToEnd();
+
+				if (versout.IndexOf("INSTALLED:") == -1)
+				{
+					ERROR = true;
+					return;
+				}
 
 				CURVERS = versout.Substring(versout.IndexOf("INSTALLED:"), versout.IndexOf("LATEST:") - versout.IndexOf("INSTALLED:")).Replace("INSTALLED:", "").Trim();
 				LATVERS = versout.Substring(versout.IndexOf("LATEST:")).Replace("LATEST:", "").Trim();

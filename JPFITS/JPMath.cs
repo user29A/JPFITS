@@ -7616,43 +7616,232 @@ namespace JPFITS
 			return result;
 		}
 
-		/// <summary>Computes the Barycentric Julian Day Correction given a Julian Date and sky pointing coordinates.</summary>
+		/// <summary>
+		/// Radial Velocity due to earth’s rotation and orbital motion referred to solar system barycenter, in direction of target. Positive away; negative towards. Accurate to ~1 m/s.
+		/// </summary>
+		/// <param name="julianDate">Geocentric Julian Date of the observation</param>
+		/// <param name="longitude">West longitude of observatory in degrees</param>
+		/// <param name="latitude">Latitude of observatory in degrees</param>
+		/// <param name="rightAscension">Right Ascension of target in degrees</param>
+		/// <param name="declination">Declination of target in degrees</param>
+		public static double RadialVelocityCorrection(double julianDate, double longitude, double latitude, double rightAscension, double declination)
+		{
+			//earth equatorial rotational linear velocity in m / s, based on spherical
+			//earth using quadratic-mean(polar - equatorial) radius; can be improved to
+			//take into account non-sphericity and geographical elevations, but these
+			//are 2nd order corrections
+			double vrot_eq = 465.1;			
+
+			//astronomical unit(m)
+			double au = 1.49597870e11;
+
+			//latitude in radians:
+			latitude = latitude * Math.PI / 180;			
+
+			//declination in radians:
+			declination = declination * Math.PI / 180;
+
+			//west longitude of observatory in hours:
+			double L = longitude / 15;
+
+			//Greenwhich Mean Sidereal Time at JD:
+			double GMST = Math.IEEERemainder(18.697374558 + 24.06570982441908 * (julianDate - 2451545.0), 24);
+
+			//Local Sidereal Time at JD and longitude:
+			double LST = GMST - L;
+
+			//local hour angle of target:
+			double ha = LST - rightAscension / 15;
+			ha = ha * Math.PI / 12;//radians
+
+			//decimal day number from J2000.0 UT 12hr:
+			double n = julianDate - 2451545.0;
+
+			//mean anomaly, in radians, at day number n:
+			double g = Math.IEEERemainder((357.528 + .9856003 * n) * Math.PI / 180, 2 * Math.PI);
+
+			//mean longitude, in radians, at n:
+			L = Math.IEEERemainder((280.46 + .9856474 * n) * Math.PI / 180, 2 * Math.PI);
+			
+			//ecliptic longitude, in radians, at n:
+			double lam = L + 1.915 * Math.PI / 180 * Math.Sin(g) + .020 * Math.PI / 180 * Math.Sin(2 * g);
+			
+			//ecliptic obliquity, in radians, at n:
+			double eps = 23.439 * Math.PI / 180 - .0000004 * Math.PI / 180 * n;
+
+			//distance of earth from sun in au’s at JD:
+			double R = 1.00014 - 0.01671 * Math.Cos(g) - 0.00014 * Math.Cos(2 * g);
+
+			//rectangular coordinates of earth wrt solar system barycenter, in au's:
+			double X = -R * Math.Cos(lam);
+			double Y = -R * Math.Cos(eps) * Math.Sin(lam);
+			double Z = -R * Math.Sin(eps) * Math.Sin(lam);
+			
+			//first deriv's of XYZ above, wrt time in days (au/d). Note: deriv’s of XYZ w d/ dt eps ~0:
+			double Xdot = .0172 * Math.Sin(lam);
+			double Ydot = -.0158 * Math.Cos(lam);
+			double Zdot = -.0068 * Math.Cos(lam);
+			
+			//rv in direction of target due to earth's rotational motion, +ve away, m/s
+			double rv_rot = Math.Cos(latitude) * Math.Cos(declination) * Math.Sin(ha) * vrot_eq;
+
+			//right ascension in radians:
+			rightAscension = rightAscension * Math.PI / 180;
+
+			//rv due to earth's orbital motion, +ve away au/d:
+			double rv_orb = -Xdot * Math.Cos(rightAscension) * Math.Cos(declination) - Ydot * Math.Sin(rightAscension) * Math.Cos(declination) - Zdot * Math.Sin(declination);
+			rv_orb = rv_orb * au / 86400;// convert to m/ s
+
+			//Radial Velocity due to earth’s rotation and orbital motion referred to barycenter, in direction of target, +ve away.
+			double RVC = rv_rot + rv_orb;
+
+			return RVC;
+		}
+
+		/// <summary>
+		/// Airmass of target: Young, A. T. 1994. Air mass and refraction. Applied Optics. 33:1108–1110
+		/// </summary>
+		/// <param name="julianDate">Geocentric Julian Date of the observation</param>
+		/// <param name="longitude">West longitude of observatory in degrees</param>
+		/// <param name="latitude">Latitude of observatory in degrees</param>
+		/// <param name="rightAscension">Right Ascension of target in degrees</param>
+		/// <param name="declination">Declination of target in degrees</param>
+		public static double AirMass(double julianDate, double longitude, double latitude, double rightAscension, double declination)
+		{
+			//west longitude of observatory in hours:
+			double L = longitude / 15;
+			
+			//Greenwhich Mean Sidereal Time at JD:
+			double GMST = Math.IEEERemainder(18.697374558 + 24.06570982441908 * (julianDate - 2451545.0), 24);
+			
+			//Local Sidereal Time at JD and longitude:
+			double LST = GMST - L;
+			
+			//local hour angle of target:
+			double ha = LST - rightAscension / 15;
+			ha = ha * Math.PI / 12;//radians
+			
+			//latitude in radians:
+			double lat = latitude * Math.PI / 180;
+
+			//declination in radians:
+			double dec = declination * Math.PI / 180;
+
+			//altitude:
+			double alt = Math.Asin(Math.Sin(lat) * Math.Sin(dec) + Math.Cos(lat) * Math.Cos(dec) * Math.Cos(ha));
+			
+			//true zenith angle; don’t care about stuff below horizon:
+			double zt = (Math.PI / 2 - alt);
+			if (zt > Math.PI / 2 - Math.PI / 2 / 50)
+				zt = Math.PI / 2 - Math.PI / 2 / 50;
+
+			//Airmass of target: Young, A.T. 1994.Air mass and refraction.Applied Optics. 33:1108–1110.
+			double A = (1.002432 * Math.Pow(Math.Cos(zt), 2) + 0.148386 * Math.Cos(zt) + 0.0096467) / (Math.Pow(Math.Cos(zt), 3) + 0.149864 * Math.Pow(Math.Cos(zt), 2) + 0.0102963 * Math.Cos(zt) + 0.000303978);
+
+			return A;
+		}
+
+		/// <summary>Computes the Barycentric Julian Day Correction given a Julian Date and sky pointing coordinates. Accurate to ~1s.</summary>
+		/// <param name="julianDate">The Julian Date.</param>
 		/// <param name="RightAscension_deg">The right ascension in degrees.</param>
 		/// <param name="Declination_deg">The declination in degrees.</param>
 		/// <param name="returnCorrectionOnly">Return only the correction values (true), or return the Julian Dates with the correction applied (false) so that they are Barycentric values.</param>
-		public static double[] BJDC(double[] julianDate, double RightAscension_deg, double Declination_deg, bool returnCorrectionOnly)
+		public static double BarycentricJuliianDayCorrection(double julianDate, double RightAscension_deg, double Declination_deg, bool returnCorrectionOnly)
 		{
-			double[] result = new double[julianDate.Length];
-
 			double cs = 173.14463348;// speed of light (au/d)
 			double n, g, L, lam, eps, R, X, Y, Z, BJDC;
 
+			// exact decimal day number from J2000.0 UT 12hr:
+			n = julianDate - 2451545.0;
+			
+			// mean anomaly, in radians, at day number n:
+			g = Math.IEEERemainder((357.528 + .9856003 * n) * Math.PI / 180, 2 * Math.PI);
+			
+			// mean longitude, in radians, at n:
+			L = Math.IEEERemainder((280.46 + .9856474 * n) * Math.PI / 180, 2 * Math.PI);
+			
+			// ecliptic longitude, in radians, at n:
+			lam = L + 1.915 * Math.PI / 180 * Math.Sin(g) + .020 * Math.PI / 180 * Math.Sin(2 * g);
+			
+			// ecliptic obliquity, in radians, at n:
+			eps = 23.439 * Math.PI / 180 - .0000004 * Math.PI / 180 * n;
+			
+			// distance of earth from sun in au’s at JD:
+			R = 1.00014 - 0.01671 * Math.Cos(g) - 0.00014 * Math.Cos(2 * g);
+			
+			// rectangular coordinates of earth wrt solar system barycenter, in au's:
+			X = -R * Math.Cos(lam);
+			Y = -R * Math.Cos(eps) * Math.Sin(lam);
+			Z = -R * Math.Sin(eps) * Math.Sin(lam);
+
+			BJDC = 1 / cs * (X * Math.Cos(RightAscension_deg) * Math.Cos(Declination_deg) + Y * Math.Sin(RightAscension_deg) * Math.Cos(Declination_deg) + Z * Math.Sin(Declination_deg));
+
+			if (returnCorrectionOnly)
+				return BJDC;
+			else
+				return julianDate + BJDC;
+		}
+
+		/// <summary>Computes the Barycentric Julian Day Correction given a Julian Date and sky pointing coordinates. Accurate to ~1s.</summary>
+		/// <param name="julianDate">A vector of Julian Dates.</param>
+		/// <param name="RightAscension_deg">The right ascension in degrees.</param>
+		/// <param name="Declination_deg">The declination in degrees.</param>
+		/// <param name="returnCorrectionOnly">Return only the correction values (true), or return the Julian Dates with the correction applied (false) so that they are Barycentric values.</param>
+		public static double[] BarycentricJuliianDayCorrection(double[] julianDate, double RightAscension_deg, double Declination_deg, bool returnCorrectionOnly)
+		{
+			double[] result = new double[julianDate.Length];
+
 			for (int i = 0; i < julianDate.Length; i++)
+				result[i] = BarycentricJuliianDayCorrection(julianDate[i], RightAscension_deg, Declination_deg, returnCorrectionOnly);
+
+			return result;
+		}
+
+		/// <summary>Computes the Barycentric Julian Day Correction given a Julian Date and sky pointing coordinates. Accurate to ~1s.</summary>
+		/// <param name="julianDate">A vector of Julian Dates.</param>
+		/// <param name="RightAscension_deg">A vector of right ascension in degrees.</param>
+		/// <param name="Declination_deg">A vector of declination in degrees.</param>
+		/// <param name="returnCorrectionOnly">Return only the correction values (true), or return the Julian Dates with the correction applied (false) so that they are Barycentric values.</param>
+		public static double[] BarycentricJuliianDayCorrection(double[] julianDate, double[] RightAscension_deg, double[] Declination_deg, bool returnCorrectionOnly)
+		{
+			double[] result = new double[julianDate.Length];
+
+			for (int i = 0; i < julianDate.Length; i++)
+				result[i] = BarycentricJuliianDayCorrection(julianDate[i], RightAscension_deg[i], Declination_deg[i], returnCorrectionOnly);
+
+			return result;
+		}
+
+		/// <summary>
+		/// Convert Calendar Date post-1583 A.D. and Univeral Time to Julian Day Number
+		/// </summary>
+		/// <param name="date">Big-endian year, month, day string = '2000-03-20' or '2000:03:20' for example</param>
+		/// <param name="utime">Universal time string = '04-15-16' or '04:15:16' for example</param>
+		public static double[] DateToJD(string[] date, string[] utime)
+		{
+			double[] result = new double[date.Length];
+			double year = 0;
+			for (int i = 0; i < date.Length; i++)
+				result[i] = DateToJD(date[i], utime[i], out year);
+
+			return result;
+		}
+
+		/// <summary>
+		/// Convert Calendar Date post-1583 A.D. and Univeral Time to Julian Day Number
+		/// </summary>
+		/// <param name="date">Big-endian year, month, day string = '2000-03-20' or '2000:03:20' for example</param>
+		/// <param name="utime">Universal time string = '04-15-16' or '04:15:16' for example</param>
+		/// <param name="yearpointyear">Get the year time as a year.year float value</param>
+		public static double[] DateToJD(string[] date, string[] utime, out double[] yearpointyear)
+		{
+			double[] result = new double[date.Length];
+			yearpointyear = new double[date.Length];
+			double year = 0;
+			for (int i = 0; i < date.Length; i++)
 			{
-				// exact decimal day number from J2000.0 UT 12hr:
-				n = julianDate[i] - 2451545.0;
-				// mean anomaly, in radians, at day number n:
-				g = Math.IEEERemainder((357.528 + .9856003 * n) * Math.PI / 180, 2 * Math.PI);
-				// mean longitude, in radians, at n:
-				L = Math.IEEERemainder((280.46 + .9856474 * n) * Math.PI / 180, 2 * Math.PI);
-				// ecliptic longitude, in radians, at n:
-				lam = L + 1.915 * Math.PI / 180 * Math.Sin(g) + .020 * Math.PI / 180 * Math.Sin(2 * g);
-				// ecliptic obliquity, in radians, at n:
-				eps = 23.439 * Math.PI / 180 - .0000004 * Math.PI / 180 * n;
-				// distance of earth from sun in au’s at JD:
-				R = 1.00014 - 0.01671 * Math.Cos(g) - 0.00014 * Math.Cos(2 * g);
-				// rectangular coordinates of earth wrt solar system barycenter referred to
-				// equinox and %equator of J2000.0, in au's:
-				X = -R * Math.Cos(lam);
-				Y = -R * Math.Cos(eps) * Math.Sin(lam);
-				Z = -R * Math.Sin(eps) * Math.Sin(lam);
-
-				BJDC = 1 / cs * (X * Math.Cos(RightAscension_deg) * Math.Cos(Declination_deg) + Y * Math.Sin(RightAscension_deg) * Math.Cos(Declination_deg) + Z * Math.Sin(Declination_deg));
-
-				result[i] = BJDC;
-
-				if (!returnCorrectionOnly)
-					result[i] += julianDate[i];
+				result[i] = DateToJD(date[i], utime[i], out year);
+				yearpointyear[i] = year;
 			}
 
 			return result;
