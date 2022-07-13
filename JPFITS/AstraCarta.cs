@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows.Forms;
 using System.Collections;
+using System.Diagnostics;
 #nullable enable
 
 namespace JPFITS
@@ -16,6 +17,7 @@ namespace JPFITS
 		string CURVERS = "";
 		string LATVERS = "";
 		bool OPENFROMARGS = false;
+		bool EXECUTEONSHOW = false;
 		bool PERFORMEXECUTE = false;
 		bool CANCELLED = false;
 		bool ERROR = false;
@@ -25,37 +27,214 @@ namespace JPFITS
 			get { return OUTFILE; }
 		}
 
+		/// <summary>
+		/// Perform a query with no user interface dialog form. With throw an informative exception if something goes wrong.
+		/// </summary>
+		/// <param name="keys">A string list of keys such as "-ra", "-dec", "-scale", etc.</param>
+		/// <param name="values">A string list of key values for the keys. Keys with no arguments must have empty strings passed as their values.</param>
+		public static string Query(ArrayList keys, ArrayList values)
+		{
+			string argstring = "";
+			int n;
+
+			n = keys.IndexOf("-ra");
+			if (n != -1)
+				argstring += String.Format("-ra {0} ", (string)values[n]);
+			else
+				throw new Exception("-ra must be supplied");
+
+			n = keys.IndexOf("-dec");
+			if (n != -1)
+				argstring += String.Format("-dec {0} ", (string)values[n]);
+			else
+				throw new Exception("-dec must be supplied");
+
+			n = keys.IndexOf("-scale");
+			if (n != -1)
+				argstring += String.Format("-scale {0} ", (string)values[n]);
+			else
+				throw new Exception("-scale must be supplied");
+
+			n = keys.IndexOf("-pixwidth");
+			if (n != -1)
+				argstring += String.Format("-pixwidth {0} ", (string)values[n]);
+			else
+				throw new Exception("-pixwidth must be supplied");
+
+			n = keys.IndexOf("-pixheight");
+			if (n != -1)
+				argstring += String.Format("-pixheight {0} ", (string)values[n]);
+			else
+				throw new Exception("-pixheight must be supplied");
+
+			n = keys.IndexOf("-buffer");
+			if (n != -1)
+				argstring += String.Format("-buffer {0} ", (string)values[n]);
+
+			n = keys.IndexOf("-offsetra");
+			if (n != -1)
+				argstring += String.Format("-offsetra {0} ", (string)values[n]);
+
+			n = keys.IndexOf("-offsetdec");
+			if (n != -1)
+				argstring += String.Format("-offsetdec {0} ", (string)values[n]);
+
+			n = keys.IndexOf("-outname");
+			if (n != -1)
+				argstring += String.Format("-outname {0} ", "\"" + string.Join("_", ((string)values[n]).Split(Path.GetInvalidFileNameChars())) + "_AstraCarta" + "\"");
+
+			n = keys.IndexOf("-catalogue");
+			if (n != -1)
+				argstring += String.Format("-catalogue {0} ", "\"" + (string)values[n] + "\"");
+
+			n = keys.IndexOf("-filter");
+			if (n != -1)
+				argstring += String.Format("-filter {0} ", "\"" + (string)values[n] + "\"");
+
+			n = keys.IndexOf("-maglimit");
+			if (n != -1)
+				argstring += String.Format("-maglimit {0} ", (string)values[n]);
+
+			n = keys.IndexOf("-shape");
+			if (n != -1)
+				argstring += String.Format("-shape {0} ", "\"" + (string)values[n] + "\"");
+
+			n = keys.IndexOf("-rotation");
+			if (n != -1)
+				argstring += String.Format("-rotation {0} ", (string)values[n]);
+
+			n = keys.IndexOf("-nquery");
+			if (n != -1)
+				argstring += String.Format("-nquery {0} ", (string)values[n]);
+
+			n = keys.IndexOf("-pmepoch");
+			if (n != -1)
+				argstring += String.Format("-pmepoch {0} ", (string)values[n]);
+
+			n = keys.IndexOf("-pmlimit");
+			if (n != -1)
+				argstring += String.Format("-pmlimit {0} ", (string)values[n]);
+
+			n = keys.IndexOf("-outdir");
+			if (n != -1)
+				argstring += String.Format("-outdir {0} ", "\"" + (string)values[n] + "\"");
+
+			n = keys.IndexOf("-entries");
+			if (n != -1)
+				argstring += String.Format("-entries {0} ", "\"" + (string)values[n] + "\"");
+
+			n = keys.IndexOf("-notable");
+			if (n != -1)
+				argstring += String.Format("-notable ");
+
+			n = keys.IndexOf("-fitsout");
+			if (n != -1)
+				argstring += String.Format("-fitsout ");
+
+			n = keys.IndexOf("-imageshow");
+			if (n != -1)
+				argstring += String.Format("-imageshow ");
+
+			n = keys.IndexOf("-outimage");
+			if (n != -1)
+				argstring += String.Format("-outimage ");
+
+			n = keys.IndexOf("-forcenew");
+			if (n != -1)
+				argstring += String.Format("-forcenew ");
+
+			n = keys.IndexOf("-rmvrawquery");
+			if (n != -1)
+				argstring += String.Format("-rmvrawquery ");
+
+			n = keys.IndexOf("-silent");
+			if (n != -1)
+				argstring += String.Format("-silent ");
+
+			n = keys.IndexOf("-overwrite");
+			if (n != -1)
+				argstring += String.Format("-overwrite ");
+
+			ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "astracarta " + argstring);
+			psi.UseShellExecute = false;
+			psi.CreateNoWindow = true;
+			psi.RedirectStandardError = true;
+			psi.RedirectStandardOutput = true;
+			System.Diagnostics.Process proc = new System.Diagnostics.Process();
+			proc = System.Diagnostics.Process.Start(psi);
+			proc.WaitForExit();
+
+			string outfile = proc.StandardOutput.ReadToEnd().Trim();
+			string test = outfile;
+			string errstr = proc.StandardError.ReadToEnd().Trim();
+			if (outfile == "")
+				throw new Exception("Query failed with message: \r\n\r\n" + errstr + "\r\n\r\n" + proc.StandardOutput.ReadToEnd().Trim() + "\r\n\r\n" + argstring);
+			
+			int c = 0;
+			while (!File.Exists(test))
+			{
+				c++;
+				test = outfile.Substring(c);
+
+				if (test.Length == 1)
+					throw new Exception("Query failed from possible output file: '" + outfile + "'");
+			}
+
+			return test.Trim();
+		}
+
+		/// <summary>
+		/// Construct AstraCarta. Useful for building queries with a user interface for option settings.
+		/// </summary>
 		public AstraCarta()
 		{
 			InitializeComponent();
 		}
 
-		public AstraCarta(ArrayList keys, ArrayList values)
+		/// <summary>
+		/// Construct AstraCarta with keys and their values. Useful for repeating/specifying user interface option settings.
+		/// </summary>
+		/// <param name="keys">A string list of keys such as "-ra", "-dec", "-scale", etc.</param>
+		/// <param name="values">A string list of key values for the keys. Keys with no arguments must have empty strings passed as their values.</param>
+		/// <param name="executeOnShow">Execute the query immediately upon Load, which is when the form is first shown.</param>
+		public AstraCarta(ArrayList keys, ArrayList values, bool executeOnShow)
 		{
-			OPENFROMARGS = true;
-
 			InitializeComponent();
 
+			OPENFROMARGS = true;
+			EXECUTEONSHOW = executeOnShow;
+
 			int n;
+
 			n = keys.IndexOf("-ra");
 			if (n != -1)
 				RATextBox.Text = (string)values[n];
+			else
+				throw new Exception("-ra must be supplied");
 
 			n = keys.IndexOf("-dec");
 			if (n != -1)
 				DecTextBox.Text = (string)values[n];
+			else
+				throw new Exception("-dec must be supplied");
 
 			n = keys.IndexOf("-scale");
 			if (n != -1)
 				ScaleTextBox.Text = (string)values[n];
+			else
+				throw new Exception("-scale must be supplied");
 
 			n = keys.IndexOf("-pixwidth");
 			if (n != -1)
 				WidthTextBox.Text = (string)values[n];
+			else
+				throw new Exception("-pixwidth must be supplied");
 
 			n = keys.IndexOf("-pixheight");
 			if (n != -1)
 				HeightTextBox.Text = (string)values[n];
+			else
+				throw new Exception("-pixheight must be supplied");
 
 			BufferTextBox.Text = "";
 			n = keys.IndexOf("-buffer");
@@ -77,60 +256,45 @@ namespace JPFITS
 			if (n != -1)
 				NameTextBox.Text = string.Join("_", ((string)values[n]).Split(Path.GetInvalidFileNameChars())) + "_AstraCarta";
 
+			CatalogueDrop.SelectedIndex = 0;//GaiaDR3
 			n = keys.IndexOf("-catalogue");
-			if (n == -1)
-				CatalogueDrop.SelectedIndex = 0;
-			else if ((string)values[n] == "GaiaDR3")
-				CatalogueDrop.SelectedIndex = 0;
-			else
-			{
-				MessageBox.Show("Catalogue: '" + (string)values[n] + "' not recognized...");
-				return;
-			}
-
-			n = keys.IndexOf("-filter");
-			if (n == -1)
-			{
-				if (CatalogueDrop.SelectedIndex != 0)
-				{
-					MessageBox.Show("No default filter for catalogue '" + CatalogueDrop.SelectedItem.ToString() + "'. Please specify the filter.");
-					return;
-				}
-				FilterDrop.SelectedIndex = 1;//gaiadr3 g
-			}
-			else if (CatalogueDrop.SelectedIndex == 0)//gaiadr3
-			{
-				if ((string)values[n] == "bp")
-					FilterDrop.SelectedIndex = 0;
-				else if ((string)values[n] == "g")
-					FilterDrop.SelectedIndex = 1;
-				else if ((string)values[n] == "rp")
-					FilterDrop.SelectedIndex = 2;
+			if (n != -1)
+				if ((string)values[n] == "GaiaDR3")
+					CatalogueDrop.SelectedIndex = 0;
 				else
-				{
-					MessageBox.Show("Filter: '" + (string)values[n] + "' not recognized for catalogue '" + CatalogueDrop.SelectedItem.ToString() + "'");
-					return;
-				}
-			}
-			else
-			{
-				MessageBox.Show("Filter: '" + (string)values[n] + "' not recognized...");
-				return;
-			}
-			//do filter stuff
+					throw new Exception("Catalogue: '" + (string)values[n] + "' not recognized...");
 
+			FilterDrop.SelectedIndex = 1;//GaiaDR3 g
+			n = keys.IndexOf("-filter");
+			if (n != -1)
+				if (CatalogueDrop.SelectedIndex == 0)//gaiadr3
+				{
+					if ((string)values[n] == "bp")
+						FilterDrop.SelectedIndex = 0;
+					else if ((string)values[n] == "g")
+						FilterDrop.SelectedIndex = 1;
+					else if ((string)values[n] == "rp")
+						FilterDrop.SelectedIndex = 2;
+					else
+						throw new Exception("Filter: '" + (string)values[n] + "' not recognized for catalogue '" + CatalogueDrop.SelectedItem.ToString() + "'");
+				}
+				else
+					throw new Exception("Filter: '" + (string)values[n] + "' not recognized...");
+
+			MagLimitTextBox.Text = "";
 			n = keys.IndexOf("-maglimit");
 			if (n != -1)
 				MagLimitTextBox.Text = (string)values[n];
 
+			ShapeDrop.SelectedIndex = 0;
 			n = keys.IndexOf("-shape");
 			if (n != -1)
-			{
 				if ((string)values[n] == "circle")
 					ShapeDrop.SelectedIndex = 1;
-				else
+				else if ((string)values[n] == "rectangle" || (string)values[n] == "square")
 					ShapeDrop.SelectedIndex = 0;
-			}
+				else
+					throw new Exception("Shape: '" + (string)values[n] + "' not recognized.");
 
 			RotationTextBox.Text = "";
 			n = keys.IndexOf("-rotation");
@@ -482,10 +646,9 @@ namespace JPFITS
 				PMLimitTextBox.Text = (string)REG.GetReg("AstraCarta", "PMLimitTextBox");
 				NQueryTextBox.Text = (string)REG.GetReg("AstraCarta", "NQueryTextBox");
 			}
-			else
-			{
+
+			if (EXECUTEONSHOW)
 				ExecuteBtn.PerformClick();
-			}			
 		}
 
 		private void CatalogueDrop_SelectedIndexChanged(object sender, EventArgs e)
