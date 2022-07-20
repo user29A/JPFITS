@@ -250,7 +250,17 @@ namespace JPFITS
 				throw new Exception("Error: WCS keywords not found in specified header '" + header + "'");*/
 		}
 
-		public WorldCoordinateSolution(double cdelt, int imageWidth, int imageHeight, double crvalRA, double crvalDec)
+		/// <summary>
+		/// Constructor based on basic parameters of a World Coordinate Solution
+		/// </summary>
+		/// <param name="cdelt">The plate scale in arcseconds per pixel.</param>
+		/// <param name="crpix1">The coordinate reference pixel on the x-axis.</param>
+		/// <param name="crpix2">The coordinate reference pixel on the y-axis.</param>
+		/// <param name="zeroBasedCRpix">True if the CRPIX values are from zero-based indexing. If true will increment CRPIXn internally by 1.</param>
+		/// <param name="crvalRA">The coordinate reference value on the RA axis.</param>
+		/// <param name="crvalDec">The coordinate reference value on the dec axis.</param>
+		/// <param name="rotation">The field rotation, in degrees.</param>
+		public WorldCoordinateSolution(double cdelt, double crpix1, double crpix2, bool zeroBasedCRpix, double crvalRA, double crvalDec, double rotation)
 		{
 			CTYPEN = new string[2];
 			CTYPEN[0] = "RA---TAN";
@@ -261,18 +271,24 @@ namespace JPFITS
 			CDELTN[1] = cdelt;
 
 			CRPIXN = new double[2];
-			CRPIXN[0] = (double)imageWidth / 2;
-			CRPIXN[1] = (double)imageHeight / 2;
+			CRPIXN[0] = crpix1;
+			CRPIXN[1] = crpix2;
+			if (zeroBasedCRpix)
+			{
+				CRPIXN[0]++;
+				CRPIXN[1]++;
+			}
 
 			CRVALN = new double[2];
 			CRVALN[0] = crvalRA;
 			CRVALN[1] = crvalDec;
 
+			rotation *= Math.PI / 180;
 			CDMATRIX = new double[2, 2];
-			CDMATRIX[0, 0] = -cdelt / 3600;
-			CDMATRIX[1, 0] = 0;
-			CDMATRIX[0, 1] = 0;
-			CDMATRIX[1, 1] = -cdelt / 3600;
+			CDMATRIX[0, 0] = -cdelt / 3600 * Math.Cos(rotation);
+			CDMATRIX[1, 0] = cdelt / 3600 * Math.Sin(rotation);
+			CDMATRIX[0, 1] = -cdelt / 3600 * Math.Sin(rotation);
+			CDMATRIX[1, 1] = -cdelt / 3600 * Math.Cos(rotation);
 
 			CD1_1 = CDMATRIX[0, 0];
 			CD1_2 = CDMATRIX[1, 0];
@@ -280,8 +296,8 @@ namespace JPFITS
 			CD2_2 = CDMATRIX[1, 1];
 
 			CROTAN = new double[2];
-			CROTAN[0] = 0;
-			CROTAN[1] = 0;
+			CROTAN[0] = rotation;
+			CROTAN[1] = rotation;
 
 			SET_CDMATRIXINV();
 
@@ -376,34 +392,6 @@ namespace JPFITS
 		#endregion
 
 		#region MEMBERS
-
-		///// <summary>Rotate the WCS solution about the reference.</summary>
-		///// <param name="degreeAngle">The angle, in degrees, to rotate the transormation matrix parameters by./></param>
-		///// <param name="viaCPIXCVALrotResolve"></param>
-		//public void RotateWCS(double degreeAngle, bool viaCPIXCVALrotResolve)
-		//{
-		//	if (!viaCPIXCVALrotResolve) 
-		//	{
-		//		CDMATRIX[0, 0] = -CDELTN[0] / 3600 * Math.Cos((CROTAN[0] + degreeAngle) * Math.PI / 180);
-		//		CDMATRIX[1, 0] = CDELTN[1] / 3600 * Math.Sin((CROTAN[0] + degreeAngle) * Math.PI / 180);
-		//		CDMATRIX[0, 1] = CDELTN[0] / 3600 * Math.Sin((CROTAN[1] + degreeAngle) * Math.PI / 180);
-		//		CDMATRIX[1, 1] = -CDELTN[1] / 3600 * Math.Cos((CROTAN[1] + degreeAngle) * Math.PI / 180);
-
-		//		CD1_1 = CDMATRIX[0, 0];
-		//		CD1_2 = CDMATRIX[1, 0];
-		//		CD2_1 = CDMATRIX[0, 1];
-		//		CD2_2 = CDMATRIX[1, 1];
-
-		//		SET_CDMATRIXINV();
-
-		//		CROTAN[0] += degreeAngle;
-		//		CROTAN[1] += degreeAngle;
-		//	}
-		//	else
-		//	{
-
-		//	}
-		//}
 
 		/// <summary>Recomputes the existing grid so that it can be updated for new display settings.</summary>
 		public void Grid_Refresh()

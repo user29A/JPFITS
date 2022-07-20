@@ -183,7 +183,7 @@ namespace JPFITS
 
 			//convert the catalogue points to intermediate points
 			BGWRKR.ReportProgress(0, "Making catalogue intermediate points...");
-			JPMath.PointD[] CATpts_intrmdt = new JPMath.PointD[(N_POINTS)];
+			JPMath.PointD[] CATpts_intrmdt = new JPMath.PointD[CAT_PTS.Length];
 			double a0 = crval1 * Math.PI / 180, d0 = crval2 * Math.PI / 180;
 			for (int i = 0; i < CATpts_intrmdt.Length; i++)
 			{
@@ -238,7 +238,7 @@ namespace JPFITS
 			DATE = DateTime.Now;
 			TimeSpan ts = new TimeSpan();
 			int prog = 0, threadnum = 0;
-			ulong ncompares = 0, nfalsepositives = 0, nfalsefalses = 0;
+			ulong ncompares = 0, nfalsepositives = 0, nfalsenegatives = 0;
 			bool compare_fieldvectors = ROTATION_LB != -Math.PI && ROTATION_UB != Math.PI;
 
 			ParallelOptions opts  = new ParallelOptions();
@@ -258,7 +258,7 @@ namespace JPFITS
 				if (SOLVED || CANCELLED)
 					loopState.Stop();
 
-				ulong ncompareslocal = 0, nfalsepositives_local = 0, nfalsefalses_local = 0;
+				ulong ncompareslocal = 0, nfalsepositives_local = 0, nfalsenegatives_local = 0;
 				//create these here so that each thread when parallel has own copy
 				double[] xpix_triplet = new double[3];
 				double[] ypix_triplet = new double[3];
@@ -277,7 +277,7 @@ namespace JPFITS
 						break;
 
 					if (i < thrgrpsz)
-						if ((double)i * mdpT100ovrlen > prog)
+						if ((int)((double)i * mdpT100ovrlen) > prog)
 							BGWRKR.ReportProgress(++prog);
 					
 					xpix_triplet[0] = PSEtriangles[i].GetVertex(0).X;
@@ -352,7 +352,7 @@ namespace JPFITS
 
 						if (N_pt_matches != 3)//not a possible solution
 						{
-							nfalsefalses_local++;
+							nfalsenegatives_local++;
 							continue;
 						}
 
@@ -388,7 +388,7 @@ namespace JPFITS
 				{
 					ncompares += ncompareslocal;
 					nfalsepositives += nfalsepositives_local;
-					nfalsefalses += nfalsefalses_local;
+					nfalsenegatives += nfalsenegatives_local;
 				}
 			});
 
@@ -405,8 +405,8 @@ namespace JPFITS
 			BGWRKR.ReportProgress(0, "Field Rotation: " + Math.Round(p01 * 180 / 3.14159265, 3));
 			BGWRKR.ReportProgress(0, "N Pt. Matches: " + total_pt_matches + " (" + (total_pt_matches * 100 / CATpts_intrmdt.Length).ToString("00.0") + "%)");
 			BGWRKR.ReportProgress(0, "N Comparisons: " + ncompares.ToString("0.00e00") + " (" + Math.Round((double)(ncompares * 100) / (double)(PSEtriangles.Length) / (double)(CATtriangles_intrmdt.Length), 1) + "%)");
+			BGWRKR.ReportProgress(0, "N False Negatives: " + nfalsenegatives);
 			BGWRKR.ReportProgress(0, "N False Postives: " + nfalsepositives);
-			BGWRKR.ReportProgress(0, "N False Falses: " + nfalsefalses);
 			BGWRKR.ReportProgress(0, "Thread: " + threadnum);
 			BGWRKR.ReportProgress(0, "Completed in: " + ts.Minutes.ToString() + "m" + ((double)(ts.Seconds) + (double)ts.Milliseconds / 1000).ToString() + "s");
 			BGWRKR.ReportProgress(0, "Comparisons per Second: " + (ncompares / ts.TotalSeconds).ToString("0.00e00") + Environment.NewLine);
@@ -675,69 +675,69 @@ namespace JPFITS
 		//	sw.Close();
 		//}
 
-		private static void MAKEGAIADR3QUERYNSCRIPT(string script_filename)
-		{
-			string script = "";
-			script += "import argparse" + Environment.NewLine;
-			script += "import sys" + Environment.NewLine;
-			script += "from astroquery.simbad import Simbad" + Environment.NewLine;
-			script += "from astropy.coordinates import SkyCoord" + Environment.NewLine;
-			script += "import astropy.units as u" + Environment.NewLine;
-			script += "from astroquery.gaia import Gaia" + Environment.NewLine;
+		//private static void MAKEGAIADR3QUERYNSCRIPT(string script_filename)
+		//{
+		//	string script = "";
+		//	script += "import argparse" + Environment.NewLine;
+		//	script += "import sys" + Environment.NewLine;
+		//	script += "from astroquery.simbad import Simbad" + Environment.NewLine;
+		//	script += "from astropy.coordinates import SkyCoord" + Environment.NewLine;
+		//	script += "import astropy.units as u" + Environment.NewLine;
+		//	script += "from astroquery.gaia import Gaia" + Environment.NewLine;
 
-			script += "ra = float(sys.argv[1])" + Environment.NewLine;
-			script += "dec = float(sys.argv[2])" + Environment.NewLine;
-			script += "filename = str(sys.argv[3])" + Environment.NewLine;
-			script += "radius = float(sys.argv[4])" + Environment.NewLine;
-			script += "square = int(sys.argv[5])" + Environment.NewLine;
-			script += "number = int(sys.argv[6])" + Environment.NewLine;
-			script += "sortfilt = str(sys.argv[7])" + Environment.NewLine;
+		//	script += "ra = float(sys.argv[1])" + Environment.NewLine;
+		//	script += "dec = float(sys.argv[2])" + Environment.NewLine;
+		//	script += "filename = str(sys.argv[3])" + Environment.NewLine;
+		//	script += "radius = float(sys.argv[4])" + Environment.NewLine;
+		//	script += "square = int(sys.argv[5])" + Environment.NewLine;
+		//	script += "number = int(sys.argv[6])" + Environment.NewLine;
+		//	script += "sortfilt = str(sys.argv[7])" + Environment.NewLine;
 
-			script += "radvals = radius * u.arcmin" + Environment.NewLine;
-			script += "if square == 1:" + Environment.NewLine;
-			script += "    radvals = radvals * 2;" + Environment.NewLine;
+		//	script += "radvals = radius * u.arcmin" + Environment.NewLine;
+		//	script += "if square == 1:" + Environment.NewLine;
+		//	script += "    radvals = radvals * 2;" + Environment.NewLine;
 
-			script += "coords = SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg), frame='fk5')" + Environment.NewLine;
+		//	script += "coords = SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg), frame='fk5')" + Environment.NewLine;
 
-			script += "jobstr = \"SELECT TOP {0} * FROM gaiaedr3.gaia_source\\n\".format(number)" + Environment.NewLine;
-			script += "jobstr += \"WHERE 1=CONTAINS(POINT('ICRS', gaiaedr3.gaia_source.ra,gaiaedr3.gaia_source.dec),\"" + Environment.NewLine;
+		//	script += "jobstr = \"SELECT TOP {0} * FROM gaiaedr3.gaia_source\\n\".format(number)" + Environment.NewLine;
+		//	script += "jobstr += \"WHERE 1=CONTAINS(POINT('ICRS', gaiaedr3.gaia_source.ra,gaiaedr3.gaia_source.dec),\"" + Environment.NewLine;
 
-			script += "if square == 1:" + Environment.NewLine;
-			script += "    jobstr += \"BOX('ICRS',{0},{1},{2},{2}))\\n\".format(coords.ra.deg,coords.dec.deg,radvals.to(u.deg).value)" + Environment.NewLine;
-			script += "else:" + Environment.NewLine;
-			script += "    jobstr += \"CIRCLE('ICRS',{0},{1},{2}))\\n\".format(coords.ra.deg,coords.dec.deg,radvals.to(u.deg).value)" + Environment.NewLine;
-			script += "if sortfilt == \"bp\":" + Environment.NewLine;
-			script += "    jobstr += \"ORDER by gaiaedr3.gaia_source.phot_bp_mean_mag ASC\"" + Environment.NewLine;
-			script += "elif sortfilt == \"rp\":" + Environment.NewLine;
-			script += "    jobstr += \"ORDER by gaiaedr3.gaia_source.phot_rp_mean_mag ASC\"" + Environment.NewLine;
-			script += "else:" + Environment.NewLine;
-			script += "    jobstr += \"ORDER by gaiaedr3.gaia_source.phot_g_mean_mag ASC\"" + Environment.NewLine;
+		//	script += "if square == 1:" + Environment.NewLine;
+		//	script += "    jobstr += \"BOX('ICRS',{0},{1},{2},{2}))\\n\".format(coords.ra.deg,coords.dec.deg,radvals.to(u.deg).value)" + Environment.NewLine;
+		//	script += "else:" + Environment.NewLine;
+		//	script += "    jobstr += \"CIRCLE('ICRS',{0},{1},{2}))\\n\".format(coords.ra.deg,coords.dec.deg,radvals.to(u.deg).value)" + Environment.NewLine;
+		//	script += "if sortfilt == \"bp\":" + Environment.NewLine;
+		//	script += "    jobstr += \"ORDER by gaiaedr3.gaia_source.phot_bp_mean_mag ASC\"" + Environment.NewLine;
+		//	script += "elif sortfilt == \"rp\":" + Environment.NewLine;
+		//	script += "    jobstr += \"ORDER by gaiaedr3.gaia_source.phot_rp_mean_mag ASC\"" + Environment.NewLine;
+		//	script += "else:" + Environment.NewLine;
+		//	script += "    jobstr += \"ORDER by gaiaedr3.gaia_source.phot_g_mean_mag ASC\"" + Environment.NewLine;
 
-			script += "print(\"Launching job query to Gaia archive\")" + Environment.NewLine;
-			script += "print(jobstr)" + Environment.NewLine;
-			script += "print(\" \")" + Environment.NewLine;
-			script += "print(\"Waiting for query results...\")" + Environment.NewLine;
-			script += "try:" + Environment.NewLine;
-			script += "    job = Gaia.launch_job_async(jobstr, dump_to_file = False)" + Environment.NewLine;
-			script += "except:" + Environment.NewLine;
-			script += "    print(job)" + Environment.NewLine;
-			script += "    print(\"Press enter to continue...\")" + Environment.NewLine;
-			script += "    input()" + Environment.NewLine;
-			script += "print(job)" + Environment.NewLine;
-			script += "results = job.get_results()" + Environment.NewLine;
+		//	script += "print(\"Launching job query to Gaia archive\")" + Environment.NewLine;
+		//	script += "print(jobstr)" + Environment.NewLine;
+		//	script += "print(\" \")" + Environment.NewLine;
+		//	script += "print(\"Waiting for query results...\")" + Environment.NewLine;
+		//	script += "try:" + Environment.NewLine;
+		//	script += "    job = Gaia.launch_job_async(jobstr, dump_to_file = False)" + Environment.NewLine;
+		//	script += "except:" + Environment.NewLine;
+		//	script += "    print(job)" + Environment.NewLine;
+		//	script += "    print(\"Press enter to continue...\")" + Environment.NewLine;
+		//	script += "    input()" + Environment.NewLine;
+		//	script += "print(job)" + Environment.NewLine;
+		//	script += "results = job.get_results()" + Environment.NewLine;
 
-			//Strip object columns from FITS table
-			script += "removelist = []" + Environment.NewLine;
-			script += "for col in results.columns:" + Environment.NewLine;
-			script += "    if results[col].dtype == 'object' :" + Environment.NewLine;
-			script += "        removelist += [col]" + Environment.NewLine;
-			script += "results.remove_columns(removelist)" + Environment.NewLine;
-			script += "results.write(filename, overwrite = True, format = 'fits')";
+		//	//Strip object columns from FITS table
+		//	script += "removelist = []" + Environment.NewLine;
+		//	script += "for col in results.columns:" + Environment.NewLine;
+		//	script += "    if results[col].dtype == 'object' :" + Environment.NewLine;
+		//	script += "        removelist += [col]" + Environment.NewLine;
+		//	script += "results.remove_columns(removelist)" + Environment.NewLine;
+		//	script += "results.write(filename, overwrite = True, format = 'fits')";
 
-			StreamWriter sw = new StreamWriter(script_filename);
-			sw.Write(script);
-			sw.Close();
-		}
+		//	StreamWriter sw = new StreamWriter(script_filename);
+		//	sw.Write(script);
+		//	sw.Close();
+		//}
 
 		#endregion
 
@@ -1091,192 +1091,192 @@ namespace JPFITS
 		//	return res;
 		//}
 
-		/// <summary>Queries the Gaia catalogue for entries within a specified region. Returns 0 if the query was successful.</summary>
-		/// <param name="ra_deg">A string of the right ascension in degrees.</param>
-		/// <param name="dec_deg">A string of the declination in degrees.</param>
-		/// <param name="result_savepathfilename">The filename to save the catalogue query FITS binary table.</param>
-		/// <param name="radius">A string of the region radius in arcminutes.</param>
-		/// <param name="square">Pass 1 if the region is square, 0 for circle.</param>
-		/// <param name="N">Number of entries for the region to return.</param>
-		/// <param name="sortfilter">The Gaia filter to sort the return by: bp, g, or rp.</param>
-		public static int GaiaDR3QueryN(string ra_deg, string dec_deg, string result_savepathfilename, string radius, string square, string N, string sortfilter)
-		{
-			string pypath = (string)REG.GetReg("CCDLAB", "PythonExePath");
+		///// <summary>Queries the Gaia catalogue for entries within a specified region. Returns 0 if the query was successful.</summary>
+		///// <param name="ra_deg">A string of the right ascension in degrees.</param>
+		///// <param name="dec_deg">A string of the declination in degrees.</param>
+		///// <param name="result_savepathfilename">The filename to save the catalogue query FITS binary table.</param>
+		///// <param name="radius">A string of the region radius in arcminutes.</param>
+		///// <param name="square">Pass 1 if the region is square, 0 for circle.</param>
+		///// <param name="N">Number of entries for the region to return.</param>
+		///// <param name="sortfilter">The Gaia filter to sort the return by: bp, g, or rp.</param>
+		//public static int GaiaDR3QueryN(string ra_deg, string dec_deg, string result_savepathfilename, string radius, string square, string N, string sortfilter)
+		//{
+		//	string pypath = (string)REG.GetReg("CCDLAB", "PythonExePath");
 
-			if (pypath == null || !File.Exists(pypath))
-			{
-				string[] dirsappdata = Directory.GetDirectories(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "*Python*", SearchOption.AllDirectories);
-				string[] dirsprogdata = Directory.GetDirectories("C:\\Program Files\\", "*Python*", SearchOption.TopDirectoryOnly);
+		//	if (pypath == null || !File.Exists(pypath))
+		//	{
+		//		string[] dirsappdata = Directory.GetDirectories(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "*Python*", SearchOption.AllDirectories);
+		//		string[] dirsprogdata = Directory.GetDirectories("C:\\Program Files\\", "*Python*", SearchOption.TopDirectoryOnly);
 
-				ArrayList locs = new ArrayList();
+		//		ArrayList locs = new ArrayList();
 
-				for (int i = 0; i < dirsappdata.Length; i++)
-				{
-					string[] files = Directory.GetFiles(dirsappdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
-					if (files.Length == 1)
-						locs.Add(files[0]);
-				}
-				for (int i = 0; i < dirsprogdata.Length; i++)
-				{
-					string[] files = Directory.GetFiles(dirsprogdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
-					if (files.Length == 1)
-						locs.Add(files[0]);
-				}
+		//		for (int i = 0; i < dirsappdata.Length; i++)
+		//		{
+		//			string[] files = Directory.GetFiles(dirsappdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
+		//			if (files.Length == 1)
+		//				locs.Add(files[0]);
+		//		}
+		//		for (int i = 0; i < dirsprogdata.Length; i++)
+		//		{
+		//			string[] files = Directory.GetFiles(dirsprogdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
+		//			if (files.Length == 1)
+		//				locs.Add(files[0]);
+		//		}
 
-				if (locs.Count == 0)
-				{
-					if (MessageBox.Show("Is Python installed? Please show me where your Python installation is located, OK? \r\n\r\nIf Python is not installed, please gather it from:\r\n\r\n https://www.python.org/downloads/windows/", "I cannot find python.exe", MessageBoxButtons.OKCancel) == DialogResult.Cancel)
-						return -2;
+		//		if (locs.Count == 0)
+		//		{
+		//			if (MessageBox.Show("Is Python installed? Please show me where your Python installation is located, OK? \r\n\r\nIf Python is not installed, please gather it from:\r\n\r\n https://www.python.org/downloads/windows/", "I cannot find python.exe", MessageBoxButtons.OKCancel) == DialogResult.Cancel)
+		//				return -2;
 
-					OpenFileDialog ofd = new OpenFileDialog();
-					ofd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-					ofd.Filter = "Executable|*.exe;";
-					if (ofd.ShowDialog() == DialogResult.Cancel)
-						return -2;
+		//			OpenFileDialog ofd = new OpenFileDialog();
+		//			ofd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+		//			ofd.Filter = "Executable|*.exe;";
+		//			if (ofd.ShowDialog() == DialogResult.Cancel)
+		//				return -2;
 
-					pypath = ofd.FileName;
-				}
-				else
-				{
-					pypath = (string)locs[0];
-					DateTime date = File.GetCreationTimeUtc((string)locs[0]);
-					for (int i = 0; i < locs.Count; i++)
-						if (File.GetCreationTimeUtc((string)locs[i]) > date)
-						{
-							date = File.GetCreationTimeUtc((string)locs[i]);
-							pypath = (string)locs[i];
-						}
-				}
+		//			pypath = ofd.FileName;
+		//		}
+		//		else
+		//		{
+		//			pypath = (string)locs[0];
+		//			DateTime date = File.GetCreationTimeUtc((string)locs[0]);
+		//			for (int i = 0; i < locs.Count; i++)
+		//				if (File.GetCreationTimeUtc((string)locs[i]) > date)
+		//				{
+		//					date = File.GetCreationTimeUtc((string)locs[i]);
+		//					pypath = (string)locs[i];
+		//				}
+		//		}
 
-				REG.SetReg("CCDLAB", "PythonExePath", pypath);
-			}
+		//		REG.SetReg("CCDLAB", "PythonExePath", pypath);
+		//	}
 
-			if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\"))
-				Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\");
+		//	if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\"))
+		//		Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\");
 			
-			string script = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\GaiaDR3QueryN.py";
-			MAKEGAIADR3QUERYNSCRIPT(script);
+		//	string script = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\GaiaDR3QueryN.py";
+		//	MAKEGAIADR3QUERYNSCRIPT(script);
 
-			if (result_savepathfilename == "")
-			{
-				if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\"))
-					Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\");
-				result_savepathfilename = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\GaiaDR3Query.fit";
-			}
+		//	if (result_savepathfilename == "")
+		//	{
+		//		if (!Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\"))
+		//			Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\");
+		//		result_savepathfilename = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Astrowerks\\CCDLAB\\GaiaDR3Query.fit";
+		//	}
 
-			System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo();
-			psi.FileName = pypath;
-			psi.Arguments = String.Format("\"" + script + "\"" + " {0} {1} {2} {3} {4} {5} {6}", ra_deg, dec_deg, "\"" + result_savepathfilename + "\"", radius, square, N, sortfilter);
+		//	System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo();
+		//	psi.FileName = pypath;
+		//	psi.Arguments = String.Format("\"" + script + "\"" + " {0} {1} {2} {3} {4} {5} {6}", ra_deg, dec_deg, "\"" + result_savepathfilename + "\"", radius, square, N, sortfilter);
 
-			/*psi.UseShellExecute = false;//??????
-			psi.CreateNoWindow = true;//????
-			psi.RedirectStandardError = true;
-			psi.RedirectStandardOutput = true;*/
+		//	/*psi.UseShellExecute = false;//??????
+		//	psi.CreateNoWindow = true;//????
+		//	psi.RedirectStandardError = true;
+		//	psi.RedirectStandardOutput = true;*/
 
-			System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
-			proc.WaitForExit();
-			int res = proc.ExitCode;
-			if (res != 0)
-			{
-				/*string stderr = proc.StandardError.ReadToEnd();
-				string stdout = proc.StandardOutput.ReadToEnd();
-				MessageBox.Show(stderr + "\r\n" + stdout);*/
-				return res;
-			}
+		//	System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
+		//	proc.WaitForExit();
+		//	int res = proc.ExitCode;
+		//	if (res != 0)
+		//	{
+		//		/*string stderr = proc.StandardError.ReadToEnd();
+		//		string stdout = proc.StandardOutput.ReadToEnd();
+		//		MessageBox.Show(stderr + "\r\n" + stdout);*/
+		//		return res;
+		//	}
 
-			return res;
-		}
+		//	return res;
+		//}
 
-		public static int AstraCarta(double ra_deg, double dec_deg, double scale, int pixwidth, int pixheight, string shape, double buffer, string outdir, string outname, string filter, int nquery, bool showplot, bool forcenew, out string result_savepathfilename)
-		{
-			result_savepathfilename = "";
-			string pypath = (string)REG.GetReg("CCDLAB", "PythonExePath");
+		//public static int AstraCarta(double ra_deg, double dec_deg, double scale, int pixwidth, int pixheight, string shape, double buffer, string outdir, string outname, string filter, int nquery, bool showplot, bool forcenew, out string result_savepathfilename)
+		//{
+		//	result_savepathfilename = "";
+		//	string pypath = (string)REG.GetReg("CCDLAB", "PythonExePath");
 
-			if (pypath == null || !File.Exists(pypath))
-			{
-				string[] dirsappdata = Directory.GetDirectories(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "*Python*", SearchOption.AllDirectories);
-				string[] dirsprogdata = Directory.GetDirectories("C:\\Program Files\\", "*Python*", SearchOption.TopDirectoryOnly);
+		//	if (pypath == null || !File.Exists(pypath))
+		//	{
+		//		string[] dirsappdata = Directory.GetDirectories(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "*Python*", SearchOption.AllDirectories);
+		//		string[] dirsprogdata = Directory.GetDirectories("C:\\Program Files\\", "*Python*", SearchOption.TopDirectoryOnly);
 
-				ArrayList locs = new ArrayList();
+		//		ArrayList locs = new ArrayList();
 
-				for (int i = 0; i < dirsappdata.Length; i++)
-				{
-					string[] files = Directory.GetFiles(dirsappdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
-					if (files.Length == 1)
-						locs.Add(files[0]);
-				}
-				for (int i = 0; i < dirsprogdata.Length; i++)
-				{
-					string[] files = Directory.GetFiles(dirsprogdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
-					if (files.Length == 1)
-						locs.Add(files[0]);
-				}
+		//		for (int i = 0; i < dirsappdata.Length; i++)
+		//		{
+		//			string[] files = Directory.GetFiles(dirsappdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
+		//			if (files.Length == 1)
+		//				locs.Add(files[0]);
+		//		}
+		//		for (int i = 0; i < dirsprogdata.Length; i++)
+		//		{
+		//			string[] files = Directory.GetFiles(dirsprogdata[i], "*python.exe", SearchOption.TopDirectoryOnly);
+		//			if (files.Length == 1)
+		//				locs.Add(files[0]);
+		//		}
 
-				if (locs.Count == 0)
-				{
-					if (MessageBox.Show("Is Python installed? Please show me where your Python installation is located, OK? \r\n\r\nIf Python is not installed, please gather it from:\r\n\r\n https://www.python.org/downloads/windows/", "I cannot find python.exe", MessageBoxButtons.OKCancel) == DialogResult.Cancel)
-						return -2;
+		//		if (locs.Count == 0)
+		//		{
+		//			if (MessageBox.Show("Is Python installed? Please show me where your Python installation is located, OK? \r\n\r\nIf Python is not installed, please gather it from:\r\n\r\n https://www.python.org/downloads/windows/", "I cannot find python.exe", MessageBoxButtons.OKCancel) == DialogResult.Cancel)
+		//				return -2;
 
-					OpenFileDialog ofd = new OpenFileDialog();
-					ofd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-					ofd.Filter = "Executable|*.exe;";
-					if (ofd.ShowDialog() == DialogResult.Cancel)
-						return -2;
+		//			OpenFileDialog ofd = new OpenFileDialog();
+		//			ofd.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+		//			ofd.Filter = "Executable|*.exe;";
+		//			if (ofd.ShowDialog() == DialogResult.Cancel)
+		//				return -2;
 
-					pypath = ofd.FileName;
-				}
-				else
-				{
-					pypath = (string)locs[0];
-					DateTime date = File.GetCreationTimeUtc((string)locs[0]);
-					for (int i = 0; i < locs.Count; i++)
-						if (File.GetCreationTimeUtc((string)locs[i]) > date)
-						{
-							date = File.GetCreationTimeUtc((string)locs[i]);
-							pypath = (string)locs[i];
-						}
-				}
+		//			pypath = ofd.FileName;
+		//		}
+		//		else
+		//		{
+		//			pypath = (string)locs[0];
+		//			DateTime date = File.GetCreationTimeUtc((string)locs[0]);
+		//			for (int i = 0; i < locs.Count; i++)
+		//				if (File.GetCreationTimeUtc((string)locs[i]) > date)
+		//				{
+		//					date = File.GetCreationTimeUtc((string)locs[i]);
+		//					pypath = (string)locs[i];
+		//				}
+		//		}
 
-				REG.SetReg("CCDLAB", "PythonExePath", pypath);
-			}
+		//		REG.SetReg("CCDLAB", "PythonExePath", pypath);
+		//	}
 
-			string argstring = String.Format("-ra {0} -dec {1} -scale {2} -pixwidth {3} -pixheight {4} -shape {5} -buffer {6} -outdir {7} -outname {8} -filter {9} -nquery {10} -fitsout", ra_deg, dec_deg, scale, pixwidth, pixheight, "\"" + shape + "\"", buffer, "\"" + outdir + "\"", "\"" + outname + "\"", "\"" + filter + "\"", nquery);
-			if (showplot)
-				argstring += " -imageshow";
-			if (forcenew)
-				argstring += " -forcenew";
-			System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "astracarta " + argstring);
+		//	string argstring = String.Format("-ra {0} -dec {1} -scale {2} -pixwidth {3} -pixheight {4} -shape {5} -buffer {6} -outdir {7} -outname {8} -filter {9} -nquery {10} -fitsout", ra_deg, dec_deg, scale, pixwidth, pixheight, "\"" + shape + "\"", buffer, "\"" + outdir + "\"", "\"" + outname + "\"", "\"" + filter + "\"", nquery);
+		//	if (showplot)
+		//		argstring += " -imageshow";
+		//	if (forcenew)
+		//		argstring += " -forcenew";
+		//	System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "astracarta " + argstring);
 
-			psi.UseShellExecute = false;
-			psi.CreateNoWindow = true;
-			psi.RedirectStandardError = true;
-			psi.RedirectStandardOutput = true;
-			System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
-			proc.WaitForExit();
-			int res = proc.ExitCode;
+		//	psi.UseShellExecute = false;
+		//	psi.CreateNoWindow = true;
+		//	psi.RedirectStandardError = true;
+		//	psi.RedirectStandardOutput = true;
+		//	System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
+		//	proc.WaitForExit();
+		//	int res = proc.ExitCode;
 
-			string stdout = proc.StandardOutput.ReadToEnd().Trim();
-			string stderr = proc.StandardError.ReadToEnd().Trim();
+		//	string stdout = proc.StandardOutput.ReadToEnd().Trim();
+		//	string stderr = proc.StandardError.ReadToEnd().Trim();
 
-			if (stderr != "")
-			{
-				MessageBox.Show(stderr + "\r\n\r\n" + stdout, "Error...");
-				return res;
-			}
+		//	if (stderr != "")
+		//	{
+		//		MessageBox.Show(stderr + "\r\n\r\n" + stdout, "Error...");
+		//		return res;
+		//	}
 
-			result_savepathfilename = stdout;
+		//	result_savepathfilename = stdout;
 
-			int c = 0;
-			string test = result_savepathfilename;
-			while (!File.Exists(test))
-			{
-				c++;
-				test = result_savepathfilename.Substring(c);
-			}
-			result_savepathfilename = test;
+		//	int c = 0;
+		//	string test = result_savepathfilename;
+		//	while (!File.Exists(test))
+		//	{
+		//		c++;
+		//		test = result_savepathfilename.Substring(c);
+		//	}
+		//	result_savepathfilename = test;
 
-			return res;
-		}
+		//	return res;
+		//}
 
 		#endregion
 	}

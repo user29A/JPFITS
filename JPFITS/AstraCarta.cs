@@ -28,7 +28,7 @@ namespace JPFITS
 		}
 
 		/// <summary>
-		/// Perform a query with no user interface dialog form. With throw an informative exception if something goes wrong.
+		/// Perform a query with no user interface dialog form. Will throw an informative exception if something goes wrong. Returns a string which is the filename of the catalogue data downloaded.
 		/// </summary>
 		/// <param name="keys">A string list of keys such as "-ra", "-dec", "-scale", etc.</param>
 		/// <param name="values">A string list of key values for the keys. Keys with no arguments must have empty strings passed as their values.</param>
@@ -40,32 +40,22 @@ namespace JPFITS
 			n = keys.IndexOf("-ra");
 			if (n != -1)
 				argstring += String.Format("-ra {0} ", (string)values[n]);
-			else
-				throw new Exception("-ra must be supplied");
 
 			n = keys.IndexOf("-dec");
 			if (n != -1)
 				argstring += String.Format("-dec {0} ", (string)values[n]);
-			else
-				throw new Exception("-dec must be supplied");
 
 			n = keys.IndexOf("-scale");
 			if (n != -1)
 				argstring += String.Format("-scale {0} ", (string)values[n]);
-			else
-				throw new Exception("-scale must be supplied");
 
 			n = keys.IndexOf("-pixwidth");
 			if (n != -1)
 				argstring += String.Format("-pixwidth {0} ", (string)values[n]);
-			else
-				throw new Exception("-pixwidth must be supplied");
 
 			n = keys.IndexOf("-pixheight");
 			if (n != -1)
 				argstring += String.Format("-pixheight {0} ", (string)values[n]);
-			else
-				throw new Exception("-pixheight must be supplied");
 
 			n = keys.IndexOf("-buffer");
 			if (n != -1)
@@ -209,32 +199,22 @@ namespace JPFITS
 			n = keys.IndexOf("-ra");
 			if (n != -1)
 				RATextBox.Text = (string)values[n];
-			else
-				throw new Exception("-ra must be supplied");
 
 			n = keys.IndexOf("-dec");
 			if (n != -1)
 				DecTextBox.Text = (string)values[n];
-			else
-				throw new Exception("-dec must be supplied");
 
 			n = keys.IndexOf("-scale");
 			if (n != -1)
 				ScaleTextBox.Text = (string)values[n];
-			else
-				throw new Exception("-scale must be supplied");
 
 			n = keys.IndexOf("-pixwidth");
 			if (n != -1)
 				WidthTextBox.Text = (string)values[n];
-			else
-				throw new Exception("-pixwidth must be supplied");
 
 			n = keys.IndexOf("-pixheight");
 			if (n != -1)
 				HeightTextBox.Text = (string)values[n];
-			else
-				throw new Exception("-pixheight must be supplied");
 
 			BufferTextBox.Text = "";
 			n = keys.IndexOf("-buffer");
