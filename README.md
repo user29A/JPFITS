@@ -4,3 +4,5 @@ FITS File interaction written in Visual Studio C# .Net, compatible across all .N
 Contact: joepostma at live dot ca
 
 Contact: jpostma at ucalgary dot ca
+
+This package was created with funding from the Canadian Space Agency via contract support to the University of Calgary.
