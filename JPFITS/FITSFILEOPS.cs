@@ -2,20 +2,15 @@
 using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
-using static alglib.reviseddualsimplex;
-using System.Windows.Forms.DataVisualization.Charting;
-using System.Windows.Forms;
-
-
 #nullable enable
 
 namespace JPFITS
 {
-
+	/// <summary>Array formatting options for the data unit returned by the READDATAUNIT method.</summary>
 	public enum DataUnitFormatting
 	{
 		/// <summary>
-		/// The Array is returned as the rank indicated by the naxisn keyword
+		/// The Array is returned as the rank indicated by the NAXIS keyword
 		/// </summary>
 		Default,
 		/// <summary>

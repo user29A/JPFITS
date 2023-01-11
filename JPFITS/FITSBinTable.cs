@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -43,26 +40,31 @@ namespace JPFITS
 		{
 			return unchecked((long)ulongValue + long.MinValue);
 		}
+
 		[MethodImpl(256)]/*256 = agressive inlining*/
 		private static int MapUintToInt(uint uintValue)
 		{
 			return unchecked((int)uintValue + int.MinValue);
 		}
+
 		[MethodImpl(256)]/*256 = agressive inlining*/
 		private static short MapUshortToShort(ushort ushortValue)
 		{
 			return unchecked((short)((short)ushortValue + short.MinValue));
 		}
+
 		[MethodImpl(256)]/*256 = agressive inlining*/
 		private static ulong MapLongToUlong(long longValue)
 		{
 			return unchecked((ulong)(longValue - long.MinValue));
 		}
+
 		[MethodImpl(256)]/*256 = agressive inlining*/
 		private static uint MapIntToUint(int intValue)
 		{
 			return unchecked((uint)(intValue - int.MinValue));
 		}
+
 		[MethodImpl(256)]/*256 = agressive inlining*/
 		private static ushort MapShortToUshort(short shortValue)
 		{
@@ -80,21 +82,21 @@ namespace JPFITS
 			MAKEHEAPBYTEARRAY(ExtensionEntryData);//will do nothing if there's no heap data
 
 			int TBytes = NAXIS1 * NAXIS2;
-			BINTABLE = new byte[TBytes];
-
-			//int nthread = omp_get_max_threads();
-			//bool parallel_top = false;
-			//if (NAXIS2 >= nthread)
-			//parallel_top = true;
+			BINTABLE = new byte[TBytes];			
 			bool exception = false;
 			TypeCode exceptiontypecode = TypeCode.Empty;
 
+			ParallelOptions opts = new ParallelOptions();
+			if (NAXIS2 >= Environment.ProcessorCount)
+				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
+			else
+				opts.MaxDegreeOfParallelism = 1;
+
 			//now write the table data into the array
-			//#pragma omp parallel for if(parallel_top)
-			for (int i = 0; i < NAXIS2; i++)
+			Parallel.For(0, NAXIS2, opts, (i, loopstate) =>
 			{
 				if (exception)
-					break;
+					loopstate.Break();
 
 				for (int j = 0; j < ExtensionEntryData.Length; j++)
 				{
@@ -206,12 +208,9 @@ namespace JPFITS
 
 						case TypeCode.UInt64:
 						{
-							//ulong bzero = 9223372036854775808;
-							long val;// ulong val;
+							long val;
 							if (TREPEATS[j] == 1)
 							{
-								//val = (((ulong[])ExtensionEntryData[j])[i] - bzero);// (((long[])ExtensionEntryData[j])[i] - bzero);
-								//val = unchecked((long)(((ulong[])ExtensionEntryData[j])[i]) + long.MinValue);
 								val = MapUlongToLong(((ulong[])ExtensionEntryData[j])[i]);
 								BINTABLE[cc] = (byte)((val >> 56) & 0xff);
 								BINTABLE[cc + 1] = (byte)((val >> 48) & 0xff);
@@ -225,8 +224,6 @@ namespace JPFITS
 							else
 								for (int ii = 0; ii < TREPEATS[j]; ii++)
 								{
-									//val = (((ulong[,])ExtensionEntryData[j])[ii, i] - bzero); //(((long[,])ExtensionEntryData[j])[ii, i] - bzero);
-									//val = unchecked((long)(((ulong[,])ExtensionEntryData[j])[ii, i]) + long.MinValue);
 									val = MapUlongToLong(((ulong[,])ExtensionEntryData[j])[ii, i]);
 									BINTABLE[cc + ii * 8] = (byte)((val >> 56) & 0xff);
 									BINTABLE[cc + ii * 8 + 1] = (byte)((val >> 48) & 0xff);
@@ -265,12 +262,9 @@ namespace JPFITS
 
 						case TypeCode.UInt32:
 						{
-							//uint bzero = 2147483648;
-							int val;//uint val;
+							int val;
 							if (TREPEATS[j] == 1)
 							{
-								//val = (((uint[])ExtensionEntryData[j])[i] - bzero); //(((int[])ExtensionEntryData[j])[i] - bzero);
-								//val = unchecked((int)(((uint[])ExtensionEntryData[j])[i]) + int.MinValue);
 								val = MapUintToInt(((uint[])ExtensionEntryData[j])[i]);
 								BINTABLE[cc] = (byte)((val >> 24) & 0xff);
 								BINTABLE[cc + 1] = (byte)((val >> 16) & 0xff);
@@ -280,8 +274,6 @@ namespace JPFITS
 							else
 								for (int ii = 0; ii < TREPEATS[j]; ii++)
 								{
-									//val = (((uint[,])ExtensionEntryData[j])[ii, i] - bzero); //(((int[,])ExtensionEntryData[j])[ii, i] - bzero);
-									//val = unchecked((int)(((uint[,])ExtensionEntryData[j])[ii, i]) + int.MinValue);
 									val = MapUintToInt(((uint[,])ExtensionEntryData[j])[ii, i]);
 									BINTABLE[cc + ii * 4] = (byte)((val >> 24) & 0xff);
 									BINTABLE[cc + ii * 4 + 1] = (byte)((val >> 16) & 0xff);
@@ -312,12 +304,9 @@ namespace JPFITS
 
 						case TypeCode.UInt16:
 						{
-							//ushort bzero = 32768;
-							short val; //ushort val;
+							short val;
 							if (TREPEATS[j] == 1)
 							{
-								//val = (ushort)(((ushort[])ExtensionEntryData[j])[i] - bzero);//(((short[])ExtensionEntryData[j])[i] - bzero);
-								//val = (short)unchecked((short)(((ushort[])ExtensionEntryData[j])[i]) + short.MinValue);
 								val = MapUshortToShort(((ushort[])ExtensionEntryData[j])[i]);
 								BINTABLE[cc] = (byte)((val >> 8) & 0xff);
 								BINTABLE[cc + 1] = (byte)(val & 0xff);
@@ -325,8 +314,6 @@ namespace JPFITS
 							else
 								for (int ii = 0; ii < TREPEATS[j]; ii++)
 								{
-									//val = (ushort)(((ushort[,])ExtensionEntryData[j])[ii, i] - bzero);//(((short[,])ExtensionEntryData[j])[ii, i] - bzero);
-									//val = (short)unchecked((short)(((ushort[,])ExtensionEntryData[j])[ii, i]) + short.MinValue);
 									val = MapUshortToShort(((ushort[,])ExtensionEntryData[j])[ii, i]);
 									BINTABLE[cc + ii * 2] = (byte)((val >> 8) & 0xff);
 									BINTABLE[cc + ii * 2 + 1] = (byte)(val & 0xff);
@@ -379,7 +366,7 @@ namespace JPFITS
 						}
 					}
 				}
-			}
+			});
 			if (exception)
 			{
 				throw new Exception("Data type not recognized for writing as FITS table: '" + exceptiontypecode.ToString() + "'");
@@ -392,10 +379,11 @@ namespace JPFITS
 			MAKETTYPEHEAPARRAYNELSPOS(ExtensionEntryData, out totalbytes);
 			HEAPDATA = new byte[(int)totalbytes];
 
-			//int nthread = omp_get_max_threads();
-			//bool parallel = false;
-			//if (NAXIS2 >= nthread)
-			//parallel = true;
+			ParallelOptions opts = new ParallelOptions();
+			if (NAXIS2 >= Environment.ProcessorCount)
+				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
+			else
+				opts.MaxDegreeOfParallelism = 1;
 
 			for (int i = 0; i < TTYPEISHEAPARRAYDESC.Length; i++)//same as extension entry data length
 			{
@@ -406,8 +394,7 @@ namespace JPFITS
 				{
 					case TypeCode.Double:
 					{
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
 						{
 							byte[] dbl = new byte[8];
 							int pos = TTYPEHEAPARRAYNELSPOS[i][1, y];
@@ -425,14 +412,13 @@ namespace JPFITS
 								HEAPDATA[pos + 7] = dbl[0];
 								pos += 8;
 							}
-						}
+						});
 						break;
 					}
 
 					case TypeCode.Single:
 					{
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
 						{
 							byte[] sng = new byte[4];
 							int pos = TTYPEHEAPARRAYNELSPOS[i][1, y];
@@ -446,14 +432,13 @@ namespace JPFITS
 								HEAPDATA[pos + 3] = sng[0];
 								pos += 4;
 							}
-						}
+						});
 						break;
 					}
 
 					case TypeCode.Int64:
 					{
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
 						{
 							long val;
 							int pos = TTYPEHEAPARRAYNELSPOS[i][1, y];
@@ -471,22 +456,19 @@ namespace JPFITS
 								HEAPDATA[pos + 7] = (byte)(val & 0xff);
 								pos += 8;
 							}
-						}
+						});
 						break;
 					}
 
 					case TypeCode.UInt64:
 					{
-						//ulong bzero = 9223372036854775808;
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
 						{
-							long val;// ulong val;
+							long val;
 							int pos = TTYPEHEAPARRAYNELSPOS[i][1, y];
 
 							for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 							{
-								//val = (((ulong[])(((ulong[][])(ExtensionEntryData[i]))[y]))[x] - bzero);//(((long[])(((long[][])(ExtensionEntryData[i]))[y]))[x] - bzero);
 								val = MapUlongToLong(((ulong[])(((ulong[][])(ExtensionEntryData[i]))[y]))[x]);
 								HEAPDATA[pos] = (byte)((val >> 56) & 0xff);
 								HEAPDATA[pos + 1] = (byte)((val >> 48) & 0xff);
@@ -498,14 +480,13 @@ namespace JPFITS
 								HEAPDATA[pos + 7] = (byte)(val & 0xff);
 								pos += 8;
 							}
-						}
+						});
 						break;
 					}
 
 					case TypeCode.Int32:
 					{
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
 						{
 							int val;
 							int pos = TTYPEHEAPARRAYNELSPOS[i][1, y];
@@ -519,22 +500,19 @@ namespace JPFITS
 								HEAPDATA[pos + 3] = (byte)(val & 0xff);
 								pos += 4;
 							}
-						}
+						});
 						break;
 					}
 
 					case TypeCode.UInt32:
 					{
-						//uint bzero = 2147483648;
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
 						{
-							int val;// uint val;
+							int val;
 							int pos = TTYPEHEAPARRAYNELSPOS[i][1, y];
 
 							for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 							{
-								//val = (((uint[])(((uint[][])(ExtensionEntryData[i]))[y]))[x] - bzero);//(((int[])(((int[][])(ExtensionEntryData[i]))[y]))[x] - bzero);
 								val = MapUintToInt(((uint[])(((uint[][])(ExtensionEntryData[i]))[y]))[x]);
 								HEAPDATA[pos] = (byte)((val >> 24) & 0xff);
 								HEAPDATA[pos + 1] = (byte)((val >> 16) & 0xff);
@@ -542,14 +520,13 @@ namespace JPFITS
 								HEAPDATA[pos + 3] = (byte)(val & 0xff);
 								pos += 4;
 							}
-						}
+						});
 						break;
 					}
 
 					case TypeCode.Int16:
 					{
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
 						{
 							short val;
 							int pos = TTYPEHEAPARRAYNELSPOS[i][1, y];
@@ -561,64 +538,65 @@ namespace JPFITS
 								HEAPDATA[pos + 1] = (byte)(val & 0xff);
 								pos += 2;
 							}
-						}
+						});
 						break;
 					}
 
 					case TypeCode.UInt16:
 					{
-						//ushort bzero = 32768;
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
 						{
-							short val;// ushort val;
+							short val;
 							int pos = TTYPEHEAPARRAYNELSPOS[i][1, y];
 
 							for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 							{
-								//val = (ushort)(((ushort[])(((ushort[][])(ExtensionEntryData[i]))[y]))[x] - bzero);//(((short[])(((short[][])(ExtensionEntryData[i]))[y]))[x] - bzero);
 								val = MapUshortToShort(((ushort[])(((ushort[][])(ExtensionEntryData[i]))[y]))[x]);
 								HEAPDATA[pos] = (byte)((val >> 8) & 0xff);
 								HEAPDATA[pos + 1] = (byte)(val & 0xff);
 								pos += 2;
 							}
-						}
+						});
 						break;
 					}
 
 					case TypeCode.SByte:
 					{
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
+						{
 							for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 								HEAPDATA[TTYPEHEAPARRAYNELSPOS[i][1, y] + x] = (byte)((sbyte[])(((sbyte[][])(ExtensionEntryData[i]))[y]))[x];
+						});
 						break;
 					}
 
 					case TypeCode.Byte:
 					{
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
+						{
 							for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 								HEAPDATA[TTYPEHEAPARRAYNELSPOS[i][1, y] + x] = ((byte[])(((byte[][])(ExtensionEntryData[i]))[y]))[x];
+						});
 						break;
 					}
 
 					case TypeCode.Boolean:
 					{
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
+						{
 							for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 								HEAPDATA[TTYPEHEAPARRAYNELSPOS[i][1, y] + x] = Convert.ToByte(((bool[])(((bool[][])(ExtensionEntryData[i]))[y]))[x]);
+						});
 						break;
 					}
 
 					case TypeCode.Char:
 					{
-						////#pragma omp parallel for if(parallel)
-						for (int y = 0; y < NAXIS2; y++)
+						Parallel.For(0, NAXIS2, opts, y =>
+						{
 							for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 								HEAPDATA[TTYPEHEAPARRAYNELSPOS[i][1, y] + x] = (byte)((string)(((string[])(ExtensionEntryData[i]))[y]))[x];
+						});
 						break;
 					}
 
@@ -905,11 +883,9 @@ namespace JPFITS
 			}
 
 			header[NKeys - 1] = ("END").PadRight(80);
-			//header[NKeys - 1] = "END                                                                             ";
 
 			for (int i = 0; i < NBlankKeys; i++)
 				header[NKeys + i] = ("").PadRight(80);
-				//header[NKeys + i] = "                                                                                ";
 
 			return header;
 		}
@@ -1383,13 +1359,18 @@ namespace JPFITS
 					dimNElements[0] /= 2;
 			}
 
+			ParallelOptions opts = new ParallelOptions();
+			if (NAXIS2 >= Environment.ProcessorCount)
+				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
+			else
+				opts.MaxDegreeOfParallelism = 1;
+
 			switch (objectTypeCode)
 			{
 				case TypeCode.Double:
 				{
-					double[][] arrya = new double[(NAXIS2)][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					double[][] arrya = new double[NAXIS2][];
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						double[] row = new double[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1409,15 +1390,14 @@ namespace JPFITS
 							pos += 8;
 						}
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case TypeCode.Single:
 				{
 					float[][] arrya = new float[(NAXIS2)][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						float[] row = new float[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1433,15 +1413,14 @@ namespace JPFITS
 							pos += 4;
 						}
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case (TypeCode.Int64):
 				{
 					long[][] arrya = new long[NAXIS2][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						long[] row = new long[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1461,16 +1440,14 @@ namespace JPFITS
 							pos += 8;
 						}
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case (TypeCode.UInt64):
 				{
-					//ulong bzero = 9223372036854775808;
 					ulong[][] arrya = new ulong[(NAXIS2)][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						ulong[] row = new ulong[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1486,20 +1463,18 @@ namespace JPFITS
 							ui64[2] = HEAPDATA[pos + 5];
 							ui64[1] = HEAPDATA[pos + 6];
 							ui64[0] = HEAPDATA[pos + 7];
-							//row[j] = BitConverter.ToUInt64(ui64, 0);// BitConverter.ToInt64(ui64, 0) + bzero;
 							row[j] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
 							pos += 8;
 						}
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case TypeCode.Int32:
 				{
 					int[][] arrya = new int[(NAXIS2)][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						int[] row = new int[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1515,16 +1490,14 @@ namespace JPFITS
 							pos += 4;
 						}
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case TypeCode.UInt32:
 				{
-					//uint bzero = 2147483648;
 					uint[][] arrya = new uint[(NAXIS2)][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						uint[] row = new uint[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1536,20 +1509,18 @@ namespace JPFITS
 							uint32[2] = HEAPDATA[pos + 1];
 							uint32[1] = HEAPDATA[pos + 2];
 							uint32[0] = HEAPDATA[pos + 3];
-							//row[j] = BitConverter.ToUInt32(uint32, 0); //BitConverter.ToInt32(uint32, 0) + bzero;
 							row[j] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
 							pos += 4;
 						}
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case TypeCode.Int16:
 				{
 					short[][] arrya = new short[(NAXIS2)][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						short[] row = new short[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1563,16 +1534,14 @@ namespace JPFITS
 							pos += 2;
 						}
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case TypeCode.UInt16:
 				{
-					//ushort bzero = 32768;
 					ushort[][] arrya = new ushort[(NAXIS2)][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						ushort[] row = new ushort[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1582,20 +1551,18 @@ namespace JPFITS
 						{
 							uint16[1] = HEAPDATA[pos];
 							uint16[0] = HEAPDATA[pos + 1];
-							//row[j] = BitConverter.ToUInt16(int16, 0);//BitConverter.ToInt16(int16, 0) + bzero;
 							row[j] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
 							pos += 2;
 						}
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case TypeCode.SByte:
 				{
 					sbyte[][] arrya = new sbyte[(NAXIS2)][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						sbyte[] row = new sbyte[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1603,15 +1570,14 @@ namespace JPFITS
 						for (int j = 0; j < row.Length; j++)
 							row[j] = (sbyte)HEAPDATA[pos + j];
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case TypeCode.Byte:
 				{
 					byte[][] arrya = new byte[(NAXIS2)][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						byte[] row = new byte[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1619,15 +1585,14 @@ namespace JPFITS
 						for (int j = 0; j < row.Length; j++)
 							row[j] = (byte)HEAPDATA[pos + j];
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case TypeCode.Boolean:
 				{
 					bool[][] arrya = new bool[(NAXIS2)][];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						bool[] row = new bool[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
@@ -1635,17 +1600,17 @@ namespace JPFITS
 						for (int j = 0; j < row.Length; j++)
 							row[j] = Convert.ToBoolean(HEAPDATA[pos + j]);
 						arrya[i] = row;
-					}
+					});
 					return arrya;
 				}
 
 				case TypeCode.Char:
 				{
 					string[] arrya = new string[(NAXIS2)];
-					////#pragma omp parallel for
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, opts, i =>
+					{
 						arrya[i] = System.Text.Encoding.ASCII.GetString(HEAPDATA, TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i], TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i]);
-
+					});
 					return arrya;
 				}
 
@@ -1903,18 +1868,18 @@ namespace JPFITS
 					}
 
 			TypeCode tcode;
-			object obj = GetTTYPEEntry(ttypeEntry, out tcode, out dimNElements);
-			int rank = ((Array)obj).Rank;
+			Array obj = GetTTYPEEntry(ttypeEntry, out tcode, out dimNElements);
+			int rank = obj.Rank;
 			int width, height;
 			if (rank == 1)
 			{
 				width = 1;
-				height = ((Array)obj).Length;
+				height = obj.Length;
 			}
 			else
 			{
-				width = ((Array)obj).GetLength(0);
-				height = ((Array)obj).GetLength(1);
+				width = obj.GetLength(0);
+				height = obj.GetLength(1);
 			}
 			double[] result = new double[(width * height)];
 
@@ -1924,16 +1889,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = ((double[])(obj))[y];
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = ((double[,])(obj))[x, y];
+						});
 					}
 					break;
 				}
@@ -1942,16 +1909,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = (double)((long[])(obj))[y];
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = (double)((long[,])(obj))[x, y];
+						});
 					}
 					break;
 				}
@@ -1960,16 +1929,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = (double)((ulong[])(obj))[y];
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = (double)((ulong[,])(obj))[x, y];
+						});
 					}
 					break;
 				}
@@ -1978,16 +1949,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = (double)((float[])(obj))[y];
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = (double)((float[,])(obj))[x, y];
+						});
 					}
 					break;
 				}
@@ -1996,16 +1969,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = (double)((uint[])(obj))[y];
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = (double)((uint[,])(obj))[x, y];
+						});
 					}
 					break;
 				}
@@ -2014,16 +1989,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = (double)((int[])(obj))[y];
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = (double)((int[,])(obj))[x, y];
+						});
 					}
 					break;
 				}
@@ -2032,16 +2009,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = (double)((ushort[])(obj))[y];
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = (double)((ushort[,])(obj))[x, y];
+						});
 					}
 					break;
 				}
@@ -2050,16 +2029,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = (double)((short[])(obj))[y];
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = (double)((short[,])(obj))[x, y];
+						});
 					}
 					break;
 				}
@@ -2068,16 +2049,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = (double)((byte[])(obj))[y];
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = (double)((byte[,])(obj))[x, y];
+						});
 					}
 					break;
 				}
@@ -2086,16 +2069,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = (double)((sbyte[])(obj))[y];
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = (double)((sbyte[,])(obj))[x, y];
+						});
 					}
 					break;
 				}
@@ -2104,16 +2089,18 @@ namespace JPFITS
 				{
 					if (rank == 1)
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							result[y] = Convert.ToDouble(((bool[])(obj))[y]);
+						});
 					}
 					else
 					{
-						//#pragma omp parallel for
-						for (int y = 0; y < height; y++)
+						Parallel.For(0, height, y =>
+						{
 							for (int x = 0; x < width; x++)
 								result[y * width + x] = Convert.ToDouble(((bool[,])(obj))[x, y]);
+						});
 					}
 					break;
 				}
@@ -2125,7 +2112,7 @@ namespace JPFITS
 			return result;
 		}
 
-		/// <summary>Return a binary table entry as an Object. Its type and rank are given to the user. If you just need a double precision array to work on, use the overload for that.</summary>
+		/// <summary>Return a binary table entry as an Array object. Its type and rank are given to the user. If you just need a double precision array to work on, use the overload for that.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="objectTypeCode">The TypeCode precision of the underlying array in the object.</param>
 		/// <param name="dimNElements">A vector to return the number of elements along each dimension of the Object. 
@@ -2161,7 +2148,6 @@ namespace JPFITS
 			int byteoffset = 0;
 			for (int i = 0; i < ttypeindex; i++)
 				byteoffset += TBYTES[i];
-			int currentbyte;
 
 			switch (TCODES[ttypeindex])
 			{
@@ -2170,11 +2156,10 @@ namespace JPFITS
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						double[] vector = new double[(NAXIS2)];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
 							byte[] dbl = new byte[(8)];
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							dbl[7] = BINTABLE[currentbyte];
 							dbl[6] = BINTABLE[currentbyte + 1];
 							dbl[5] = BINTABLE[currentbyte + 2];
@@ -2184,19 +2169,18 @@ namespace JPFITS
 							dbl[1] = BINTABLE[currentbyte + 6];
 							dbl[0] = BINTABLE[currentbyte + 7];
 							vector[i] = BitConverter.ToDouble(dbl, 0);
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							byte[] dbl = new byte[8];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
-								currentbyte = byteoffset + i * NAXIS1 + j * 8;
 								dbl[7] = BINTABLE[currentbyte];
 								dbl[6] = BINTABLE[currentbyte + 1];
 								dbl[5] = BINTABLE[currentbyte + 2];
@@ -2206,8 +2190,9 @@ namespace JPFITS
 								dbl[1] = BINTABLE[currentbyte + 6];
 								dbl[0] = BINTABLE[currentbyte + 7];
 								arrya[j, i] = BitConverter.ToDouble(dbl, 0);
+								currentbyte += 8;
 							}
-						}
+						});
 						return arrya;
 					}
 				}
@@ -2217,36 +2202,35 @@ namespace JPFITS
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						float[] vector = new float[(NAXIS2)];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
 							byte[] sng = new byte[(4)];
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							sng[3] = BINTABLE[currentbyte];
 							sng[2] = BINTABLE[currentbyte + 1];
 							sng[1] = BINTABLE[currentbyte + 2];
 							sng[0] = BINTABLE[currentbyte + 3];
 							vector[i] = BitConverter.ToSingle(sng, 0);
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						float[,] arrya = new float[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							byte[] sng = new byte[(4)];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
-							{
-								currentbyte = byteoffset + i * NAXIS1 + j * 4;
+							{ 
 								sng[3] = BINTABLE[currentbyte];
 								sng[2] = BINTABLE[currentbyte + 1];
 								sng[1] = BINTABLE[currentbyte + 2];
 								sng[0] = BINTABLE[currentbyte + 3];
 								arrya[j, i] = BitConverter.ToSingle(sng, 0);
+								currentbyte += 4;
 							}
-						}
+						});
 						return arrya;
 					}
 				}
@@ -2256,11 +2240,10 @@ namespace JPFITS
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						long[] vector = new long[(NAXIS2)];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
 							byte[] i64 = new byte[(8)];
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							i64[7] = BINTABLE[currentbyte];
 							i64[6] = BINTABLE[currentbyte + 1];
 							i64[5] = BINTABLE[currentbyte + 2];
@@ -2270,19 +2253,18 @@ namespace JPFITS
 							i64[1] = BINTABLE[currentbyte + 6];
 							i64[0] = BINTABLE[currentbyte + 7];
 							vector[i] = BitConverter.ToInt64(i64, 0);
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						long[,] arrya = new long[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							byte[] i64 = new byte[(8)];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
-								currentbyte = byteoffset + i * NAXIS1 + j * 8;
 								i64[7] = BINTABLE[currentbyte];
 								i64[6] = BINTABLE[currentbyte + 1];
 								i64[5] = BINTABLE[currentbyte + 2];
@@ -2292,23 +2274,22 @@ namespace JPFITS
 								i64[1] = BINTABLE[currentbyte + 6];
 								i64[0] = BINTABLE[currentbyte + 7];
 								arrya[j, i] = BitConverter.ToInt64(i64, 0);
+								currentbyte += 8;
 							}
-						}
+						});
 						return arrya;
 					}
 				}
 
 				case (TypeCode.UInt64):
 				{
-					//ulong bzero = 9223372036854775808;
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						ulong[] vector = new ulong[NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
 							byte[] ui64 = new byte[(8)];
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							ui64[7] = BINTABLE[currentbyte];
 							ui64[6] = BINTABLE[currentbyte + 1];
 							ui64[5] = BINTABLE[currentbyte + 2];
@@ -2317,21 +2298,19 @@ namespace JPFITS
 							ui64[2] = BINTABLE[currentbyte + 5];
 							ui64[1] = BINTABLE[currentbyte + 6];
 							ui64[0] = BINTABLE[currentbyte + 7];
-							//vector[i] = BitConverter.ToUInt64(ui64, 0);//BitConverter.ToInt64(ui64, 0) + bzero;
 							vector[i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						ulong[,] arrya = new ulong[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							byte[] ui64 = new byte[8];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
-								currentbyte = byteoffset + i * NAXIS1 + j * 8;
 								ui64[7] = BINTABLE[currentbyte];
 								ui64[6] = BINTABLE[currentbyte + 1];
 								ui64[5] = BINTABLE[currentbyte + 2];
@@ -2340,52 +2319,48 @@ namespace JPFITS
 								ui64[2] = BINTABLE[currentbyte + 5];
 								ui64[1] = BINTABLE[currentbyte + 6];
 								ui64[0] = BINTABLE[currentbyte + 7];
-								//arrya[j, i] = BitConverter.ToUInt64(ui64, 0);//BitConverter.ToInt64(ui64, 0) + bzero;
 								arrya[j, i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+								currentbyte += 8;
 							}
-						}
+						});
 						return arrya;
 					}
 				}
 
 				case TypeCode.UInt32:
 				{
-					//uint bzero = 2147483648;
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						uint[] vector = new uint[(NAXIS2)];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
 							byte[] uint32 = new byte[(4)];
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							uint32[3] = BINTABLE[currentbyte];
 							uint32[2] = BINTABLE[currentbyte + 1];
 							uint32[1] = BINTABLE[currentbyte + 2];
 							uint32[0] = BINTABLE[currentbyte + 3];
-							//vector[i] = BitConverter.ToUInt32(uint32, 0);//BitConverter.ToInt32(uint32, 0) + bzero;
 							vector[i] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						uint[,] arrya = new uint[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							byte[] uint32 = new byte[(4)];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
-								currentbyte = byteoffset + i * NAXIS1 + j * 4;
 								uint32[3] = BINTABLE[currentbyte];
 								uint32[2] = BINTABLE[currentbyte + 1];
 								uint32[1] = BINTABLE[currentbyte + 2];
 								uint32[0] = BINTABLE[currentbyte + 3];
-								//arrya[j, i] = BitConverter.ToUInt32(uint32, 0);//BitConverter.ToInt32(uint32, 0) + bzero;
 								arrya[j, i] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
+								currentbyte += 4;
 							}
-						}
+						});
 						return arrya;
 					}
 				}
@@ -2395,74 +2370,69 @@ namespace JPFITS
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						int[] vector = new int[(NAXIS2)];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
 							byte[] int32 = new byte[(4)];
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							int32[3] = BINTABLE[currentbyte];
 							int32[2] = BINTABLE[currentbyte + 1];
 							int32[1] = BINTABLE[currentbyte + 2];
 							int32[0] = BINTABLE[currentbyte + 3];
 							vector[i] = BitConverter.ToInt32(int32, 0);
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						int[,] arrya = new int[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							byte[] int32 = new byte[4];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
-								currentbyte = byteoffset + i * NAXIS1 + j * 4;
 								int32[3] = BINTABLE[currentbyte];
 								int32[2] = BINTABLE[currentbyte + 1];
 								int32[1] = BINTABLE[currentbyte + 2];
 								int32[0] = BINTABLE[currentbyte + 3];
 								arrya[j, i] = BitConverter.ToInt32(int32, 0);
+								currentbyte += 4;
 							}
-						}
+						});
 						return arrya;
 					}
 				}
 
 				case TypeCode.UInt16:
 				{
-					//ushort bzero = 32768;
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						ushort[] vector = new ushort[(NAXIS2)];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
 							byte[] uint16 = new byte[(2)];
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							uint16[1] = BINTABLE[currentbyte];
 							uint16[0] = BINTABLE[currentbyte + 1];
-							//vector[i] = BitConverter.ToUInt16(uint16, 0);//BitConverter.ToInt16(uint16, 0) + bzero;
 							vector[i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						ushort[,] arrya = new ushort[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							byte[] uint16 = new byte[(2)];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
-								currentbyte = byteoffset + i * NAXIS1 + j * 2;
 								uint16[1] = BINTABLE[currentbyte];
 								uint16[0] = BINTABLE[currentbyte + 1];
-								//arrya[j, i] = BitConverter.ToUInt16(uint16, 0);//BitConverter.ToInt16(uint16, 0) + bzero;
 								arrya[j, i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+								currentbyte += 2;
 							}
-						}
+						});
 						return arrya;
 					}
 				}
@@ -2472,32 +2442,31 @@ namespace JPFITS
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						short[] vector = new short[NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
 							byte[] int16 = new byte[(2)];
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							int16[1] = BINTABLE[currentbyte];
 							int16[0] = BINTABLE[currentbyte + 1];
 							vector[i] = BitConverter.ToInt16(int16, 0);
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						short[,] arrya = new short[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							byte[] int16 = new byte[(2)];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
-								currentbyte = byteoffset + i * NAXIS1 + j * 2;
 								int16[1] = BINTABLE[currentbyte];
 								int16[0] = BINTABLE[currentbyte + 1];
 								arrya[j, i] = BitConverter.ToInt16(int16, 0);
+								currentbyte += 2;
 							}
-						}
+						});
 						return arrya;
 					}
 				}
@@ -2507,24 +2476,25 @@ namespace JPFITS
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						byte[] vector = new byte[NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							vector[i] = (byte)BINTABLE[currentbyte];
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						byte[,] arrya = new byte[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
+						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
-								currentbyte = byteoffset + i * NAXIS1 + j;
 								arrya[j, i] = (byte)BINTABLE[currentbyte];
+								currentbyte += 1;
 							}
+						});
 						return arrya;
 					}
 				}
@@ -2534,24 +2504,25 @@ namespace JPFITS
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						sbyte[] vector = new sbyte[NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							vector[i] = (sbyte)(BINTABLE[currentbyte]);
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						sbyte[,] arrya = new sbyte[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
+						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
-								currentbyte = byteoffset + i * NAXIS1 + j;
 								arrya[j, i] = (sbyte)(BINTABLE[currentbyte]);
+								currentbyte += 1;
 							}
+						});
 						return arrya;
 					}
 				}
@@ -2561,24 +2532,25 @@ namespace JPFITS
 					if (TREPEATS[ttypeindex] == 1)
 					{
 						bool[] vector = new bool[(NAXIS2)];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
 						{
-							currentbyte = byteoffset + i * NAXIS1;
+							int currentbyte = byteoffset + i * NAXIS1;
 							vector[i] = Convert.ToBoolean(BINTABLE[currentbyte]);
-						}
+						});
 						return vector;
 					}
 					else
 					{
 						bool[,] arrya = new bool[TREPEATS[ttypeindex], NAXIS2];
-						//#pragma omp parallel for private(currentbyte)
-						for (int i = 0; i < NAXIS2; i++)
+						Parallel.For(0, NAXIS2, i =>
+						{
+							int currentbyte = byteoffset + i * NAXIS1;
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
-								currentbyte = byteoffset + i * NAXIS1 + j;
 								arrya[j, i] = Convert.ToBoolean(BINTABLE[currentbyte]);
+								currentbyte += 1;
 							}
+						});
 						return arrya;
 					}
 				}
@@ -2586,17 +2558,17 @@ namespace JPFITS
 				case TypeCode.Char:
 				{
 					string[] vector = new string[(NAXIS2)];
-					//#pragma omp parallel for private(currentbyte)
-					for (int i = 0; i < NAXIS2; i++)
+					Parallel.For(0, NAXIS2, i =>
 					{
+						int currentbyte = byteoffset + i * NAXIS1;
 						byte[] charstr = new byte[(TREPEATS[ttypeindex])];
 						for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 						{
-							currentbyte = byteoffset + i * NAXIS1 + j;
 							charstr[j] = BINTABLE[currentbyte];
+							currentbyte += 1;
 						}
 						vector[i] = System.Text.Encoding.ASCII.GetString(charstr);
-					}
+					});
 					return vector;
 				}
 
@@ -2737,7 +2709,6 @@ namespace JPFITS
 
 					case (TypeCode.UInt64):
 					{
-						//ulong bzero = 9223372036854775808;
 						byte[] ui64 = new byte[(8)];
 						if (objectArrayRank == 1)
 						{
@@ -2749,7 +2720,6 @@ namespace JPFITS
 							ui64[2] = BINTABLE[currentbyte + 5];
 							ui64[1] = BINTABLE[currentbyte + 6];
 							ui64[0] = BINTABLE[currentbyte + 7];
-							//return (BitConverter.ToUInt64(ui64, 0)).ToString(); //(BitConverter.ToInt64(ui64, 0) + bzero).ToString();
 							return MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
 						}
 						else
@@ -2765,7 +2735,6 @@ namespace JPFITS
 								ui64[2] = BINTABLE[currentbyte + 5];
 								ui64[1] = BINTABLE[currentbyte + 6];
 								ui64[0] = BINTABLE[currentbyte + 7];
-								//str += (BitConverter.ToUInt64(ui64, 0)).ToString() + "; "; //(BitConverter.ToInt64(ui64, 0) + bzero).ToString() + "; ";
 								str += (MapLongToUlong(BitConverter.ToInt64(ui64, 0))).ToString() + "; ";
 							}
 							return str;
@@ -2774,7 +2743,6 @@ namespace JPFITS
 
 					case TypeCode.UInt32:
 					{
-						//uint bzero = 2147483648;
 						byte[] uint32 = new byte[(4)];
 						if (objectArrayRank == 1)
 						{
@@ -2782,7 +2750,6 @@ namespace JPFITS
 							uint32[2] = BINTABLE[currentbyte + 1];
 							uint32[1] = BINTABLE[currentbyte + 2];
 							uint32[0] = BINTABLE[currentbyte + 3];
-							//return (BitConverter.ToInt32(uint32, 0) + bzero).ToString();
 							return (MapIntToUint(BitConverter.ToInt32(uint32, 0))).ToString();
 						}
 						else
@@ -2794,7 +2761,6 @@ namespace JPFITS
 								uint32[2] = BINTABLE[currentbyte + 1];
 								uint32[1] = BINTABLE[currentbyte + 2];
 								uint32[0] = BINTABLE[currentbyte + 3];
-								//str += (BitConverter.ToInt32(uint32, 0) + bzero).ToString() + "; ";
 								str += (MapIntToUint(BitConverter.ToInt32(uint32, 0))).ToString() + "; ";
 							}
 							return str;
@@ -2830,13 +2796,11 @@ namespace JPFITS
 
 					case TypeCode.UInt16:
 					{
-						//ushort bzero = 32768;
 						byte[] uint16 = new byte[(2)];
 						if (objectArrayRank == 1)
 						{
 							uint16[1] = BINTABLE[currentbyte];
 							uint16[0] = BINTABLE[currentbyte + 1];
-							//return (BitConverter.ToInt16(uint16, 0) + bzero).ToString();
 							return MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
 						}
 						else
@@ -2846,7 +2810,6 @@ namespace JPFITS
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 2;
 								uint16[1] = BINTABLE[currentbyte];
 								uint16[0] = BINTABLE[currentbyte + 1];
-								//str += (BitConverter.ToInt16(uint16, 0) + bzero).ToString() + "; ";
 								str += (MapShortToUshort(BitConverter.ToInt16(uint16, 0))).ToString() + "; ";
 							}
 							return str;
@@ -2998,7 +2961,6 @@ namespace JPFITS
 
 					case (TypeCode.UInt64):
 					{
-						//ulong bzero = 9223372036854775808;
 						byte[] ui64 = new byte[(8)];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
@@ -3010,7 +2972,6 @@ namespace JPFITS
 							ui64[2] = HEAPDATA[currentbyte + 5];
 							ui64[1] = HEAPDATA[currentbyte + 6];
 							ui64[0] = HEAPDATA[currentbyte + 7];
-							//str += (BitConverter.ToUInt64(ui64, 0)).ToString() + "; "; //(BitConverter.ToInt64(ui64, 0) + bzero).ToString() + "; ";
 							str += MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString() + "; ";
 							currentbyte += 8;
 						}
@@ -3034,7 +2995,6 @@ namespace JPFITS
 
 					case TypeCode.UInt32:
 					{
-						//uint bzero = 2147483648;
 						byte[] uint32 = new byte[(4)];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
@@ -3042,7 +3002,6 @@ namespace JPFITS
 							uint32[2] = HEAPDATA[currentbyte + 1];
 							uint32[1] = HEAPDATA[currentbyte + 2];
 							uint32[0] = HEAPDATA[currentbyte + 3];
-							//str += (BitConverter.ToInt32(uint32, 0) + bzero).ToString() + "; ";
 							str += MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString() + "; ";
 							currentbyte += 4;
 						}
@@ -3064,13 +3023,11 @@ namespace JPFITS
 
 					case TypeCode.UInt16:
 					{
-						//ushort bzero = 32768;
 						byte[] uint16 = new byte[(2)];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
 							uint16[1] = HEAPDATA[currentbyte];
 							uint16[0] = HEAPDATA[currentbyte + 1];
-							//str += (BitConverter.ToInt16(uint16, 0) + bzero).ToString() + "; ";
 							str += MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString() + "; ";
 							currentbyte += 2;
 						}
