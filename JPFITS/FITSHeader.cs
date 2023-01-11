@@ -8,16 +8,12 @@ namespace JPFITS
 	/// <summary>FITSImageHeader class for managing FITS file Primary Image headers.</summary>
 	public class FITSHeader
 	{
-		private JPFITS.FITSHeaderKey[]? HEADERKEYS;
-		private string[]? FORMATTEDHEADER;
-		private bool UPDATEDISPLAYHEADER = true;
-		private bool ISEXTENSION = false;
-
+		#region CONSTRUCTORS
 		/// <summary>Constructor. Creates an instance of a FITSImageHeader, with options to indicate whether extensions are present, and sets essential keywords for a given image it will be the header for.
-		/// <para>If the image is to be an extension, then use GetFormattedHeaderBlock to pull the header out with SIMPLE = T changed to XTENSION = IMAGE for writing.</para></summary>
+		/// <br />If the image is to be an extension, then use GetFormattedHeaderBlock to pull the header out with SIMPLE = T changed to XTENSION = IMAGE for writing.</summary>
 		/// <param name="mayContainExtensions">If true, heyword EXTEND = T is added, otherwise it is left out.</param>
-		/// <param name="image">If image is nullptr, then NAXIS = 0 and there are no NAXISn keywords or BSCALE or BZERO. Otherwise NAXIS, NAXISn, BSCALE and BZERO are set as per the image dimensions.
-		/// <para>If the image will be saved at a different precision than double, use SetBITPIXNAXISBSCZ(precision, image) at write time.</para></param>
+		/// <param name="image">If image is null, then NAXIS = 0 and there are no NAXISn keywords or BSCALE or BZERO. Otherwise NAXIS, NAXISn, BSCALE and BZERO are set as per the image dimensions.
+		/// <br />If the image will be saved at a different precision than double, use SetBITPIXNAXISBSCZ(precision, image) at write time.</param>
 		public FITSHeader(bool mayContainExtensions, double[,]? image)
 		{
 			MAKE_DEFAULT_HEADER(mayContainExtensions, image);
@@ -31,23 +27,28 @@ namespace JPFITS
 			if (populate_nonessential)
 				HEADERKEYS = new JPFITS.FITSHeaderKey[headerlines.Count];
 			else
-			{
+				HEADERKEYS = new JPFITS.FITSHeaderKey[0];
+			/*{
 				int N = 10;
 				if (headerlines.Count < 10)
 					N = headerlines.Count;
 				HEADERKEYS = new JPFITS.FITSHeaderKey[N];
-			}
+			}*/
 
 			for (int i = 0; i < HEADERKEYS.Length; i++)
 				HEADERKEYS[i] = new FITSHeaderKey((string)headerlines[i]);
 		}
 
+		/// <summary>
+		/// Make a header object from an existing FITS file.
+		/// </summary>
+		/// <param name="fileName">The file from which to get the primary header unit and make this header from.</param>
 		public FITSHeader(string fileName)
 		{
 			FileStream fs = new FileStream(fileName, FileMode.Open);
 			ArrayList headerlines = new ArrayList();
-			bool ext = false;
-			FITSFILEOPS.SCANPRIMARYUNIT(fs, false, ref headerlines, ref ext);
+			bool ext;
+			FITSFILEOPS.SCANPRIMARYUNIT(fs, false, ref headerlines, out ext);
 			fs.Close();
 
 			HEADERKEYS = new JPFITS.FITSHeaderKey[headerlines.Count];
@@ -55,6 +56,10 @@ namespace JPFITS
 				HEADERKEYS[i] = new FITSHeaderKey((string)headerlines[i]);
 		}
 
+		/// <summary>
+		/// Make a HITSHeader object from an existing one. Creates a new exact copy.
+		/// </summary>
+		/// <param name="header">A FITSHeader object.</param>
 		public FITSHeader(FITSHeader header)
 		{
 			HEADERKEYS = new JPFITS.FITSHeaderKey[header.Length];
@@ -62,6 +67,179 @@ namespace JPFITS
 				HEADERKEYS[i] = new FITSHeaderKey(header[i].GetFullyFomattedFITSLine());
 		}
 
+		#endregion
+
+		#region PROPERTIES
+		/// <summary>Returns the FITSHeaderKey object at a given zero-based index in the header.</summary>
+		public FITSHeaderKey this[int i]
+		{
+			get { return HEADERKEYS[i]; }
+			set { HEADERKEYS[i] = value; }
+		}
+
+		/// <summary>Returns the number of header key lines in the header, excluding any assumed padding after END key.</summary>
+		public int Length
+		{
+			get { return HEADERKEYS.Length; }
+		}
+
+		#endregion
+
+		#region MEMBERS
+
+		/// <summary>Copies a header from another FITSImageHeader into this one. Restricted keywords are neither copied nor overwritten.</summary>
+		public void CopyHeaderFrom(JPFITS.FITSHeader sourceHeader)
+		{
+			bool[] oktocopy = new bool[sourceHeader.Length];
+			int ntocopy = 0;
+
+			for (int i = 0; i < sourceHeader.Length; i++)
+				if (ValidKeyEdit(sourceHeader.GetKeyName(i), false))
+				{
+					ntocopy++;
+					oktocopy[i] = true;
+				}
+
+			JPFITS.FITSHeaderKey[] newheaderkeys = new JPFITS.FITSHeaderKey[this.Length + ntocopy];
+
+			for (int i = 0; i < this.Length - 1; i++)//leave off END for now
+				newheaderkeys[i] = HEADERKEYS[i];
+
+			int c = 0;
+			for (int i = 0; i < sourceHeader.Length; i++)
+				if (oktocopy[i])
+				{
+					newheaderkeys[this.Length - 1 + c] = sourceHeader[i];
+					c++;
+				}
+
+			//END
+			newheaderkeys[newheaderkeys.Length - 1] = new FITSHeaderKey("END");
+
+			HEADERKEYS = newheaderkeys;
+			UPDATEDISPLAYHEADER = true;
+		}
+
+		/// <summary>Returns a formatted header block with the existing keys, and sets the first key to either SIMPLE = T or XTENSION = IMAGE. If a full 2880-multiple block is needed, set keysOnly to false.</summary>
+		/// <param name="isExtension">If true then the first keyword is set to XTENSION = IMAGE, otherwise it is SIMPLE = T.</param>
+		/// <param name="keysOnly">If true then only the existing keywords are returned formatted, otherwise if you need the entire 2880-multiple block pass false. True typically needed for display, false typically needed for writing.</param>
+		public string[] GetFormattedHeaderBlock(bool isExtension, bool keysOnly)
+		{
+			if (isExtension && !ISEXTENSION)
+			{
+				UPDATEDISPLAYHEADER = true;
+				ISEXTENSION = true;
+
+				this.RemoveKey("EXTEND");
+
+				HEADERKEYS[0].Name = "XTENSION";
+				HEADERKEYS[0].Value = "IMAGE";
+				HEADERKEYS[0].Comment = "IMAGE extension";
+
+				bool pcountkey = false, gcountkey = false;
+				for (int i = 0; i < this.Length; i++)
+					if (!pcountkey || !gcountkey)
+					{
+						if (HEADERKEYS[i].Name.Trim() == "PCOUNT")
+							pcountkey = true;
+						if (HEADERKEYS[i].Name.Trim() == "GCOUNT")
+							pcountkey = true;
+					}
+				if (!pcountkey && !gcountkey)//they would BOTH not be present if things are being done correctly...need to add them
+				{
+					int naxis = -1;
+					for (int i = 0; i < this.Length; i++)
+						if (HEADERKEYS[i].Name.Trim() == "NAXIS")
+						{
+							naxis = Convert.ToInt32(HEADERKEYS[i].Value.Trim());
+							break;
+						}
+					int naxisNindex = -1;
+					for (int i = 0; i < this.Length; i++)
+						if (HEADERKEYS[i].Name.Trim() == "NAXIS" + naxis.ToString())
+						{
+							naxisNindex = i;
+							break;
+						}
+
+					JPFITS.FITSHeaderKey[] keys = new JPFITS.FITSHeaderKey[this.Length + 2];
+
+					for (int i = 0; i <= naxisNindex; i++)
+						keys[i] = HEADERKEYS[i];
+
+					keys[naxisNindex + 1] = new FITSHeaderKey("PCOUNT", "0", "number of bytes in heap area");
+					keys[naxisNindex + 2] = new FITSHeaderKey("GCOUNT", "1", "single data table");
+
+					for (int i = naxisNindex + 3; i < keys.Length; i++)
+						keys[i] = HEADERKEYS[i - 2];
+
+					HEADERKEYS = keys;
+				}
+			}
+			else if (!isExtension && ISEXTENSION)
+			{
+				UPDATEDISPLAYHEADER = true;
+				ISEXTENSION = false;
+				HEADERKEYS[0].Name = "SIMPLE";
+				HEADERKEYS[0].Value = "T";
+				HEADERKEYS[0].Comment = "file conforms to FITS standard.";
+			}
+
+			if (!UPDATEDISPLAYHEADER && !keysOnly)
+				return FORMATTEDHEADER;
+
+			UPDATEDISPLAYHEADER = false;
+
+			if (keysOnly)
+				FORMATTEDHEADER = new string[this.Length];
+			else
+			{
+				int NKeys = this.Length;
+				int NCards = (NKeys - 1) / 36;
+				FORMATTEDHEADER = new string[(NCards + 1) * 36];
+			}
+
+			for (int i = 0; i < this.Length; i++)
+				FORMATTEDHEADER[i] = HEADERKEYS[i].GetFullyFomattedFITSLine();
+
+			if (keysOnly)
+				return FORMATTEDHEADER;
+
+			string empty = "";
+
+			for (int i = this.Length; i < FORMATTEDHEADER.Length; i++)
+				FORMATTEDHEADER[i] = empty.PadLeft(80);
+
+			return FORMATTEDHEADER;
+		}
+
+		/// <summary>ValidKeyEdit returns whether the given key is an essential key and shouldn't be user-modified.</summary>
+		/// <param name="key">The name of the header key.</param>
+		public static bool ValidKeyEdit(string key, bool showMessageBox)
+		{
+			for (int i = 0; i < INVALIDEDITKEYS.Length; i++)
+				if (key == INVALIDEDITKEYS[i])
+				{
+					if (showMessageBox)
+						System.Windows.Forms.MessageBox.Show("Selected key: '" + key + "' is restricted. Operation not allowed.", "Warning...");
+					return false;
+				}
+
+			return true;
+		}
+
+		/// <summary>Returns all of the key names from the header.</summary>
+		public string[] GetAllKeyNames()
+		{
+			string[] names = new string[this.Length];
+			for (int i = 0; i < this.Length; i++)
+				names[i] = this[i].Name;
+			return names;
+		}
+
+		#endregion
+
+		#region HEADER KEY INTERACTION
 		/// <summary>GetKeyName returns the key of the primary header line at index. Throws an exception if the index exceeds the number of header lines.</summary>
 		/// <param name="index">The zero-based line number to get the key name from.</param>
 		public string GetKeyName(int index)
@@ -246,9 +424,9 @@ namespace JPFITS
 		}
 
 		/// <summary>AddCommentKey adds a new key line formatted as a comment.
-		/// <para>If the length of the commentKeyLine is more than 80 elements, the comment will be continued on subsequent lines until depleted.</para>
-		/// <para>If the user wishes the line to begin with COMMENT, then write the input commentKeyLine beginning as such.</para>
-		/// <para>If the user wishes the line to be blank, then pass commentKeyLine as an empty string or as only containing blanks (whitespace).</para></summary>
+		/// <br />If the length of the commentKeyLine is more than 80 elements, the comment will be continued on subsequent lines until depleted.
+		/// <br />If the user wishes the line to begin with COMMENT, then write the input commentKeyLine beginning as such.
+		/// <br />If the user wishes the line to be blank, then pass commentKeyLine as an empty string or as only containing blanks (whitespace).</summary>
 		/// <param name="commentKeyLine">The comment line.</param>
 		/// <param name="keyIndex">Insert at this zero-based index. Use -1 to append to the end of the header (before END key). If keyIndex exceeds the header, the line is appended to the end of the header (before END key).</param>
 		public void AddCommentKeyLine(string commentKeyLine, int keyIndex)
@@ -370,310 +548,97 @@ namespace JPFITS
 			UPDATEDISPLAYHEADER = true;
 		}
 
-		/// <summary>Copies a header from another FITSImageHeader into this one. Restricted keywords are neither copied nor overwritten.</summary>
-		public void CopyHeaderFrom(JPFITS.FITSHeader sourceHeader)
+		#endregion
+
+		#region STATIC HEADER INTERACTION
+		public static TypeCode GetHeaderTypeCode(FITSHeader header)
 		{
-			bool[] oktocopy = new bool[sourceHeader.Length];
-			int ntocopy = 0;
+			int BITPIX = Convert.ToInt32(header.GetKeyValue("BITPIX"));
 
-			for (int i = 0; i < sourceHeader.Length; i++)
-				if (ValidKeyEdit(sourceHeader.GetKeyName(i), false))
-				{
-					ntocopy++;
-					oktocopy[i] = true;
-				}
-
-			JPFITS.FITSHeaderKey[] newheaderkeys = new JPFITS.FITSHeaderKey[this.Length + ntocopy];
-
-			for (int i = 0; i < this.Length - 1; i++)//leave off END for now
-				newheaderkeys[i] = HEADERKEYS[i];
-
-			int c = 0;
-			for (int i = 0; i < sourceHeader.Length; i++)
-				if (oktocopy[i])
-				{
-					newheaderkeys[this.Length - 1 + c] = sourceHeader[i];
-					c++;
-				}
-
-			//END
-			newheaderkeys[newheaderkeys.Length - 1] = new FITSHeaderKey("END");
-
-			HEADERKEYS = newheaderkeys;
-			UPDATEDISPLAYHEADER = true;
-		}
-
-		/// <summary>This sets the BITPIX, NAXIS, NAXISn, BSCALE and BZERO keywords of the header given the TypeCode and the image. If the image is null then NAXIS = 0 and any NAXISn keywords are removed as well as BSCALE and BZERO.</summary>
-		public void SetBITPIXNAXISBSCZ(TypeCode precision, double[,]? image)
-		{
-			UPDATEDISPLAYHEADER = true;
-			if (image == null || image.Length == 0)
-			{
-				SetKey("BITPIX", "8", false, 0);
-				SetKey("NAXIS", "0", false, 0);
-				RemoveKey("NAXIS1");
-				RemoveKey("NAXIS2");
-				RemoveKey("BZERO");
-				RemoveKey("BSCALE");
-				return;
-			}
+			int BZERO;
+			string bzero = header.GetKeyValue("BZERO");
+			if (bzero == "")
+				BZERO = 0;
 			else
+				BZERO = Convert.ToInt32(bzero);
+
+			switch (BITPIX)
 			{
-				SetKey("NAXIS", "2", "Number of image axes", true, 2);
-				SetKey("NAXIS1", image.GetLength(0).ToString(), true, 3);
-				SetKey("NAXIS2", image.GetLength(1).ToString(), true, 4);
-			}
+				case 16:
+				{
+					if (BZERO == 0)
+						return TypeCode.Int16;
+					else
+						return TypeCode.UInt16;
+				}
 
-			switch (precision)
-			{
-				case TypeCode.SByte:
-					{
-						SetKey("BITPIX", "8", false, 0);
-						SetKey("BZERO", "0", "Data Offset; pixel = pixel*BSCALE+BZERO", true, 5);
-						SetKey("BSCALE", "1", "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
-						break;
-					}
+				case 32:
+				{
+					if (BZERO == 0)
+						return TypeCode.Int32;
+					else
+						return TypeCode.UInt32;
+				}
 
-				case TypeCode.Byte:
-					{
-						SetKey("BITPIX", "8", false, 0);
-						SetKey("BZERO", "128", "Data Offset; pixel = pixel*BSCALE+BZERO", true, 5);
-						SetKey("BSCALE", "1", "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
-						break;
-					}
+				case 64:
+				{
+					if (BZERO == 0)
+						return TypeCode.Int64;
+					else
+						return TypeCode.UInt64;
+				}
 
-				case TypeCode.Int16:
-					{
-						SetKey("BITPIX", "16", false, 0);
-						SetKey("BZERO", "0", "Data Offset; pixel = pixel*BSCALE+BZERO", true, 5);
-						SetKey("BSCALE", "1", "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
-						break;
-					}
+				case -32:
+					return TypeCode.Single;
 
-				case TypeCode.UInt16:
-					{
-						SetKey("BITPIX", "16", false, 0);
-						SetKey("BZERO", "32768", "Data Offset; pixel = pixel*BSCALE+BZERO", true, 5);
-						SetKey("BSCALE", "1", "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
-						break;
-					}
-
-				case TypeCode.Int32:
-					{
-						SetKey("BITPIX", "32", false, 0);
-						SetKey("BZERO", "0", "Data Offset; pixel = pixel*BSCALE+BZERO", true, 5);
-						SetKey("BSCALE", "1", "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
-						break;
-					}
-
-				case TypeCode.UInt32:
-					{
-						SetKey("BITPIX", "32", false, 0);
-						SetKey("BZERO", "2147483648", "Data Offset; pixel = pixel*BSCALE+BZERO", true, 5);
-						SetKey("BSCALE", "1", "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
-						break;
-					}
-
-				case TypeCode.Int64:
-					{
-						SetKey("BITPIX", "64", false, 0);
-						SetKey("BZERO", "0", "Data Offset; pixel = pixel*BSCALE+BZERO", true, 5);
-						SetKey("BSCALE", "1", "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
-						break;
-					}
-
-				case TypeCode.UInt64:
-					{
-						SetKey("BITPIX", "64", false, 0);
-						SetKey("BZERO", "9223372036854775808", "Data Offset; pixel = pixel*BSCALE+BZERO", true, 5);
-						SetKey("BSCALE", "1", "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
-						break;
-					}
-
-				case TypeCode.Single:
-					{
-						SetKey("BITPIX", "-32", false, 0);
-						SetKey("BZERO", "0", "Data Offset; pixel = pixel*BSCALE+BZERO", true, 5);
-						SetKey("BSCALE", "1", "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
-						break;
-					}
-
-				case TypeCode.Double:
-					{
-						SetKey("BITPIX", "-64", false, 0);
-						SetKey("BZERO", "0", "Data Offset; pixel = pixel*BSCALE+BZERO", true, 5);
-						SetKey("BSCALE", "1", "Data Scaling; pixel = pixel*BSCALE+BZERO", true, 6);
-						break;
-					}
+				case -64:
+					return TypeCode.Double;
 
 				default:
-					{
-						throw new Exception("TypeCode '" + precision.ToString() + "' not recognized at SetBITPIXNAXISBSCZ.");
-					}
+					throw new Exception(String.Format("Problem with BITPIX {0} or BZERO {1}", BITPIX, BZERO));
 			}
 		}
 
-		/// <summary>Returns a formatted header block with the existing keys, and sets the first key to either SIMPLE = T or XTENSION = IMAGE. If a full 2880-multiple block is needed, set keysOnly to false.</summary>
-		/// <param name="isExtension">If true then the first keyword is set to XTENSION = IMAGE, otherwise it is SIMPLE = T.</param>
-		/// <param name="keysOnly">If true then only the existing keywords are returned formatted, otherwise if you need the entire 2880-multiple block pass false. True typically needed for display, false typically needed for writing.</param>
-		public string[] GetFormattedHeaderBlock(bool isExtension, bool keysOnly)
+		#endregion
+
+		#region PRIVATE MEMBERS
+		private JPFITS.FITSHeaderKey[]? HEADERKEYS;
+		private string[]? FORMATTEDHEADER;
+		private bool UPDATEDISPLAYHEADER = true;
+		private bool ISEXTENSION = false;
+		private static string[] INVALIDEDITKEYS = { "SIMPLE", "EXTEND", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "NAXIS3", "NAXIS4", "BZERO", "BSCALE", "END", "PCOUNT", "GCOUNT", "THEAP", "GROUPS", "XTENSION", "TFIELDS" };
+
+		/// <summary>
+		/// Make a header with essential keywords.
+		/// </summary>
+		/// <param name="mayContainExtensions">Include the EXTEND keyword with value T</param>
+		/// <param name="dataUnit">The data unit array. Pass null for NAXIS = 0.</param>
+		private void MAKE_DEFAULT_HEADER(bool mayContainExtensions, Array? dataUnit)
 		{
-			if (isExtension && !ISEXTENSION)
-			{
-				UPDATEDISPLAYHEADER = true;
-				ISEXTENSION = true;
+			int BITPIX;
+			double BZERO, BSCALE;
+			int[] NAXISN;
+			FITSFILEOPS.GETBITPIXNAXISnBSCALEBZERO(TypeCode.Double, dataUnit, out BITPIX, out NAXISN, out BSCALE, out BZERO);
 
-				this.RemoveKey("EXTEND");
-
-				HEADERKEYS[0].Name = "XTENSION";
-				HEADERKEYS[0].Value = "IMAGE";
-				HEADERKEYS[0].Comment = "Image extension";
-
-				bool pcountkey = false, gcountkey = false;
-				for (int i = 0; i < this.Length; i++)
-					if (!pcountkey || !gcountkey)
-					{
-						if (HEADERKEYS[i].Name.Trim() == "PCOUNT")
-							pcountkey = true;
-						if (HEADERKEYS[i].Name.Trim() == "GCOUNT")
-							pcountkey = true;
-					}
-				if (!pcountkey && !gcountkey)//they would BOTH not be present if things are being done correctly...need to add them
-				{
-					int naxis = -1;
-					for (int i = 0; i < this.Length; i++)
-						if (HEADERKEYS[i].Name.Trim() == "NAXIS")
-						{
-							naxis = Convert.ToInt32(HEADERKEYS[i].Value.Trim());
-							break;
-						}
-					int naxisNindex = -1;
-					for (int i = 0; i < this.Length; i++)
-						if (HEADERKEYS[i].Name.Trim() == "NAXIS" + naxis.ToString())
-						{
-							naxisNindex = i;
-							break;
-						}
-
-					JPFITS.FITSHeaderKey[] keys = new JPFITS.FITSHeaderKey[this.Length + 2];
-
-					for (int i = 0; i <= naxisNindex; i++)
-						keys[i] = HEADERKEYS[i];
-
-					keys[naxisNindex + 1] = new FITSHeaderKey("PCOUNT", "0", "number of bytes in heap area");
-					keys[naxisNindex + 2] = new FITSHeaderKey("GCOUNT", "1", "single data table");
-
-					for (int i = naxisNindex + 3; i < keys.Length; i++)
-						keys[i] = HEADERKEYS[i - 2];
-
-					HEADERKEYS = keys;
-				}
-			}
-			else if (!isExtension && ISEXTENSION)
-			{
-				UPDATEDISPLAYHEADER = true;
-				ISEXTENSION = false;
-				HEADERKEYS[0].Name = "SIMPLE";
-				HEADERKEYS[0].Value = "T";
-				HEADERKEYS[0].Comment = "file conforms to FITS standard.";
-			}
-
-			if (!UPDATEDISPLAYHEADER && !keysOnly)
-				return FORMATTEDHEADER;
-
-			UPDATEDISPLAYHEADER = false;
-
-			if (keysOnly)
-				FORMATTEDHEADER = new string[this.Length];
-			else
-			{
-				int NKeys = this.Length;
-				int NCards = (NKeys - 1) / 36;
-				FORMATTEDHEADER = new string[(NCards + 1) * 36];
-			}
-
-			for (int i = 0; i < this.Length; i++)
-				FORMATTEDHEADER[i] = HEADERKEYS[i].GetFullyFomattedFITSLine();
-
-			if (keysOnly)
-				return FORMATTEDHEADER;
-
-			string empty = "";
-
-			for (int i = this.Length; i < FORMATTEDHEADER.Length; i++)
-				FORMATTEDHEADER[i] = empty.PadLeft(80);
-
-			return FORMATTEDHEADER;
-		}
-
-		/// <summary>ValidKeyEdit returns whether the given key is an essential key and shouldn't be user-modified.</summary>
-		/// <param name="key">The name of the header key.</param>
-		public static bool ValidKeyEdit(string key, bool showMessageBox)
-		{
-			for (int i = 0; i < INVALIDEDITKEYS.Length; i++)
-				if (key == INVALIDEDITKEYS[i])
-				{
-					if (showMessageBox)
-						System.Windows.Forms.MessageBox.Show("Selected key: '" + key + "' is restricted. Operation not allowed.", "Warning...");
-					return false;
-				}
-
-			return true;
-		}
-
-		/// <summary>Returns all of the key names from the header.</summary>
-		public string[] GetAllKeyNames()
-		{
-			string[] names = new string[this.Length];
-			for (int i = 0; i < this.Length; i++)
-				names[i] = this[i].Name;
-			return names;
-		}
-
-		/// <summary>Returns the FITSHeaderKey object at a given zero-based index in the header.</summary>
-		public FITSHeaderKey this[int i]
-		{
-			get { return HEADERKEYS[i]; }
-			set { HEADERKEYS[i] = value; }
-		}
-
-		/// <summary>Returns the number of header key lines in the header, excluding any assumed padding after END key.</summary>
-		public int Length
-		{
-			get { return HEADERKEYS.Length; }
-		}		
-
-		private static string[] INVALIDEDITKEYS = { "SIMPLE", "EXTEND", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "BZERO", "BSCALE", "END", "PCOUNT", "GCOUNT", "THEAP", "GROUPS", "XTENSION", "TFIELDS" };
-
-		private void MAKE_DEFAULT_HEADER(bool mayContainExtensions, double[,]? image)
-		{
-			if (mayContainExtensions && image == null)
+			if (mayContainExtensions && dataUnit == null)
 				HEADERKEYS = new FITSHeaderKey[5];
-			else if (mayContainExtensions && image != null)
-				HEADERKEYS = new FITSHeaderKey[9];
-			else if (!mayContainExtensions && image == null)
+			else if (mayContainExtensions && dataUnit != null)
+				HEADERKEYS = new FITSHeaderKey[7 + NAXISN.Length];
+			else if (!mayContainExtensions && dataUnit == null)
 				HEADERKEYS = new FITSHeaderKey[4];
-			else  //(!mayContainExtensions && image != nullptr)
-				HEADERKEYS = new FITSHeaderKey[8];
-
-			long BZERO = 0, BSCALE = 1;
-			int BITPIX = -64, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0;
-			if (image != null)
-			{
-				NAXIS = 2;
-				NAXIS1 = image.GetLength(0);
-				NAXIS2 = image.GetLength(1);
-			}
+			else if (!mayContainExtensions && dataUnit != null)
+				HEADERKEYS = new FITSHeaderKey[6 + NAXISN.Length];
 
 			int c = 0;
 			HEADERKEYS[c++] = new FITSHeaderKey("SIMPLE", "T", "file conforms to FITS standard");
 			HEADERKEYS[c++] = new FITSHeaderKey("BITPIX", BITPIX.ToString(), "bits per pixel");
-			HEADERKEYS[c++] = new FITSHeaderKey("NAXIS", NAXIS.ToString(), "number of data axes");
+			HEADERKEYS[c++] = new FITSHeaderKey("NAXIS", NAXISN.Length.ToString(), "number of data axes");
 
-			if (image != null)
+			if (dataUnit != null)
 			{
-				HEADERKEYS[c++] = new FITSHeaderKey("NAXIS1", NAXIS1.ToString(), "width - number of data columns");
-				HEADERKEYS[c++] = new FITSHeaderKey("NAXIS2", NAXIS2.ToString(), "height - number of data rows");
+				for (int i = 0; i < dataUnit.Rank; i++)
+					HEADERKEYS[c++] = new FITSHeaderKey("NAXIS" + (i + 1).ToString(), dataUnit.GetLength(i).ToString(), "number of elements on this axis");
+
 				HEADERKEYS[c++] = new FITSHeaderKey("BZERO", BZERO.ToString(), "data offset");
 				HEADERKEYS[c++] = new FITSHeaderKey("BSCALE", BSCALE.ToString(), "data scaling");
 			}
@@ -683,5 +648,8 @@ namespace JPFITS
 			HEADERKEYS[c++] = new FITSHeaderKey("END");
 			UPDATEDISPLAYHEADER = true;
 		}
+
+		#endregion
+
 	}
 }

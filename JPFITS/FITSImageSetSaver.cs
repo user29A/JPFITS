@@ -214,12 +214,12 @@ namespace JPFITS
 			}
 
 			if (FileExtension.SelectedIndex <= 2)//extension == ".fts" || extension == ".fits" || extension == ".fit")
-				IMAGESET.Write(TypeCode.Double, true, true, "Saving image set");
+				IMAGESET.Write(TypeCode.Double, true, "Saving image set");
 			else if (FileExtension.SelectedIndex == 3 /*(extension == ".jpg"*/)
 			{
 				for (int i = 0; i < IMAGESET.Count; i++)
 				{
-					Bitmap bmp1 = JPBitMap.ArrayToBmp(IMAGESET[i].Image, 0, 0, InvertGrayScaleChck.Checked, new double[2] { IMAGESET[i].Mean - IMAGESET[i].Std * 0.5, IMAGESET[i].Mean + IMAGESET[i].Std * 5 }, IMAGESET[i].Width, IMAGESET[i].Height, false);
+					Bitmap bmp1 = JPBitMap.ArrayToBmp(IMAGESET[i].Image, 0, 0, InvertGrayScaleChck.Checked, new double[2] { IMAGESET[i].Mean - IMAGESET[i].Stdv * 0.5, IMAGESET[i].Mean + IMAGESET[i].Stdv * 5 }, IMAGESET[i].Width, IMAGESET[i].Height, false);
 					bmp1.Save(IMAGESET[i].FullFileName, ImageFormat.Jpeg);
 				}
 			}
@@ -323,7 +323,7 @@ namespace JPFITS
 				DirectoryFileLabel.Text = "File Name:";
 
 				string name = IMAGESET.GetCommonDirectory();
-				name = name + new DirectoryInfo(name).Name + ".zip";
+				name = Path.Combine(name, new DirectoryInfo(name).Name + ".zip");
 				DirectoryTxt.Text = name;
 
 				REG.SetReg("CCDLAB", "BatchSavePath", DirectoryTxt.Text);

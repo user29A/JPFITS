@@ -16,6 +16,7 @@ namespace JPFITS
 	{
 		#region PRIVATE MEMBERS
 
+		private string? NAME;
 		private bool FITTED = false;
 		private string? FIT_EQUATION;
 		//private bool WCS_GENERATED = false;
@@ -52,6 +53,8 @@ namespace JPFITS
 		private JPMath.PointD[]? CENTROID_POINTS;
 		private double[]? CENTROIDS_X;               // x centroid positions of sources
 		private double[]? CENTROIDS_Y;               // y centroid positions of sources
+		private int[]? CENTROIDS_X_PIXEL;
+		private int[]? CENTROIDS_Y_PIXEL;
 		private double[]? CENTROIDS_RA_DEG;      // right ascension centroid positions of sources - if available
 		private string[]? CENTROIDS_RA_HMS;      // right ascension centroid positions of sources - if available
 		private double[]? CENTROIDS_DEC_DEG;     // declination centroid positions of sources - if available
@@ -89,8 +92,10 @@ namespace JPFITS
 		{
 			if (Convert.ToInt32(e.Argument) == 1)//Extract
 			{
-				ArrayList Xs = new ArrayList();// x positions
-				ArrayList Ys = new ArrayList();// y positions
+				ArrayList XPIXs = new ArrayList();// x position
+				ArrayList YPIXs = new ArrayList();// y position
+				ArrayList Xs = new ArrayList();// x centroids
+				ArrayList Ys = new ArrayList();// y centroids
 				ArrayList Ks = new ArrayList();// kernel sums
 				ArrayList Ps = new ArrayList();// pixel values
 				ArrayList Bs = new ArrayList();// background estimates
@@ -328,6 +333,8 @@ namespace JPFITS
 							}
 
 							src_index++;
+							XPIXs.Add(x);
+							YPIXs.Add(y);
 							Xs.Add(x_centroid);
 							Ys.Add(y_centroid);
 							Ks.Add(kernel_psf_sum);
@@ -356,6 +363,8 @@ namespace JPFITS
 
 				for (int i = 0; i < N_SRC; i++)
 				{
+					CENTROIDS_X_PIXEL[i] = Convert.ToInt32(XPIXs[i]);
+					CENTROIDS_Y_PIXEL[i] = Convert.ToInt32(YPIXs[i]);
 					CENTROIDS_X[i] = Convert.ToDouble(Xs[i]);
 					CENTROIDS_Y[i] = Convert.ToDouble(Ys[i]);
 					CENTROIDS_AMPLITUDE[i] = Convert.ToDouble(Ps[i]);
@@ -377,6 +386,7 @@ namespace JPFITS
 			int np = N_SRC / Environment.ProcessorCount;
 
 			Parallel.For(0, N_SRC, (int k, ParallelLoopState state) =>
+			//for (int k = 0; k < N_SRC; k++)
 			{
 				if (WAITBAR.DialogResult == DialogResult.Cancel)
 				{
@@ -696,6 +706,8 @@ namespace JPFITS
 
 		private void INITARRAYS()
 		{
+			CENTROIDS_X_PIXEL = new int[N_SRC];
+			CENTROIDS_Y_PIXEL = new int[N_SRC];
 			CENTROIDS_X = new double[(N_SRC)];
 			CENTROIDS_Y = new double[(N_SRC)];
 			FITS_X = new double[(N_SRC)];
@@ -784,6 +796,18 @@ namespace JPFITS
 			}
 		}
 
+		/// <summary>Gets the x-axis center kernel pixel of extracted sources.</summary>
+		public int[] Centroids_X_Pixel
+		{
+			get { return CENTROIDS_X_PIXEL; }
+		}
+
+		/// <summary>Gets the y-axis center kernel pixel of extracted sources.</summary>
+		public int[] Centroids_Y_Pixel
+		{
+			get { return CENTROIDS_Y_PIXEL; }
+		}
+
 		/// <summary>Gets or Sets the x-axis centroids of extracted sources.</summary>
 		public double[] Centroids_X
 		{
@@ -846,6 +870,12 @@ namespace JPFITS
 		public bool Fitted
 		{
 			get { return FITTED; }
+		}
+
+		public string Name
+		{
+			get { return NAME; }
+			set { NAME = value; }
 		}
 
 		/// <summary>Returns the boolean source map.</summary>
@@ -1170,7 +1200,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
-		/// <para>G(x,y|P) = P(0) * exp( -((x - P(1)).^2 + (y - P(2)).^2 ) / (2*P(3)^2)) + P(4).</para></summary>
+		/// <br />G(x,y|P) = P(0) * exp( -((x - P(1)).^2 + (y - P(2)).^2 ) / (2*P(3)^2)) + P(4).</summary>
 		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3) and P(4) are used, all other parameter initial estimates are determined locally.</param>
 		/// <param name="LBnds">Lower bounds for the fit parameters. Only LBnds(3) and LBnds(4) are used, all other parameter bound estimates are determined locally.</param>
 		/// <param name="UBnds">Upper bounds for the fit parameters. Only UBnds(3) and LBnds(4) are used, all other parameter bound estimates are determined locally.</param>
@@ -1198,7 +1228,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
-		/// <para>G(x,y|P) = P(0) * exp( -((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))).^2 / (2*P(4)^2) - ( -(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))).^2 / (2*P(5)^2) ) + P(6).</para></summary>
+		/// <br />G(x,y|P) = P(0) * exp( -((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))).^2 / (2*P(4)^2) - ( -(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))).^2 / (2*P(5)^2) ) + P(6).</summary>
 		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5) and P(6) are used, all other parameter initial estimates are determined locally.</param>
 		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as above.</param>
 		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as above.</param>
@@ -1226,7 +1256,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
-		/// <para>M(x,y|P) = P(0) * ( 1 + { (x - P(1))^2 + (y - P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5).</para></summary>
+		/// <br />M(x,y|P) = P(0) * ( 1 + { (x - P(1))^2 + (y - P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5).</summary>
 		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5) are used, all other parameter initial estimates are determined locally.</param>
 		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as above.</param>
 		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as above.</param>
@@ -1254,7 +1284,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
-		/// <para>M(x,y|P) = P(0) * (1 + { ((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))) ^ 2 } / P(4) ^ 2 + { (-(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))) ^ 2 } / P(5) ^ 2) ^ (-P(6)) + P(7).</para></summary>
+		/// <br />M(x,y|P) = P(0) * (1 + { ((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))) ^ 2 } / P(4) ^ 2 + { (-(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))) ^ 2 } / P(5) ^ 2) ^ (-P(6)) + P(7).</summary>
 		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5),  P(6) and P(7) are used, all other parameter initial estimates are determined locally.</param>
 		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as above.</param>
 		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as above.</param>

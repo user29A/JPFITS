@@ -33,7 +33,7 @@
 			this.IncludePrimaryChck = new System.Windows.Forms.CheckBox();
 			this.ReturnSelectionBtn = new System.Windows.Forms.Button();
 			this.CancelBtn = new System.Windows.Forms.Button();
-			this.ExtensionChckdListBox = new System.Windows.Forms.CheckedListBox();
+			this.ExtensionListBox = new System.Windows.Forms.ListBox();
 			this.SuspendLayout();
 			// 
 			// SelectAllBtn
@@ -68,7 +68,8 @@
 			// 
 			// ReturnSelectionBtn
 			// 
-			this.ReturnSelectionBtn.Location = new System.Drawing.Point(177, 164);
+			this.ReturnSelectionBtn.DialogResult = System.Windows.Forms.DialogResult.OK;
+			this.ReturnSelectionBtn.Location = new System.Drawing.Point(177, 227);
 			this.ReturnSelectionBtn.Name = "ReturnSelectionBtn";
 			this.ReturnSelectionBtn.Size = new System.Drawing.Size(99, 23);
 			this.ReturnSelectionBtn.TabIndex = 8;
@@ -79,7 +80,7 @@
 			// CancelBtn
 			// 
 			this.CancelBtn.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-			this.CancelBtn.Location = new System.Drawing.Point(177, 193);
+			this.CancelBtn.Location = new System.Drawing.Point(177, 256);
 			this.CancelBtn.Name = "CancelBtn";
 			this.CancelBtn.Size = new System.Drawing.Size(99, 23);
 			this.CancelBtn.TabIndex = 7;
@@ -87,32 +88,37 @@
 			this.CancelBtn.UseVisualStyleBackColor = true;
 			this.CancelBtn.Click += new System.EventHandler(this.CancelBtn_Click);
 			// 
-			// ExtensionChckdListBox
+			// ExtensionListBox
 			// 
-			this.ExtensionChckdListBox.Dock = System.Windows.Forms.DockStyle.Left;
-			this.ExtensionChckdListBox.FormattingEnabled = true;
-			this.ExtensionChckdListBox.Location = new System.Drawing.Point(0, 0);
-			this.ExtensionChckdListBox.Name = "ExtensionChckdListBox";
-			this.ExtensionChckdListBox.ScrollAlwaysVisible = true;
-			this.ExtensionChckdListBox.Size = new System.Drawing.Size(171, 222);
-			this.ExtensionChckdListBox.TabIndex = 9;
+			this.ExtensionListBox.Dock = System.Windows.Forms.DockStyle.Left;
+			this.ExtensionListBox.FormattingEnabled = true;
+			this.ExtensionListBox.Location = new System.Drawing.Point(0, 0);
+			this.ExtensionListBox.Name = "ExtensionListBox";
+			this.ExtensionListBox.ScrollAlwaysVisible = true;
+			this.ExtensionListBox.SelectionMode = System.Windows.Forms.SelectionMode.MultiExtended;
+			this.ExtensionListBox.Size = new System.Drawing.Size(171, 282);
+			this.ExtensionListBox.TabIndex = 10;
+			this.ExtensionListBox.SelectedIndexChanged += new System.EventHandler(this.ExtensionListBox_SelectedIndexChanged);
+			this.ExtensionListBox.DoubleClick += new System.EventHandler(this.ExtensionListBox_DoubleClick);
 			// 
 			// FITSImageExtensionsLister
 			// 
+			this.AcceptButton = this.ReturnSelectionBtn;
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.CancelButton = this.CancelBtn;
-			this.ClientSize = new System.Drawing.Size(281, 222);
+			this.ClientSize = new System.Drawing.Size(281, 282);
 			this.ControlBox = false;
-			this.Controls.Add(this.ExtensionChckdListBox);
+			this.Controls.Add(this.ExtensionListBox);
 			this.Controls.Add(this.ReturnSelectionBtn);
 			this.Controls.Add(this.CancelBtn);
 			this.Controls.Add(this.IncludePrimaryChck);
 			this.Controls.Add(this.ClearSelectionBtn);
 			this.Controls.Add(this.SelectAllBtn);
 			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
-			this.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+			this.Margin = new System.Windows.Forms.Padding(2);
 			this.Name = "FITSImageExtensionsLister";
+			this.ShowIcon = false;
 			this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
 			this.Text = "Image Extensions";
@@ -127,6 +133,6 @@
 		public System.Windows.Forms.CheckBox IncludePrimaryChck;
 		private System.Windows.Forms.Button ReturnSelectionBtn;
 		private System.Windows.Forms.Button CancelBtn;
-		public System.Windows.Forms.CheckedListBox ExtensionChckdListBox;
+		private System.Windows.Forms.ListBox ExtensionListBox;
 	}
 }

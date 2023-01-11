@@ -1,12 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+#nullable enable
 
 namespace JPFITS
 {
@@ -45,49 +39,64 @@ namespace JPFITS
 
 			int n = 1;
 			for (int i = 0; i < extlist.Length; i++)
+			{
 				if (extlist[i] == "")
 				{
-					ExtensionChckdListBox.Items.Add("Unnamed extension: " + n, true);
+					ExtensionListBox.Items.Add("Unnamed extension: " + n);
 					n++;
 				}
 				else
-					ExtensionChckdListBox.Items.Add(extlist[i], true);
+					ExtensionListBox.Items.Add(extlist[i]);
+
+				ExtensionListBox.SetSelected(i, true);
+			}
 		}
 
 		private void SelectAllBtn_Click(object sender, EventArgs e)
 		{
-			for (int i = 0; i < ExtensionChckdListBox.Items.Count; i++)
-				ExtensionChckdListBox.SetItemChecked(i, true);
+			for (int i = 0; i < ExtensionListBox.Items.Count; i++)
+				ExtensionListBox.SetSelected(i, true);
 		}
 
 		private void ClearSelectionBtn_Click(object sender, EventArgs e)
 		{
-			for (int i = 0; i < ExtensionChckdListBox.Items.Count; i++)
-				ExtensionChckdListBox.SetItemChecked(i, false);
+			for (int i = 0; i < ExtensionListBox.Items.Count; i++)
+				ExtensionListBox.SetSelected(i, false);
 		}
 
 		private void ReturnSelectionBtn_Click(object sender, EventArgs e)
 		{
-			if (ExtensionChckdListBox.CheckedItems.Count == 0)
+			if (ExtensionListBox.SelectedItems.Count == 0)
 				return;
 
-			EXTNAMES = new string[ExtensionChckdListBox.CheckedItems.Count];
-			EXTINDEXES_ONEBASED = new int[ExtensionChckdListBox.CheckedItems.Count];
+			EXTNAMES = new string[ExtensionListBox.SelectedItems.Count];
+			EXTINDEXES_ONEBASED = new int[ExtensionListBox.SelectedItems.Count];
 
-			for (int i = 0; i < ExtensionChckdListBox.Items.Count; i++)
-				if (ExtensionChckdListBox.GetItemChecked(i))
-				{ 
-					EXTNAMES[i] = ExtensionChckdListBox.Items[i].ToString();
-					EXTINDEXES_ONEBASED[i] = i + 1;
-				}
-
-			this.DialogResult = DialogResult.OK;
-			this.Close();
+			for (int i = 0; i < ExtensionListBox.SelectedItems.Count; i++)
+			{ 
+				EXTNAMES[i] = ExtensionListBox.SelectedItems[i].ToString();
+				EXTINDEXES_ONEBASED[i] = ExtensionListBox.SelectedIndices[i] + 1;
+			}
 		}
 
 		private void CancelBtn_Click(object sender, EventArgs e)
 		{
 
+		}
+
+		private void ExtensionListBox_SelectedIndexChanged(object sender, EventArgs e)
+		{
+			if (ExtensionListBox.SelectedItems.Count == 0)
+				ReturnSelectionBtn.Enabled = false;
+			else
+				ReturnSelectionBtn.Enabled = true;
+
+			this.Text = string.Format("Image Extensions ({0} selected)", ExtensionListBox.SelectedItems.Count);
+		}
+
+		private void ExtensionListBox_DoubleClick(object sender, EventArgs e)
+		{
+			ReturnSelectionBtn.PerformClick();
 		}
 	}
 }

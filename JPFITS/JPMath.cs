@@ -13,13 +13,22 @@ namespace JPFITS
 	{
 		public class PointD
 		{
-			private double POINTX, POINTY, POINTVAL;
+			private double POINTX, POINTY, POINTVAL, POINTXOLD, POINTYOLD;
 
 			public PointD(double x, double y, double value)
 			{
 				POINTX = x;
 				POINTY = y;
 				POINTVAL = value;
+			}
+
+			public PointD(double x, double y, double value, double x_old, double y_old)
+			{
+				POINTX = x;
+				POINTY = y;
+				POINTVAL = value;
+				POINTXOLD = x_old;
+				POINTYOLD = y_old;
 			}
 
 			public double X
@@ -40,7 +49,20 @@ namespace JPFITS
 				set { POINTVAL = value; }
 			}
 
+			public double X_Old
+			{
+				get { return POINTXOLD; }
+				set { POINTXOLD = value; }
+			}
+
+			public double Y_Old
+			{
+				get { return POINTYOLD; }
+				set { POINTYOLD = value; }
+			}
+
 			/// <summary>Computes the distance from the current point to another point.</summary>
+			[MethodImpl(256)]
 			public double DistanceTo(PointD other_point)
 			{
 				double dx = POINTX - other_point.X, dy = POINTY - other_point.Y;
@@ -73,13 +95,24 @@ namespace JPFITS
 				return true;
 			}
 
+			[MethodImpl(256)]/*256 = agressive inlining*/
 			public static double ISLEFT(PointD P0, PointD P1, PointD P2)
 			{
 				return ((P1.X - P0.X) * (P2.Y - P0.Y) - (P2.X - P0.X) * (P1.Y - P0.Y));
 			}
 
+			[MethodImpl(256)]/*256 = agressive inlining*/
 			public static bool[,] PolygonInteriorPointsRegion(int regionXSize, int regionYSize, PointD[] polygon, int Xmin, int Ymin, int Xmax, int Ymax)
 			{
+				if (Xmin < 0)
+					throw new Exception("Xmin is less than 0: " + Xmin);
+				if (Xmax >= regionXSize)
+					throw new Exception(String.Format("Xmax (0-based: {0}) is greater than the x-region size {1} ", Xmax, regionXSize));
+				if (Ymin < 0)
+					throw new Exception("Ymin is less than 0: " + Ymin);
+				if (Ymax >= regionYSize)
+					throw new Exception(String.Format("Ymax (0-based: {0}) is greater than the y-region size {1} ", Ymax, regionYSize));
+
 				bool[,] region = new bool[regionXSize, regionYSize];
 				Parallel.For(Xmin, Xmax + 1, x =>
 				{
@@ -175,7 +208,8 @@ namespace JPFITS
 			private PointD[] POINTS;
 			private double[] VERTEXANGLES = new double[0];
 			private double[] SIDELENGTHS = new double[0];
-			
+
+			[MethodImpl(256)]/*256 = agressive inlining*/
 			private void SORTTRIANGLE()
 			{
 				PointD[] points = new PointD[3] { POINTS[0], POINTS[1], POINTS[2] };
@@ -254,7 +288,8 @@ namespace JPFITS
 
 				POINTS = new PointD[3] { points[common0], points[common1], points[common2] };
 			}
-			
+
+			[MethodImpl(256)]/*256 = agressive inlining*/
 			private void MAKEVERTEXANGLES()
 			{
 				VERTEXANGLES = new double[3];
@@ -267,7 +302,8 @@ namespace JPFITS
 				VERTEXANGLES[1] = Math.Acos(-(D02 * D02 - D01 * D01 - D12 * D12) / (2 * D01 * D12));
 				VERTEXANGLES[2] = Math.Acos(-(D01 * D01 - D02 * D02 - D12 * D12) / (2 * D02 * D12));
 			}
-			
+
+			[MethodImpl(256)]/*256 = agressive inlining*/
 			private void MAKEFIELDVECTORS()
 			{
 				FIELDVECTOR = new PointD(POINTS[2].X - POINTS[1].X, POINTS[2].Y - POINTS[1].Y, SIDELENGTHS[2]);
@@ -282,11 +318,11 @@ namespace JPFITS
 		#region FITTING
 
 		/// <summary>Determines the non-linear least-squares fit parameters for a positively-oriented Gaussian curve G(x|p)
-		/// <para>G(x|p) = p(0) * exp( -(x - p(1))^2 / (2*p(2)^2) ) + p(3)</para></summary>
+		/// <br />G(x|p) = p(0) * exp( -(x - p(1))^2 / (2*p(2)^2) ) + p(3)</summary>
 		/// <param name="xdata">The x-data grid positions of the Gaussian data. If nullptr is passed a vector will automatically be created of appropriate size, centered on zero.</param>
 		/// <param name="Gdata">The values of the data to be fitted to the Gaussian.</param>
 		/// <param name="p">The initial and return parameters of the Gaussian. If p is only initialized and input with all zeros, initial estimates will automatically be computed.
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = sigma; p[3] = bias.</para></param>
+		/// <br />p[0] = amplitude; <br />p[1] = x-center; <br />p[2] = sigma; <br />p[3] = bias.</param>
 		/// <param name="p_lbnd">The lower-bound on the fit parameters. If nullptr is passed they will automatically be set by the Gdata dimensions with allowance.</param>
 		/// <param name="p_ubnd">The upper-bound on the fit parameters. If nullptr is passed they will automatically be set by the Gdata dimensions with allowance.</param>
 		/// <param name="p_err">The returned errors on the fitted parameters. Pass nullptr if not required.</param>
@@ -371,11 +407,11 @@ namespace JPFITS
 		}
 
 		/// <summary>Determines the non-linear least-squares fit parameters for a 1D Moffat curve M(x|p)
-		/// <para>M(x|p) = p(0) * ( 1 + (x - p(1))^2 / p(2)^2 )^(-p(3)) + p(4)</para></summary>
+		/// <br />M(x|p) = p(0) * ( 1 + (x - p(1))^2 / p(2)^2 )^(-p(3)) + p(4)</summary>
 		/// <param name="xdata">The x data grid positions of the Moffat data. If nullptr is passed a vector will automatically be created of appropriate size, centered on zero.</param>
 		/// <param name="Mdata">The values of the data to be fitted to the Moffat.</param>
 		/// <param name="p">The initial and return parameters of the Moffat. If p is only initialized and input with all zeros, initial estimates will automatically be computed.
-		/// <para>p[0] = amplitude, p[1] = x-center, p[2] = theta, p[3] = beta, p[4] = bias.</para></param>
+		/// <br />p[0] = amplitude <br />p[1] = x-center <br />p[2] = theta <br />p[3] = beta <br />p[4] = bias</param>
 		/// <param name="p_err">The errors on the fitted parameters. Pass nullptr if not required.</param>
 		/// <param name="fit_residuals">The residuals of the fit: Mdata[x] - M(x|p). Pass nullptr if not required.</param>
 		public static void Fit_Moffat1d(double[] xdata, double[] Mdata, ref double[] p, double[]? p_lbnd, double[]? p_ubnd, ref double[]? p_err, ref double[]? fit_residuals)
@@ -459,17 +495,17 @@ namespace JPFITS
 		}
 
 		/// <summary>Determines the non-linear least-squares fit parameters for a positively-oriented 2-d Gaussian surface G(x,y|p)
-		/// <para>G(x,y|p) = p(0) * exp(-((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2)) + p(4)</para>
-		/// <para>or</para>
-		/// <para>G(x,y|p) = p(0) * exp(-((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)</para>
-		/// <para>The form of G(x,y|p) used is determined by the length of the parameter vector p</para></summary>
+		/// <br />G(x,y|p) = p(0) * exp(-((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2)) + p(4)
+		/// <br />or
+		/// <br />G(x,y|p) = p(0) * exp(-((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)
+		/// <br />The form of G(x,y|p) used is determined by the length of the parameter vector p</summary>
 		/// <param name="xdata">The x-data grid positions of the Gaussian data.</param>
 		/// <param name="ydata">The y-data grid positions of the Gaussian data.</param>
 		/// <param name="Gdata">The values of the data to be fitted to the Gaussian.</param>
 		/// <param name="p">The initial and return parameters of the Gaussian fit. The length of p determines which type of fit occurs. If p is only initialized and input with all zeros, initial estimates will automatically be computed. Options are:
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias</para>
-		/// <para>or</para>
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias.</para></param>
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias
+		/// <br />or
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias.</param>
 		/// <param name="p_LB">The lower bound contraints on the fit parameters. Pass nullptr or an array of length 0 if not required.</param>
 		/// <param name="p_UB">The upper bound contraints on the fit parameters. Pass nullptr or an array of length 0 if not required.</param>
 		/// <param name="p_err">The return errors on the fitted parameters. Pass null or an array of length 0 if not required.</param>
@@ -569,29 +605,29 @@ namespace JPFITS
 			{
 				double val = 0;
 				double[] X = new double[2];
-				for (int j = 0; j < xw; j++)
-					for (int k = 0; k < xw; k++)
+				for (int xx = 0; xx < xw; xx++)
+					for (int yy = 0; yy < yh; yy++)
 					{
-						X[0] = (double)xdata[j];
-						X[1] = (double)ydata[k];
-						alglib_Gauss_2d(p, X, ref val, obj);
-						fit_residuals[i, j] = Gdata[i, j] - val;
+						X[0] = (double)xdata[xx];
+						X[1] = (double)ydata[yy];
+						alglib_Moffat_2d(p, X, ref val, obj);
+						fit_residuals[xx, yy] = Gdata[xx, yy] - val;
 					}
 			}
 		}
 
 		/// <summary>Determines the non-linear least-squares fit parameters for a 2-d Moffat surface M(x,y|p)
-		/// <para>M(x,y|p) = p(0) * ( 1 + { (x - p(1))^2 + (y - p(2))^2 } / p(3)^2 )^(-p(4)) + p(5)</para>
-		/// <para>or</para>
-		/// <para>M(x,y|p) = p(0) * ( 1 + { ((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3)))^2 } / p(5)^2 )^(-p(6)) + p(7)</para>
-		/// <para>The form of M(x,y|p) used is determined by the length of the parameter vector p</para></summary>
+		/// <br />M(x,y|p) = p(0) * ( 1 + { (x - p(1))^2 + (y - p(2))^2 } / p(3)^2 )^(-p(4)) + p(5)
+		/// <br />or
+		/// <br />M(x,y|p) = p(0) * ( 1 + { ((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3)))^2 } / p(5)^2 )^(-p(6)) + p(7)
+		/// <br />The form of M(x,y|p) used is determined by the length of the parameter vector p</summary>
 		/// <param name="xdata">The x-data grid positions of the Moffat data.</param>
 		/// <param name="ydata">The y-data grid positions of the Moffat data.</param>
 		/// <param name="Mdata">The values of the data to be fitted to the Moffat.</param>
 		/// <param name="p">The initial and return parameters of the Moffat. If p is only initialized and input with all zeros, initial estimates will automatically be computed. Options are:
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias</para>
-		/// <para>or</para>
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias</para></param>
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias
+		/// <br />or
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias</param>
 		/// <param name="p_LB">The lower bound contraints on the fit parameters. Pass nullptr or an array of length 0 if not required.</param>
 		/// <param name="p_UB">The upper bound contraints on the fit parameters. Pass nullptr or an array of length 0 if not required.</param>
 		/// <param name="p_err">The return errors on the fitted parameters. Pass null or an array of length 0 if not required.</param>
@@ -693,7 +729,7 @@ namespace JPFITS
 				double val = 0;
 				double[] X = new double[2];
 				for (int xx = 0; xx < xw; xx++)
-					for (int yy = 0; yy < xw; yy++)
+					for (int yy = 0; yy < yh; yy++)
 					{
 						X[0] = (double)xdata[xx];
 						X[1] = (double)ydata[yy];
@@ -704,17 +740,17 @@ namespace JPFITS
 		}
 
 		/// <summary>Determines the non-linear least-squares fit parameters for a field of n positively-oriented 2-d Gaussian surfaces G(x,y|p_n)
-		/// <para>G(x,y|p_n) = Sum[p_n(0) * exp(-((x - p_n(1))^2 + (y - p_n(2))^2) / (2*p_n(3)^2))] + p(4)</para>
-		/// <para>or</para>
-		/// <para>G(x,y|p_n) =  Sum[p_n(0) * exp(-((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 / (2*p_n(4)^2) - (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3))).^2 / (2*p_n(5)^2) )] + p(6)</para>
-		/// <para>The form of G(x,y|p_n) used is determined by the horizontal length of the parameter vector p</para></summary>
+		/// <br />G(x,y|p_n) = Sum[p_n(0) * exp(-((x - p_n(1))^2 + (y - p_n(2))^2) / (2*p_n(3)^2))] + p(4)
+		/// <br />or
+		/// <br />G(x,y|p_n) =  Sum[p_n(0) * exp(-((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 / (2*p_n(4)^2) - (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3))).^2 / (2*p_n(5)^2) )] + p(6)
+		/// <br />The form of G(x,y|p_n) used is determined by the horizontal length of the parameter vector p</summary>
 		/// <param name="xdata">The x-data grid positions of the Gaussian data.</param>
 		/// <param name="ydata">The y-data grid positions of the Gaussian data.</param>
 		/// <param name="Gdata">The values of the data to be fitted to the Gaussian.</param>
 		/// <param name="p">The initial and return parameters of the Gaussian. If p is only initialized and input with all zeros, initial estimates will automatically be computed. Options are:
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias</para>
-		/// <para>or</para>
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias.</para></param>
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias
+		/// <br />or
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias.</param>
 		/// <param name="p_LB">The lower bound contraints on the fit parameters.</param>
 		/// <param name="p_UB">The upper bound contraints on the fit parameters.</param>
 		/// <param name="p_err">The return errors on the fitted parameters. Pass an array of length 0 if not required.</param>
@@ -810,17 +846,17 @@ namespace JPFITS
 		}
 
 		/// <summary>Determines the non-linear least-squares fit parameters for a 2-d Moffat surface M(x,y|p)
-		/// <para>M(x,y|p_n) = sum[p_n(0) * ( 1 + { (x - p_n(1))^2 + (y - p_n(2))^2 } / p_n(3)^2 )^(-p_n(4))] + p(5)</para>
-		/// <para>or</para>
-		/// <para>M(x,y|p_n) = sum[p_n(0) * ( 1 + { ((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 } / p_n(4)^2 + { (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3)))^2 } / p_n(5)^2 )^(-p_n(6))] + p_n(7)</para>
-		/// <para>The form of M(x,y|p_n) used is determined by the length of the parameter vector p</para></summary>
+		/// <br />M(x,y|p_n) = sum[p_n(0) * ( 1 + { (x - p_n(1))^2 + (y - p_n(2))^2 } / p_n(3)^2 )^(-p_n(4))] + p(5)
+		/// <br />or
+		/// <br />M(x,y|p_n) = sum[p_n(0) * ( 1 + { ((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 } / p_n(4)^2 + { (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3)))^2 } / p_n(5)^2 )^(-p_n(6))] + p_n(7)
+		/// <br />The form of M(x,y|p_n) used is determined by the length of the parameter vector p</summary>
 		/// <param name="xdata">The x-data grid positions of the Moffat data.</param>
 		/// <param name="ydata">The y-data grid positions of the Moffat data.</param>
 		/// <param name="Mdata">The values of the data to be fitted to the Moffat.</param>
 		/// <param name="p">The initial and return parameters of the Moffat. If p is only initialized and input with all zeros, initial estimates will automatically be computed. Options are:
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias</para>
-		/// <para>or</para>
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias</para></param>
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias
+		/// <br />or
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias</param>
 		/// <param name="p_LB">The lower bound contraints on the fit parameters.</param>
 		/// <param name="p_UB">The upper bound contraints on the fit parameters.</param>
 		/// <param name="p_err">The return errors on the fitted parameters. Pass an array of length 0 if not required.</param>
@@ -1495,9 +1531,9 @@ namespace JPFITS
 		/// <param name="x_pix">The x-axis points for which to determine the transformation of.</param>
 		/// <param name="y_pix">The y-axis points for which to determine the transformation of.</param>
 		/// <param name="p">The initial and return parameters of the tranformation. Options are
-		/// <para>p[0] = scale, p[1] = phi (radians), p[2] = x-axis pixel coordinate reference, p[3] = y-axis pixel coordinate reference,</para>
-		///<para>or</para>
-		///<para>p[0] = Matrix coeff [0, 0], p[1] = Matrix coeff [1, 0], p[2] = Matrix coeff [0, 1], p[3] = Matrix coeff [1, 1], p[4] = x-axis pixel coordinate reference, p[5] = y-axis pixel coordinate reference,</para></param>
+		/// <br />p[0] = scale; p[1] = phi (radians); p[2] = x-axis pixel coordinate reference; p[3] = y-axis pixel coordinate reference;
+		/// <br />or
+		/// <br />p[0] = Matrix coeff [0, 0]; p[1] = Matrix coeff [1, 0]; p[2] = Matrix coeff [0, 1]; p[3] = Matrix coeff [1, 1]; p[4] = x-axis pixel coordinate reference; p[5] = y-axis pixel coordinate reference;</param>
 		/// <param name="p_lbnd">The lower-bound on the fit parameters.</param>
 		/// <param name="p_ubnd">The upper-bound on the fit parameters.</param>
 		/// <param name="p_scale">The order of magnitude scale (positive) of the fit parameters.</param>
@@ -1530,9 +1566,9 @@ namespace JPFITS
 		/// <param name="x_tran">The x-axis points for which to determine the transformation of.</param>
 		/// <param name="y_tran">The y-axis points for which to determine the transformation of.</param>
 		/// <param name="p">The initial and return parameters of the tranformation. Options are
-		/// <para>p[0] = scale, p[1] = phi (radians), p[2] = x-tran pixel coordinate rotation reference, p[3] = y-tran pixel coordinate rotation reference, p[4] = x-tran pixel coordinate shift, p[5] = x-tran pixel coordinate shift</para>
-		///<para>or</para>
-		///<para>p[0] = Matrix coeff [0, 0], p[1] = Matrix coeff [1, 0], p[2] = Matrix coeff [0, 1], p[3] = Matrix coeff [1, 1], p[4] = x-tran pixel coordinate rotation reference, p[5] = y-tran pixel coordinate rotation reference, p[6] = x-tran pixel coordinate shift, p[7] = x-tran pixel coordinate shift</para></param>
+		/// <br />p[0] = scale; p[1] = phi (radians); p[2] = x-tran pixel coordinate rotation reference; p[3] = y-tran pixel coordinate rotation reference; p[4] = x-tran pixel coordinate shift; p[5] = x-tran pixel coordinate shift;
+		/// <br />or
+		/// <br />p[0] = Matrix coeff [0, 0]; p[1] = Matrix coeff [1, 0]; p[2] = Matrix coeff [0, 1]; p[3] = Matrix coeff [1, 1]; p[4] = x-tran pixel coordinate rotation reference; p[5] = y-tran pixel coordinate rotation reference; p[6] = x-tran pixel coordinate shift; p[7] = x-tran pixel coordinate shift;</param>
 		/// <param name="p_lbnd">The lower-bound on the fit parameters.</param>
 		/// <param name="p_ubnd">The upper-bound on the fit parameters.</param>
 		/// <param name="p_scale">The order of magnitude scale (positive) of the fit parameters.</param>
@@ -2084,79 +2120,65 @@ namespace JPFITS
 		}
 
 		/// <summary>Computes the normalized radial profile.</summary>
-		/// <param name="Mdata">The 2D profile to create the radial plot from. Maximum value must be the center pixel, and Mdata array [x, y] size must be odd and square. If the size Mdata is less than 16 elements, the profile is spline-interpolated by a factor of 5.</param>
-		/// <param name="xdata">The abscissa values for the Mdata array.</param>
-		/// <param name="ydata">The ordinate values for the Mdata array.</param>
-		/// <param name="axisscale">The unit scale per pixel of the axes, assuming both axes are equal. Pass 0 or 1 for no scale, or any other value greater than zero for scaling.</param>
-		/// <param name="radial_x">The radial profile abscissa values (returned).</param>
-		/// <param name="radial_y">The radial profile abscissa values (returned).</param>
-		public static void Radial_Profile_Normalized(double[,] Mdata, int[] xdata, int[] ydata, double axisscale, out double[] radial_x, out double[] radial_y)
+		/// <param name="Rdata">The 2D profile to create the radial plot from. Maximum value must be the center pixel, and Rdata array [x, y] size must be odd and square. If the size Rdata is less than 33x33 elements, the profile is spline-interpolated by a factor of 5.</param>
+		/// <param name="xdata">The abscissa (horizontal) values for the Rdata array.</param>
+		/// <param name="ydata">The ordinate (vertical) values for the Rdata array.</param>
+		/// <param name="axis_scale">The unit scale per pixel of the axes, assuming both axes are equal. Pass 0 or 1 for no scale, or any other value greater than zero for scaling.</param>
+		/// <param name="radial_x">The radial profile radius values (returned).</param>
+		/// <param name="radial_y">The radial profile values (returned).</param>
+		public static void Radial_Profile_Normalized(double[,] Rdata, int[] xdata, int[] ydata, double axis_scale, out double[] radial_x, out double[] radial_y)
 		{
+			if (Rdata.GetLength(0) != Rdata.GetLength(1))
+				throw new Exception("Error: Rdata array must be square.");
+
+			if (Rdata.GetLength(0) < 5)
+				throw new Exception("Error: Rdata array must be at least 5x5 pixels...");
+
+			if (IsEven(Rdata.GetLength(0)))
+				throw new Exception("Error: Rdata array not odd-size number of square elements. Cannot solve radial fit.");
+
+			int Rdata_HW = (Rdata.GetLength(0) - 1) / 2;
+
 			int xx, yy;
-			double center_val = JPMath.Max(Mdata, out xx, out yy, false);
-			if (xx != (Mdata.GetLength(0) - 1) / 2 || yy != (Mdata.GetLength(1) - 1) / 2)
+			double center_val = JPMath.Max(Rdata, out xx, out yy, false);
+
+			if (xx != Rdata_HW || yy != Rdata_HW)
+				throw new Exception("Error: Rdata maximum of array not at the center of the array. Cannot solve radial fit.");
+
+			double[] xdata_dbl = new double[xdata.Length];
+			double[] ydata_dbl = new double[ydata.Length];
+			for (int i = 0; i < xdata.Length; i++)
 			{
-				throw new Exception("Error: Mdata array either not odd-size or maximum of array not at the center of the array. Cannot solve radial fit");
+				xdata_dbl[i] = (double)(xdata[i]);
+				ydata_dbl[i] = (double)(ydata[i]);
 			}
-			if (Mdata.GetLength(0) != Mdata.GetLength(1))
+
+			double[,] interp_Rdata = Rdata;
+			if (Rdata_HW <= 15)
 			{
-				throw new Exception("Error: Mdata array must be square.");
-			}
-			if (Mdata.GetLength(0) < 5)
-			{
-				throw new Exception("Error: Region of interest SubWindow must be at least 5x5 pixels...");
-			}
-
-			double[,] SUBIMAGE_radplot = Mdata;
-
-			int SUBIMAGE_HWX = (Mdata.GetLength(0) - 1) / 2;
-			int SUBIMAGE_HWY = (Mdata.GetLength(1) - 1) / 2;
-			double X0 = (double)xdata[SUBIMAGE_HWX];
-			double Y0 = (double)ydata[SUBIMAGE_HWY];
-			int interp_delta = 1;
-
-			double[] XSUBRANGE_radplot;
-			double[] YSUBRANGE_radplot;
-
-			if (SUBIMAGE_HWX > 15)
-			{
-				XSUBRANGE_radplot = new double[xdata.Length];
-				YSUBRANGE_radplot = new double[ydata.Length];
-				for (int i = 0; i < xdata.Length; i++)
-					XSUBRANGE_radplot[i] = (double)(xdata[i]);
-				for (int i = 0; i < ydata.Length; i++)
-					YSUBRANGE_radplot[i] = (double)(ydata[i]);
-			}
-			else
-			{
-				interp_delta = 5;
-				double[] xxx = new double[xdata.Length];
-				double[] yyy = new double[ydata.Length];
-				for (int i = 0; i < xdata.Length; i++)
-					xxx[i] = (double)(xdata[i]);
-				for (int i = 0; i < ydata.Length; i++)
-					yyy[i] = (double)(ydata[i]);
-
-				SUBIMAGE_radplot = JPMath.Interpolate2d(xxx, yyy, SUBIMAGE_radplot, interp_delta, interp_delta, out XSUBRANGE_radplot, out YSUBRANGE_radplot, true);
+				int interp_delta = 5;
+				interp_Rdata = JPMath.Interpolate2d(xdata_dbl, ydata_dbl, interp_Rdata, interp_delta, interp_delta, out xdata_dbl, out ydata_dbl, true);
 			}
 
 			ArrayList distances_LIST = new ArrayList();
 			ArrayList values_LIST = new ArrayList();
-			double SUBIMAGE_HWX_sq = (double)(SUBIMAGE_HWX * SUBIMAGE_HWX);
+			double Rdata_HW_sq = (double)(Rdata_HW * Rdata_HW);
+			double X0 = (double)xdata[Rdata_HW];
+			double Y0 = (double)ydata[Rdata_HW];
 
-			for (int x = 0; x < XSUBRANGE_radplot.Length; x++)
+			for (int x = 0; x < xdata_dbl.Length; x++)
 			{
-				double dx_sq = (XSUBRANGE_radplot[x] - X0);
+				double dx_sq = (xdata_dbl[x] - X0);
 				dx_sq *= dx_sq;
-				for (int y = 0; y < YSUBRANGE_radplot.Length; y++)
+				for (int y = 0; y < ydata_dbl.Length; y++)
 				{
-					double dy = YSUBRANGE_radplot[y] - Y0;
+					double dy = ydata_dbl[y] - Y0;
 					double d_sq = dx_sq + dy * dy;
-					if (d_sq > SUBIMAGE_HWX_sq)
+					if (d_sq > Rdata_HW_sq)
 						continue;
 
 					distances_LIST.Add(d_sq);
-					values_LIST.Add(SUBIMAGE_radplot[x, y]);
+					values_LIST.Add(interp_Rdata[x, y]);
 				}
 			}
 
@@ -2189,19 +2211,17 @@ namespace JPFITS
 				i += dcounter - 1;
 			}
 
-			double[] r_binned = new double[r_binnedlist.Count];
-			double[] v_binned = new double[r_binnedlist.Count];
-			for (int q = 0; q < r_binned.Length; q++)
-			{
-				r_binned[q] = Math.Sqrt((double)r_binnedlist[q]);
-				v_binned[q] = (double)v_binnedlist[q];
-			}
-			if (axisscale != 0 && axisscale != 1 && axisscale > 0)
-				for (int q = 0; q < r_binned.Length; q++)
-					r_binned[q] *= axisscale;
+			if (axis_scale == 0)
+				axis_scale = 1;
 
-			radial_x = r_binned;
-			radial_y = v_binned;
+			radial_x = new double[r_binnedlist.Count];
+			radial_y = new double[r_binnedlist.Count];
+
+			for (int q = 0; q < radial_x.Length; q++)
+			{
+				radial_x[q] = Math.Sqrt((double)r_binnedlist[q]) * axis_scale;
+				radial_y[q] = (double)v_binnedlist[q];
+			}
 		}
 
 		public static double QuadFit3PtsCenterPos(double[] x, double[] y)
@@ -2246,10 +2266,10 @@ namespace JPFITS
 		/// <param name="kernelsize">For simple or linear must be an integer; for centered must be an odd integer; for expoenential must be greater than zero and less than or equal to 1.</param>
 		/// <param name="do_parallel">Optionally perform array operations in parallel. False when parallelizing upstream.</param>
 		/// <param name="method">The mathematical method to use for smoothing:
-		/// <para> &quot;simple&quot; - simple moving average</para>
-		/// <para> &quot;centered&quot; - centered moving average</para>
-		/// <para> &quot;linear&quot; - linear regresion moving average</para>
-		/// <para> &quot;exponential&quot; - exponential moving average</para></param>
+		/// <br /> &quot;simple&quot; - simple moving average
+		/// <br /> &quot;centered&quot; - centered moving average
+		/// <br /> &quot;linear&quot; - linear regresion moving average
+		/// <br /> &quot;exponential&quot; - exponential moving average</param>
 		public static double[] Smooth(double[] data, double kernelsize, bool do_parallel, string method)
 		{
 			double[] result = new double[data.Length];
@@ -2343,11 +2363,11 @@ namespace JPFITS
 		/// <param name="ydata">The y-values of the data to interpolate.</param>
 		/// <param name="xinterp">The x-positions at which to interpolate y-values.</param>
 		/// <param name="style">The type of interpolation to compute:
-		/// <para> &quot;linear&quot; - linear interpolation</para>
-		/// <para> &quot;cubic&quot;  - cubic spline interpolation</para>
-		/// <para> &quot;mono&quot;   - monotone cubic spline which preserves monoticity of the data</para>
-		/// <para> &quot;catmullrom&quot;   - default Catmull-Rom spline</para>
-		/// <para> &quot;akima&quot;  - Akima is a cubic spline which is stable to the outliers, avoiding the oscillations of a cubic spline</para></param>
+		/// <br /> &quot;linear&quot; - linear interpolation
+		/// <br /> &quot;cubic&quot;  - cubic spline interpolation
+		/// <br /> &quot;mono&quot;   - monotone cubic spline which preserves monoticity of the data
+		/// <br /> &quot;catmullrom&quot;   - default Catmull-Rom spline
+		/// <br /> &quot;akima&quot;  - Akima is a cubic spline which is stable to the outliers, avoiding the oscillations of a cubic spline</param>
 		public static double[] Interpolate1d(double[] xdata, double[] ydata, double[] xinterp, string style, bool do_parallel)
 		{
 			double[] result = new double[xinterp.Length];
@@ -2468,15 +2488,15 @@ namespace JPFITS
 		}
 
 		/// <summary>Calculates a single point of a 2-d Gaussian surface G(x,y|p)
-		/// <para>G(x,y|p) = p(0)*exp(-((x-p(1))^2 + (y - p(2))^2)/(2*p(3)^2)) + p(4)</para>
-		/// <para>or</para>
-		/// <para>G(x,y|p) = p(0)*exp(-((x-p(1))*cos(p(3)) + (y-p(2))*sin(p(3)))^2 / (2*p(4)^2) - (-(x-p(1))*sin(p(3)) + (y-p(2))*cos(p(3))).^2 / (2*p(5)^2) ) + p(6)</para>
-		/// <para>where x[0] is a position on X-axis x, and x[1] is a position on Y-axis y.</para>
-		/// <para>The form of G(x,y|p) used is determined by the length of the parmater vector p</para></summary>
+		/// <br />G(x,y|p) = p(0)*exp(-((x-p(1))^2 + (y - p(2))^2)/(2*p(3)^2)) + p(4)
+		/// <br />or
+		/// <br />G(x,y|p) = p(0)*exp(-((x-p(1))*cos(p(3)) + (y-p(2))*sin(p(3)))^2 / (2*p(4)^2) - (-(x-p(1))*sin(p(3)) + (y-p(2))*cos(p(3))).^2 / (2*p(5)^2) ) + p(6)
+		/// <br />where x[0] is a position on X-axis x, and x[1] is a position on Y-axis y.
+		/// <br />The form of G(x,y|p) used is determined by the length of the parmater vector p</summary>
 		/// <param name="p">The initial parameters of the Gaussian fit.  Options are:
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias</para>
-		/// <para>or</para>
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias</para></param>
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias
+		/// <br />or
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias</param>
 		/// <param name="x">The x,y position to calculate the value val of the Gaussian G(x,y|p): x[0] = x, x[1] = y</param>
 		/// <param name="val">The calculated value of the Gaussian.</param>
 		/// <param name="obj">obj.</param>
@@ -4018,15 +4038,15 @@ namespace JPFITS
 		}
 
 		/// <summary>Calculates a single point of a 2-d Moffat surface M(x,y|p)
-		/// <para>M(x,y|p) = p(0) * ( 1 + { (x-p(1))^2 + (y-p(2))^2 } / p(3)^2 ) ^ (-p(4)) + p(5)</para>
-		/// <para>or</para>
-		/// <para>M(x,y|p) = p(0) * ( 1 + { ((x-p(1))*cos(p(3)) + (y-p(2))*sin(p(3)))^2 } / p(4)^2 + { (-(x-p(1))*sin(p(3)) + (y-p(2))*cos(p(3)))^2 } / p(5)^2 ) ^ (-p(6)) + p(7)</para>
-		/// <para>where x[0] is a position on X-axis x, and x[1] is a position on Y-axis y.</para>
-		/// <para>The form of M(x,y|p) used is determined by the length of the parmater vector "p"</para></summary>
+		/// <br />M(x,y|p) = p(0) * ( 1 + { (x-p(1))^2 + (y-p(2))^2 } / p(3)^2 ) ^ (-p(4)) + p(5)
+		/// <br />or
+		/// <br />M(x,y|p) = p(0) * ( 1 + { ((x-p(1))*cos(p(3)) + (y-p(2))*sin(p(3)))^2 } / p(4)^2 + { (-(x-p(1))*sin(p(3)) + (y-p(2))*cos(p(3)))^2 } / p(5)^2 ) ^ (-p(6)) + p(7)
+		/// <br />where x[0] is a position on X-axis x, and x[1] is a position on Y-axis y.
+		/// <br />The form of M(x,y|p) used is determined by the length of the parmater vector "p"</summary>
 		/// <param name="p">The initial parameters of the Moffat fit.  Options are:
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias</para>
-		/// <para>or</para>
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias</para></param>
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias
+		/// <br />or
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias</param>
 		/// <param name="x">The x,y position to calculate the value val of the Moffat M(x,y|p): x[0] = x, x[1] = y</param>
 		/// <param name="val">The calculated value of the Moffat.</param>
 		/// <param name="obj">obj.</param>
@@ -4356,7 +4376,7 @@ namespace JPFITS
 		#region FIND AND REPLACE
 
 		/// <summary>Returns an array with the indeces at which the 2D data array satisfies the matching style for the given value.
-		/// <para>The return array is an n x 2 array giving the row [n, 0] and column [n, 1] indices of the match.</para></summary>
+		/// <br />The return array is an n x 2 array giving the row [n, 0] and column [n, 1] indices of the match.</summary>
 		/// <param name="data">The data array to check for matches.</param>
 		/// <param name="val">The value with which to check for a match in the data array.</param>
 		/// <param name="style">The matching style can be &lt;, &lt;=, ==, &gt;=, &gt;, !=.</param>
@@ -5223,6 +5243,74 @@ namespace JPFITS
 
 		#region ARRAY OPERATIONS
 
+		/// <summary>Identifies and removes hot pixels from an image. The algorithm is not a simple find and replace, but assesses whether a pixel is part of a source<br />
+		/// with legitimate high values or is a solitary or paired high value which is simply hot.</summary>
+		/// <param name="image">An image array with hot pixels.</param>
+		/// <param name="countThreshold">The pixel value above which a pixel might be considered to be hot.</param>
+		/// <param name="Nhot">The maximum number of hot pixels in a hot pixel cluster. Recommend 1, 2, sometimes 3 if hot pixels cluster in 3's.</param>
+		/// <param name="doParallel">Perform array scan with parallelism.</param>
+		public static double[,] DeSpeckle(double[,] image, double countThreshold, int Nhot, bool doParallel)
+		{
+			ParallelOptions opts = new ParallelOptions();
+			if (doParallel)
+				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
+			else
+				opts.MaxDegreeOfParallelism = 1;
+
+			/*if (countThreshold == 0)
+				countThreshold = image.Median + image.Std * 8;*/
+
+			double[,] result = new double[image.GetLength(0), image.GetLength(1)];
+			for (int y = 0; y < image.GetLength(1); y++)
+			{
+				result[0, y] = image[0, y];
+				result[image.GetLength(0) - 1, y] = image[image.GetLength(0) - 1, y];
+			}
+			for (int x = 0; x < image.GetLength(0); x++)
+			{
+				result[x, 0] = image[x, 0];
+				result[x, image.GetLength(1) - 1] = image[x, image.GetLength(1) - 1];
+			}
+
+			//for (int y = 1; y < image.Height - 1; y++)
+			Parallel.For(1, image.GetLength(1) - 1, opts, y =>
+			{
+				int npix = 0;
+				for (int x = 1; x < image.GetLength(0) - 1; x++)
+				{
+					result[x, y] = image[x, y];
+					npix = 0;
+
+					if (image[x, y] > countThreshold)
+					{
+						npix++;
+
+						if (image[x - 1, y] > countThreshold)
+							npix++;
+						if (image[x + 1, y] > countThreshold)
+							npix++;
+						if (image[x - 1, y - 1] > countThreshold)
+							npix++;
+						if (image[x, y - 1] > countThreshold)
+							npix++;
+						if (image[x + 1, y - 1] > countThreshold)
+							npix++;
+						if (image[x - 1, y + 1] > countThreshold)
+							npix++;
+						if (image[x, y + 1] > countThreshold)
+							npix++;
+						if (image[x + 1, y + 1] > countThreshold)
+							npix++;
+
+						if (npix <= Nhot)
+							result[x, y] = JPMath.Median(new double[8] { image[x - 1, y], image[x + 1, y], image[x - 1, y - 1], image[x, y - 1], image[x + 1, y - 1], image[x - 1, y + 1], image[x, y + 1], image[x + 1, y + 1] });
+					}
+				}
+			});
+
+			return result;
+		}
+
 		/// <summary>Determines the cross correlation lags between two images using the image-reduction-to-vector method.</summary>
 		/// <param name="reference">The reference data array against which to create the cross correlation.</param>
 		/// <param name="COMPARISON">The comparison data array with which to create the cross correlation.</param>
@@ -5259,35 +5347,32 @@ namespace JPFITS
 			double[] Vref = Sum(refref, 0, do_parallel);
 			double[] HCOM = Sum(COMCOM, 1, do_parallel);
 			double[] VCOM = Sum(COMCOM, 0, do_parallel);
-			double meanref = Mean(Href, do_parallel);
-			double meanCOM = Mean(HCOM, do_parallel);
+			double meanref = Median(Href);
+			double meanCOM = Median(HCOM);
 			Href = VectorSubScalar(Href, meanref, do_parallel);
 			Vref = VectorSubScalar(Vref, meanref, do_parallel);
 			HCOM = VectorSubScalar(HCOM, meanCOM, do_parallel);
 			VCOM = VectorSubScalar(VCOM, meanCOM, do_parallel);
 
-			int[] Hcorr_Lag;
-			int[] Vcorr_Lag;
+			double[] Hcorr_Lag;
+            double[] Vcorr_Lag;
 			double[] Hcorr_Amp = XCorr(Href, HCOM, out Hcorr_Lag, do_parallel);
 			double[] Vcorr_Amp = XCorr(Vref, VCOM, out Vcorr_Lag, do_parallel);
 
 			int maxHAmpindex;
 			double maxH = Max(Hcorr_Amp, out maxHAmpindex, do_parallel);
-			int xmax = Hcorr_Lag[maxHAmpindex];
+			double xmax = Hcorr_Lag[maxHAmpindex];
 			int maxVAmpindex;
 			double maxV = Max(Vcorr_Amp, out maxVAmpindex, do_parallel);
-			int ymax = Vcorr_Lag[maxVAmpindex];
+			double ymax = Vcorr_Lag[maxVAmpindex];
 
 			double[] Hx = new double[3] { (double)(xmax - 1), (double)(xmax), (double)(xmax + 1) };
 			double[] Hy = new double[3] { Hcorr_Amp[maxHAmpindex - 1], Hcorr_Amp[maxHAmpindex], Hcorr_Amp[maxHAmpindex + 1] };
 			double[] Vx = new double[3] { (double)(ymax - 1), (double)(ymax), (double)(ymax + 1) };
 			double[] Vy = new double[3] { Vcorr_Amp[maxVAmpindex - 1], Vcorr_Amp[maxVAmpindex], Vcorr_Amp[maxVAmpindex + 1] };
 
-			//double[] shift = new double[2);//return value, x,y
 			xshift = QuadFit3PtsCenterPos(Hx, Hy);
 			yshift = QuadFit3PtsCenterPos(Vx, Vy);
-
-			//return shift;
 		}
 
 		/// <summary>Determines the cross correlation lags between two images using the image-reduction-to-vector method where the reference image has already been reduced to X and Y vectors.</summary>
@@ -5296,9 +5381,9 @@ namespace JPFITS
 		/// <param name="COMPARISON">The comparison data array with which to create the cross correlation.</param>
 		/// <param name="autoDeBias_COMX">Option to automatically de-gradient the comparison image along the x-dimension (horizontal degradient).</param>
 		/// <param name="autoDeBias_COMY">Option to automatically de-gradient the comparison image along the y-dimension (vertical degradient).</param>
-		/// <param name="xshift">The sub-integer x-shift of the comparison with respect to the reference, passed by reference.</param>
-		/// <param name="yshift">The sub-integer y-shift of the comparison with respect to the reference, passed by reference.</param>
-		/// <param name="do_parallel">Optionally perform all array operations in parallel. False when parallelizing upstream.</param>
+		/// <param name="xshift">The x-shift of the comparison with respect to the reference.</param>
+		/// <param name="yshift">The y-shift of the comparison with respect to the reference.</param>
+		/// <param name="do_parallel">Optionally perform all array operations in parallel.</param>
 		public static void XCorrImageLagShifts(double[] referenceX, double[] referenceY, double[,] COMPARISON, bool autoDeBias_COMX, bool autoDeBias_COMY, bool autoHanning_COM, out double xshift, out double yshift, bool do_parallel)
 		{
 			double[,] COMCOM = new double[COMPARISON.GetLength(0), COMPARISON.GetLength(1)];
@@ -5313,33 +5398,37 @@ namespace JPFITS
 
 			double[] HCOM = Sum(COMCOM, 1, do_parallel);
 			double[] VCOM = Sum(COMCOM, 0, do_parallel);
-			double meanCOM = Mean(HCOM, do_parallel);
-			HCOM = VectorSubScalar(HCOM, meanCOM, do_parallel);
-			VCOM = VectorSubScalar(VCOM, meanCOM, do_parallel);
+			double meanCOM = Median(HCOM);
+			HCOM = VectorSubScalar(HCOM, meanCOM, false);
+			VCOM = VectorSubScalar(VCOM, meanCOM, false);
 
-			int[] Hcorr_Lag;
+			double[] Hcorr_Lag;
 			double[] Hcorr_Amp = XCorr(referenceX, HCOM, out Hcorr_Lag, do_parallel);
 			int maxHAmpindex = 0;
-			double maxH = Max(Hcorr_Amp, out maxHAmpindex, do_parallel);
-			int xmax = Hcorr_Lag[maxHAmpindex];
+			double maxH = Max(Hcorr_Amp, out maxHAmpindex, false);
+			double xmax = Hcorr_Lag[maxHAmpindex];
 
-			int[] Vcorr_Lag;
+			double[] Vcorr_Lag;
 			double[] Vcorr_Amp = XCorr(referenceY, VCOM, out Vcorr_Lag, do_parallel);
 			int maxVAmpindex = 0;
-			double maxV = Max(Vcorr_Amp, out maxVAmpindex, do_parallel);
-			int ymax = Vcorr_Lag[maxVAmpindex];
+			double maxV = Max(Vcorr_Amp, out maxVAmpindex, false);
+			double ymax = Vcorr_Lag[maxVAmpindex];
 
 			double[] Hx = new double[3] { (double)(xmax - 1), (double)(xmax), (double)(xmax + 1) };
 			double[] Hy = new double[3] { Hcorr_Amp[maxHAmpindex - 1], Hcorr_Amp[maxHAmpindex], Hcorr_Amp[maxHAmpindex + 1] };
 			double[] Vx = new double[3] { (double)(ymax - 1), (double)(ymax), (double)(ymax + 1) };
 			double[] Vy = new double[3] { Vcorr_Amp[maxVAmpindex - 1], Vcorr_Amp[maxVAmpindex], Vcorr_Amp[maxVAmpindex + 1] };
 
-			//double[] shift = new double[2);//return value, x,y
 			xshift = QuadFit3PtsCenterPos(Hx, Hy);
 			yshift = QuadFit3PtsCenterPos(Vx, Vy);
 
-			//return shift;
-		}
+			//MessageBox.Show(xshift + " " + xmax);
+			//MessageBox.Show(yshift + " " + ymax);
+
+			//Plotter plot = new Plotter();
+			//plot.jpChart1.PlotXYData(Hcorr_Lag, Hcorr_Amp, "t", "t", "t", System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine, "t");
+			//plot.ShowDialog();
+        }
 
 		/// <summary>Returns the 2-D array with gradients removed from a specified dimension.</summary>
 		/// <param name="data">The data array to degradient.</param>
@@ -5487,13 +5576,13 @@ namespace JPFITS
 		[MethodImpl(256)]
 		public static double InterpolateBiLinear(double[,] data, int width, int height, double x, double y)
 		{
-			int xoldfloor = (int)Math.Floor(x);
-			int yoldfloor = (int)Math.Floor(y);
+			int xoldfloor = (int)(x);
+			int yoldfloor = (int)(y);
 			if (xoldfloor < 0 || yoldfloor < 0)
 				return 0;
 
-			int xoldciel = (int)Math.Ceiling(x);
-			int yoldciel = (int)Math.Ceiling(y);
+			int xoldciel = (int)(x + 1);
+			int yoldciel = (int)(y + 1);
 			if (xoldciel >= width || yoldciel >= height)
 				return 0;
 
@@ -5570,15 +5659,18 @@ namespace JPFITS
 		/// <summary>Rotates an array about its center.</summary>
 		/// <param name="data">The array to rotate.</param>
 		/// <param name="radians">The angle to rotate the array, positive counter-clockwise.</param>
-		/// <param name="x_center">The rotation center on the x-axis to rotate the array about. Pass Double.MaxValue for array center.</param>
-		/// <param name="y_center">The rotation center on the y-axis to rotate the array about. Pass Double.MaxValue for array center.</param>
-		/// <param name="style">&quot;nearest&quot; - nearest-neighbor pixel, or, &quot;bilinear&quot; - for 2x2 interpolation, or, &quot;lanc_n&quot; - for Lanczos interpolation of order n = 3, 4, 5.</param>
-		public static double[,] RotateShiftArray(double[,] data, double radians, double x_center, double y_center, string style, int xshift, int yshift, bool do_parallel)
+		/// <param name="x_center">The zero-based rotation center on the x-axis to rotate the array about. Pass Double.MaxValue for array center.</param>
+		/// <param name="y_center">The zero-based rotation center on the y-axis to rotate the array about. Pass Double.MaxValue for array center.</param>
+		/// <param name="interp_style">&quot;nearest&quot; nearest neighbor pixel<br />&quot;bilinear&quot; 2x2 bilinear interpolation<br />&quot;lanc_n&quot; Lanczos interpolation of order n = 3, 4, 5</param>
+		/// <param name="xshift">The amount to shift the image on the x-axis.</param>
+		/// <param name="yshift">The amount to shift the image on the y-axis.</param>
+		/// <param name="do_parallel">Perform operation with parallelism.</param>
+		public static double[,] RotateShiftArray(double[,] data, double radians, double x_center, double y_center, string interp_style, double xshift, double yshift, bool do_parallel)
 		{
 			int width = data.GetLength(0);
 			int height = data.GetLength(1);
-			double xmid = (double)(width) / 2;
-			double ymid = (double)(height) / 2;
+			double xmid = (double)(width / 2 - 1);//zero based
+			double ymid = (double)(height / 2 - 1);//zero based
 			if (x_center != Double.MaxValue)
 				xmid = x_center;
 			if (y_center != Double.MaxValue)
@@ -5590,38 +5682,50 @@ namespace JPFITS
 			else
 				opts.MaxDegreeOfParallelism = 1;
 
-			if (style.ToLower() == "nearest")
+            double cosrad = Math.Cos(radians), sinrad = Math.Sin(radians);
+			double MyshiftMymid = -yshift - ymid;
+			double MxshiftMxmid = -xshift - xmid;
+
+            if (interp_style.ToLower() == "nearest")
 			{
 				Parallel.For(0, width, opts, x =>
 				{
 					int xold, yold;
-					for (int y = 0; y < height; y++)
+					double xMxmidPxshift = (double)x + MxshiftMxmid;
+					double yPyshiftMymid;
+
+                    for (int y = 0; y < height; y++)
 					{
-						xold = (int)Math.Round(((double)x - xmid - (double)xshift) * Math.Cos(radians) - ((double)y - ymid - (double)yshift) * Math.Sin(radians) + xmid);
-						yold = (int)Math.Round(((double)x - xmid - (double)xshift) * Math.Sin(radians) + ((double)y - ymid - (double)yshift) * Math.Cos(radians) + ymid);
+						yPyshiftMymid = (double)y + MyshiftMymid;
+                        xold = (int)Math.Round(xMxmidPxshift * cosrad - yPyshiftMymid * sinrad + xmid);
+						yold = (int)Math.Round(xMxmidPxshift * sinrad + yPyshiftMymid * cosrad + ymid);
 						if (xold >= 0 && xold < width && yold >= 0 && yold < height)
 							arr[x, y] = data[xold, yold];
 					}
 				});
 			}
 
-			if (style.ToLower() == "bilinear")
+			if (interp_style.ToLower() == "bilinear")
 			{
 				Parallel.For(0, width, opts, x =>
 				{
 					double xold, yold;
-					for (int y = 0; y < height; y++)
+                    double xMxmidPxshift = (double)x + MxshiftMxmid;
+                    double yPyshiftMymid;
+
+                    for (int y = 0; y < height; y++)
 					{
-						xold = ((double)x - xmid - (double)xshift) * Math.Cos(radians) - ((double)y - ymid - (double)yshift) * Math.Sin(radians) + xmid;
-						yold = ((double)x - xmid - (double)xshift) * Math.Sin(radians) + ((double)y - ymid - (double)yshift) * Math.Cos(radians) + ymid;
+                        yPyshiftMymid = (double)y + MyshiftMymid;
+                        xold = xMxmidPxshift * cosrad - yPyshiftMymid * sinrad + xmid;
+						yold = xMxmidPxshift * sinrad + yPyshiftMymid * cosrad + ymid;
 						arr[x, y] = InterpolateBiLinear(data, width, height, xold, yold);
 					}
 				});
 			}
 
-			if (style.Contains("lanc"))
+			if (interp_style.Contains("lanc"))
 			{
-				string sn = style.Substring(style.Length - 1);
+				string sn = interp_style.Substring(interp_style.Length - 1);
 				if (!JPMath.IsNumeric(sn))
 					throw new Exception("Lanczos order " + sn + " indeterminable. ");
 				int n = Convert.ToInt32(sn);
@@ -5631,10 +5735,14 @@ namespace JPFITS
 				Parallel.For(0, width, opts, x =>
 				{
 					double xold, yold;
-					for (int y = n; y < height - n; y++)
+                    double xMxmidPxshift = (double)x + MxshiftMxmid;
+                    double yPyshiftMymid;
+
+                    for (int y = n; y < height - n; y++)
 					{
-						xold = ((double)x - xmid - (double)xshift) * Math.Cos(radians) - ((double)y - ymid - (double)yshift) * Math.Sin(radians) + xmid;
-						yold = ((double)x - xmid - (double)xshift) * Math.Sin(radians) + ((double)y - ymid - (double)yshift) * Math.Cos(radians) + ymid;
+                        yPyshiftMymid = (double)y + MyshiftMymid;
+                        xold = xMxmidPxshift * cosrad - yPyshiftMymid * sinrad + xmid;
+						yold = xMxmidPxshift * sinrad + yPyshiftMymid * cosrad + ymid;
 						arr[x, y] = InterpolateLanczos(data, width, height, xold, yold, n);
 					}
 				});
@@ -5664,16 +5772,19 @@ namespace JPFITS
 				return result.Sum();
 		}
 
-		/// <summary>Returns the cross correlation of two equal-length vectors and its lag shifts.</summary>
+		/// <summary>Returns the cross correlation of two equal-length vectors and its lags.</summary>
 		/// <param name="reference">The reference data array against which to create the cross correlation.</param>
 		/// <param name="relative">The comparison data array with which to create the cross correlation.</param>
 		/// <param name="lags">An array passed (arrays pass by reference) to populate the cross correlation lags.</param>
-		public static double[] XCorr(double[] reference, double[] relative, out int[] lags, bool do_parallel)
+		public static double[] XCorr(double[] reference, double[] relative, out double[] lags, bool do_parallel)
 		{
+			if (reference.Length != relative.Length)
+				throw new Exception("Error in JPMath.XCorr, \"reference\" and \"relative\" must be equal length.");
+
 			int L = reference.Length;
 			int xcl = 2 * L - 1;
 			double[] result = new double[2 * L - 1];
-			int[] loclags = new int[2 * L - 1];
+			double[] loclags = new double[2 * L - 1];
 
 			ParallelOptions opts = new ParallelOptions();
 			if (do_parallel)
@@ -5693,11 +5804,51 @@ namespace JPFITS
 				loclags[i] = -L + 1 + i;
 			});
 
-			lags = new int[2 * L - 1];
+			lags = new double[2 * L - 1];
 			loclags.CopyTo(lags, 0);
 			return result;
 		}
 
+		/// <summary>Returns the cross correlation of two equal-length vectors and its lags over a range of lags centered on zero lag. Only the lag range is returned.</summary>
+		/// <param name="reference">The reference data array against which to create the cross correlation.</param>
+		/// <param name="relative">The comparison data array with which to create the cross correlation. Must be equal in length to the reference array.</param>
+		/// <param name="lags">An array passed (arrays pass by reference) to populate the cross correlation lags. Only the +- lang range is returned.</param>
+		/// <param name="maxlag">The +- maximum lag displacement between the vectors. Only the +- lag range is returned. 0 returns the dot product of the vectors. Must be positive or zero and smaller than the length of the input vectors.</param>
+		public static double[] XCorr(double[] reference, double[] relative, out double[] lags, int maxlag)
+		{
+			if (maxlag < 0)
+				throw new Exception("Error in JPMath.XCorr, \"maxlag\" cannot be less than zero.");
+			if (maxlag >= reference.Length)
+				throw new Exception("Error in JPMath.XCorr, \"maxlag\" cannot be greater than or equal to the length of the input vectors.");
+			if (reference.Length != relative.Length)
+				throw new Exception("Error in JPMath.XCorr, \"reference\" and \"relative\" must be equal length.");
+
+			int L = reference.Length;
+			int xcm = L - 1;
+			double[] result = new double[2 * maxlag + 1];
+			lags = new double[2 * maxlag + 1];
+
+			for (int i = xcm - maxlag; i <= xcm + maxlag; i++)
+			{
+				if (i < L)
+					for (int j = 0; j < i + 1; j++)
+						result[i - xcm + maxlag] += reference[L - 1 - i + j] * relative[j];
+				else
+					for (int j = 0; j < 2 * L - i - 1; j++)
+						result[i - xcm + maxlag] += reference[j] * relative[i - L + j + 1];
+
+				lags[i - xcm + maxlag] = -L + 1 + i;
+			}
+
+			return result;
+		}
+
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="data"></param>
+		/// <param name="Nx"></param>
+		/// <returns></returns>
 		public static double[] Bin(double[] data, int Nx)
 		{
 			if (Nx > data.GetLength(0))
@@ -5819,17 +5970,26 @@ namespace JPFITS
 			Parallel.For(0, width, opts, x =>
 			{
 				for (int y = 0; y < height; y++)
-					result[x, y] = data[x + cropping[0] - 1, y + cropping[2] - 1];
+					result[x, y] = data[x + cropping[0], y + cropping[2]];
 			});
 
 			return result;
 		}
 
+		/// <summary>
+		/// Excise a vertical or horizontal strip from an array.
+		/// </summary>
+		/// <param name="data">The array.</param>
+		/// <param name="column">True if a column is to be excised, false if a row.</param>
+		/// <param name="X0">The coordinate of the center of the strip to be excised.</param>
+		/// <param name="halfWidth">A strip +- the halfWidth will be excised.</param>
+		/// <param name="do_parallel">Perform operation with parallelism over the array operations.</param>
 		public static double[,] Excise(double[,] data, bool column, int X0, int halfWidth, bool do_parallel)
 		{
 			double[,] result;
 			int[] xrange;
 			int[] yrange;
+			int hwt2p1 = halfWidth * 2 + 1;
 
 			if (column)
 			{
@@ -5843,11 +6003,11 @@ namespace JPFITS
 					if (i < X0 - halfWidth)
 						xrange[i] = i;
 					else if (i > X0 + halfWidth)
-						xrange[i - (halfWidth * 2 + 1)] = i;
+						xrange[i - hwt2p1] = i;
 			}
 			else
 			{
-				result = new double[data.GetLength(0), data.GetLength(1) - (halfWidth * 2 + 1)];
+				result = new double[data.GetLength(0), data.GetLength(1) - hwt2p1];
 				xrange = new int[result.GetLength(0)];
 				for (int i = 0; i < xrange.Length; i++)
 					xrange[i] = i;
@@ -5857,7 +6017,7 @@ namespace JPFITS
 					if (i < X0 - halfWidth)
 						yrange[i] = i;
 					else if (i > X0 + halfWidth)
-						yrange[i - (halfWidth * 2 + 1)] = i;
+						yrange[i - hwt2p1] = i;
 			}
 
 			ParallelOptions opts = new ParallelOptions();
@@ -5916,20 +6076,29 @@ namespace JPFITS
 
 		#region ARRAY STATISTICS
 
+		public static long Product(int[] data)
+		{
+			long product = 1;
+			for (int i = 0; i < data.Length; i++)
+				product *= data[i];
+			
+			return product;
+		}
+
 		/// <summary>Returns the sum over all elements in the data array.</summary>
 		/// <param name="vectorOrArray">A vecor or 2-D array.</param>
-		public static double Sum(object vectorOrArray, bool do_parallel)
+		public static double Sum(Array vectorOrArray, bool do_parallel)
 		{
-			TypeCode type = Type.GetTypeCode((((Array)vectorOrArray).GetType()).GetElementType());
-			int rank = ((Array)vectorOrArray).Rank;
+			TypeCode type = Type.GetTypeCode((vectorOrArray.GetType()).GetElementType());
+			int rank = vectorOrArray.Rank;
 			double res = 0;
 			int naxis0 = -1, naxis1 = -1;
 			if (rank == 1)
-				naxis0 = ((Array)vectorOrArray).Length;
+				naxis0 = vectorOrArray.Length;
 			else
 			{
-				naxis0 = ((Array)vectorOrArray).GetLength(0);
-				naxis1 = ((Array)vectorOrArray).GetLength(1);
+				naxis0 = vectorOrArray.GetLength(0);
+				naxis1 = vectorOrArray.GetLength(1);
 			}
 
 			object locker = new object();
@@ -5979,7 +6148,7 @@ namespace JPFITS
 						{
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
-								sum += (double)((float[])vectorOrArray)[x];
+								sum += ((float[])vectorOrArray)[x];
 
 							lock (locker)
 							{
@@ -5992,7 +6161,7 @@ namespace JPFITS
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
 								for (int y = 0; y < naxis1; y++)
-									sum += (double)((float[,])vectorOrArray)[x, y];
+									sum += ((float[,])vectorOrArray)[x, y];
 
 							lock (locker)
 							{
@@ -6009,7 +6178,7 @@ namespace JPFITS
 						{
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
-								sum += (double)((ulong[])vectorOrArray)[x];
+								sum += ((ulong[])vectorOrArray)[x];
 
 							lock (locker)
 							{
@@ -6022,7 +6191,7 @@ namespace JPFITS
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
 								for (int y = 0; y < naxis1; y++)
-									sum += (double)((ulong[,])vectorOrArray)[x, y];
+									sum += ((ulong[,])vectorOrArray)[x, y];
 
 							lock (locker)
 							{
@@ -6039,7 +6208,7 @@ namespace JPFITS
 						{
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
-								sum += (double)((long[])vectorOrArray)[x];
+								sum += ((long[])vectorOrArray)[x];
 
 							lock (locker)
 							{
@@ -6052,7 +6221,7 @@ namespace JPFITS
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
 								for (int y = 0; y < naxis1; y++)
-									sum += (double)((long[,])vectorOrArray)[x, y];
+									sum += ((long[,])vectorOrArray)[x, y];
 
 							lock (locker)
 							{
@@ -6069,7 +6238,7 @@ namespace JPFITS
 						{
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
-								sum += (double)((uint[])vectorOrArray)[x];
+								sum += ((uint[])vectorOrArray)[x];
 
 							lock (locker)
 							{
@@ -6082,7 +6251,7 @@ namespace JPFITS
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
 								for (int y = 0; y < naxis1; y++)
-									sum += (double)((uint[,])vectorOrArray)[x, y];
+									sum += ((uint[,])vectorOrArray)[x, y];
 
 							lock (locker)
 							{
@@ -6099,7 +6268,7 @@ namespace JPFITS
 						{
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
-								sum += (double)((int[])vectorOrArray)[x];
+								sum += ((int[])vectorOrArray)[x];
 
 							lock (locker)
 							{
@@ -6112,7 +6281,7 @@ namespace JPFITS
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
 								for (int y = 0; y < naxis1; y++)
-									sum += (double)((int[,])vectorOrArray)[x, y];
+									sum += ((int[,])vectorOrArray)[x, y];
 
 							lock (locker)
 							{
@@ -6129,7 +6298,7 @@ namespace JPFITS
 						{
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
-								sum += (double)((ushort[])vectorOrArray)[x];
+								sum += ((ushort[])vectorOrArray)[x];
 
 							lock (locker)
 							{
@@ -6142,7 +6311,7 @@ namespace JPFITS
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
 								for (int y = 0; y < naxis1; y++)
-									sum += (double)((ushort[,])vectorOrArray)[x, y];
+									sum += ((ushort[,])vectorOrArray)[x, y];
 
 							lock (locker)
 							{
@@ -6159,7 +6328,7 @@ namespace JPFITS
 						{
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
-								sum += (double)((short[])vectorOrArray)[x];
+								sum += ((short[])vectorOrArray)[x];
 
 							lock (locker)
 							{
@@ -6172,7 +6341,7 @@ namespace JPFITS
 							double sum = 0;
 							for (int x = range.Item1; x < range.Item2; x++)
 								for (int y = 0; y < naxis1; y++)
-									sum += (double)((short[,])vectorOrArray)[x, y];
+									sum += ((short[,])vectorOrArray)[x, y];
 
 							lock (locker)
 							{
@@ -6192,8 +6361,8 @@ namespace JPFITS
 		/// <summary>Sum a 2-D array along one dimension, resulting in a 1-D vector array.</summary>
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="dim">The dimension along which to sum.  
-		/// <para>0 (zero) sums along the horizontal axis, resulting in a vertical vector.</para>
-		/// <para>1 (one) sums along the vertical axis, resulting in a horizontal vector.</para></param>
+		/// <br />0 (zero) sums along the horizontal axis, resulting in a vertical vector.
+		/// <br />1 (one) sums along the vertical axis, resulting in a horizontal vector.</param>
 		public static double[] Sum(double[,] data, int dim, bool do_parallel)
 		{
 			int d = 1;
@@ -6201,7 +6370,6 @@ namespace JPFITS
 				d = 0;
 
 			double[] result = new double[data.GetLength(d)];
-			double S;
 
 			ParallelOptions parallel_options = new ParallelOptions();
 			if (do_parallel)
@@ -6213,7 +6381,7 @@ namespace JPFITS
 			{
 				Parallel.For(0, data.GetLength(1), parallel_options, j =>
 				{
-					S = 0;
+                    double S = 0;
 					for (int i = 0; i < data.GetLength(0); i++)
 						S += data[i, j];
 
@@ -6225,7 +6393,7 @@ namespace JPFITS
 			{
 				Parallel.For(0, data.GetLength(1), parallel_options, i =>
 				{
-					S = 0;
+                    double S = 0;
 					for (int j = 0; j < data.GetLength(1); j++)
 						S += data[i, j];
 
@@ -6239,8 +6407,8 @@ namespace JPFITS
 		/// <summary>Sum a 2-D array along one dimension, resulting in a 1-D vector array.</summary>
 		/// <param name="data">A 2-D int array.</param>
 		/// <param name="dim">The dimension along which to sum.  
-		/// <para>0 (zero) sums along the horizontal axis, resulting in a vertical vector.</para>
-		/// <para>1 (one) sums along the vertical axis, resulting in a horizontal vector.</para></param>
+		/// <br />0 (zero) sums along the horizontal axis, resulting in a vertical vector.
+		/// <br />1 (one) sums along the vertical axis, resulting in a horizontal vector.</param>
 		public static int[] Sum(int[,] data, int dim, bool do_parallel)
 		{
 			int d = 1;
@@ -6248,7 +6416,6 @@ namespace JPFITS
 				d = 0;
 
 			int[] result = new int[data.GetLength(d)];
-			int S;
 
 			ParallelOptions parallel_options = new ParallelOptions();
 			if (do_parallel)
@@ -6262,7 +6429,7 @@ namespace JPFITS
 			{
 				Parallel.For(0, data.GetLength(1), parallel_options, j =>
 				{
-					S = 0;
+                    int S = 0;
 					for (int i = 0; i < data.GetLength(0); i++)
 						S += data[i, j];
 
@@ -6274,7 +6441,7 @@ namespace JPFITS
 			{
 				Parallel.For(0, data.GetLength(1), parallel_options, i =>
 				{
-					S = 0;
+                    int S = 0;
 					for (int j = 0; j < data.GetLength(1); j++)
 						S += data[i, j];
 
@@ -6288,8 +6455,8 @@ namespace JPFITS
 		/// <summary>Average a 2-D array along one dimension, resulting in a 1-D vector array.</summary>
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="dim">The dimension along which to average.  
-		/// <para>0 (zero) averages along the horizontal axis, resulting in a vertical vector.</para>
-		/// <para>1 (one) averages along the vertical axis, resulting in a horizontal vector.</para></param>
+		/// <br />0 (zero) averages along the horizontal axis, resulting in a vertical vector.
+		/// <br />1 (one) averages along the vertical axis, resulting in a horizontal vector.</param>
 		public static double[] Mean(double[,] data, int dim, bool do_parallel)
 		{
 			int d = 1;
@@ -6298,7 +6465,6 @@ namespace JPFITS
 
 			double dimOppL = (double)data.GetLength(dim);
 			double[] result = new double[data.GetLength(d)];
-			double S;
 
 			ParallelOptions parallel_options = new ParallelOptions();
 			if (do_parallel)
@@ -6312,7 +6478,7 @@ namespace JPFITS
 			{
 				Parallel.For(0, data.GetLength(1), parallel_options, j =>
 				{
-					S = 0;
+                    double S = 0;
 					for (int i = 0; i < data.GetLength(0); i++)
 						S += data[i, j];
 
@@ -6324,7 +6490,7 @@ namespace JPFITS
 			{
 				Parallel.For(0, data.GetLength(1), parallel_options, i =>
 				{
-					S = 0;
+                    double S = 0;
 					for (int j = 0; j < data.GetLength(1); j++)
 						S += data[i, j];
 
@@ -6337,16 +6503,16 @@ namespace JPFITS
 
 		/// <summary>Returns the mean over all elements in the data array.</summary>
 		/// <param name="vectorOrArray">A vecor or 2-D array.</param>
-		public static double Mean(object vectorOrArray, bool do_parallel)
+		public static double Mean(Array vectorOrArray, bool do_parallel)
 		{
-			return Sum(vectorOrArray, do_parallel) / (double)(((Array)vectorOrArray).Length);
+			return Sum(vectorOrArray, do_parallel) / (double)((vectorOrArray).Length);
 		}
 
 		/// <summary>Average a 2D array along one dimension, resulting in a 1D vector array.</summary>
 		/// <param name="data">A 2D double array.</param>
 		/// <param name="dim">The dimension along which to average.  
-		/// <para>0 (zero) averages along the horizontal axis, resulting in a vertical vector.</para>
-		/// <para>1 (one) averages along the vertical axis, resulting in a horizontal vector.</para></param>
+		/// <br />0 (zero) averages along the horizontal axis, resulting in a vertical vector.
+		/// <br />1 (one) averages along the vertical axis, resulting in a horizontal vector.</param>
 		public static double[] Stdv(double[,] data, int dim, bool do_parallel)
 		{
 			int d = 1;
@@ -6362,14 +6528,13 @@ namespace JPFITS
 			double[] mean = JPMath.Mean(data, dim, true);
 			double diml = data.GetLength(dim) - 1.0;
 			double[] result = new double[data.GetLength(d)];
-			double std = 0;
 
 			if (dim == 0)//collapses array horizontally, i.e., makes a 'vertical' vector
 			{
 
 				Parallel.For(0, data.GetLength(1), parallel_options, j =>
 				{
-					std = 0;
+                    double std = 0;
 					for (int i = 0; i < data.GetLength(0); i++)
 						std += (data[i, j] - mean[j]) * (data[i, j] - mean[j]);
 
@@ -6381,7 +6546,7 @@ namespace JPFITS
 			{
 				Parallel.For(0, data.GetLength(1), parallel_options, i =>
 				{
-					std = 0;
+                    double std = 0;
 					for (int j = 0; j < data.GetLength(1); j++)
 						std += (data[i, j] - mean[i]) * (data[i, j] - mean[i]);
 
@@ -6393,8 +6558,8 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the minima and their indices along a given dimension of the data array.
-		/// <para> If dim = 0, the minima are row-wise.</para>
-		/// <para> If dim = 1, the minima are column-wise.</para></summary>
+		/// <br /> If dim = 0, the minima are row-wise.
+		/// <br /> If dim = 1, the minima are column-wise.</summary>
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="dim">The dimension along which to reduce to minimums:  0 is x (rows), 1 is y (columns).</param>
 		/// <param name="indices">An array passed to populate the indices at which the minima appear along the dimension.</param>
@@ -6406,7 +6571,6 @@ namespace JPFITS
 
 			double[] result = new double[data.GetLength(d)];
 			int[] locinds = new int[data.GetLength(d)];
-			double min = System.Double.MaxValue;
 
 			object locker = new object();
 			ParallelOptions opts = new ParallelOptions();
@@ -6423,7 +6587,7 @@ namespace JPFITS
 				{
 					for (int j = range.Item1; j < range.Item2; j++)
 					{
-						min = System.Double.MaxValue;
+                        double min = System.Double.MaxValue;
 						for (int i = 0; i < data.GetLength(0); i++)
 							if (data[i, j] < min)
 							{
@@ -6443,7 +6607,7 @@ namespace JPFITS
 				{
 					for (int i = range.Item1; i < range.Item2; i++)
 					{
-						min = System.Double.MaxValue;
+                        double min = System.Double.MaxValue;
 						for (int j = 0; j < data.GetLength(1); j++)
 							if (data[i, j] < min)
 							{
@@ -6656,8 +6820,8 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the maxima and their indices along a given dimension of the data array.
-		/// <para> If dim = 0, the maxima are row-wise.</para>
-		/// <para> If dim = 1, the maxima are column-wise.</para></summary>
+		/// <br /> If dim = 0, the maxima are row-wise.
+		/// <br /> If dim = 1, the maxima are column-wise.</summary>
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="dim">The dimension along which to reduce to maximums:  0 is x (rows), 1 is y (columns).</param>
 		/// <param name="indices">An array passed to populate the indices at which the maxima appear along the dimension.</param>
@@ -7746,7 +7910,7 @@ namespace JPFITS
 		/// <param name="RightAscension_deg">The right ascension in degrees.</param>
 		/// <param name="Declination_deg">The declination in degrees.</param>
 		/// <param name="returnCorrectionOnly">Return only the correction values (true), or return the Julian Dates with the correction applied (false) so that they are Barycentric values.</param>
-		public static double BarycentricJuliianDayCorrection(double julianDate, double RightAscension_deg, double Declination_deg, bool returnCorrectionOnly)
+		public static double BarycentricJulianDayCorrection(double julianDate, double RightAscension_deg, double Declination_deg, bool returnCorrectionOnly)
 		{
 			double cs = 173.14463348;// speed of light (au/d)
 			double n, g, L, lam, eps, R, X, Y, Z, BJDC;
@@ -7787,12 +7951,12 @@ namespace JPFITS
 		/// <param name="RightAscension_deg">The right ascension in degrees.</param>
 		/// <param name="Declination_deg">The declination in degrees.</param>
 		/// <param name="returnCorrectionOnly">Return only the correction values (true), or return the Julian Dates with the correction applied (false) so that they are Barycentric values.</param>
-		public static double[] BarycentricJuliianDayCorrection(double[] julianDate, double RightAscension_deg, double Declination_deg, bool returnCorrectionOnly)
+		public static double[] BarycentricJulianDayCorrection(double[] julianDate, double RightAscension_deg, double Declination_deg, bool returnCorrectionOnly)
 		{
 			double[] result = new double[julianDate.Length];
 
 			for (int i = 0; i < julianDate.Length; i++)
-				result[i] = BarycentricJuliianDayCorrection(julianDate[i], RightAscension_deg, Declination_deg, returnCorrectionOnly);
+				result[i] = BarycentricJulianDayCorrection(julianDate[i], RightAscension_deg, Declination_deg, returnCorrectionOnly);
 
 			return result;
 		}
@@ -7802,12 +7966,12 @@ namespace JPFITS
 		/// <param name="RightAscension_deg">A vector of right ascension in degrees.</param>
 		/// <param name="Declination_deg">A vector of declination in degrees.</param>
 		/// <param name="returnCorrectionOnly">Return only the correction values (true), or return the Julian Dates with the correction applied (false) so that they are Barycentric values.</param>
-		public static double[] BarycentricJuliianDayCorrection(double[] julianDate, double[] RightAscension_deg, double[] Declination_deg, bool returnCorrectionOnly)
+		public static double[] BarycentricJulianDayCorrection(double[] julianDate, double[] RightAscension_deg, double[] Declination_deg, bool returnCorrectionOnly)
 		{
 			double[] result = new double[julianDate.Length];
 
 			for (int i = 0; i < julianDate.Length; i++)
-				result[i] = BarycentricJuliianDayCorrection(julianDate[i], RightAscension_deg[i], Declination_deg[i], returnCorrectionOnly);
+				result[i] = BarycentricJulianDayCorrection(julianDate[i], RightAscension_deg[i], Declination_deg[i], returnCorrectionOnly);
 
 			return result;
 		}
@@ -7969,6 +8133,12 @@ namespace JPFITS
 				return false;
 		}
 
+		/// <summary>Returns true if a string number is an integer, false if it is not.</summary>
+		public static bool IsInteger(string x)
+		{
+			return IsInteger(Convert.ToDouble(x));
+		}
+
 		#endregion
 
 		#region FUNCTIONS
@@ -7998,6 +8168,11 @@ namespace JPFITS
 			return result;
 		}
 
+		/// <summary>
+		/// Returns an input data array multiplied by the Hanning Function (Cosine Bell)
+		/// </summary>
+		/// <param name="data">The ipnut array.</param>
+		/// <param name="do_parallel">Perform array operations with parallelism.</param>
 		public static double[,] Hanning(double[,] data, bool do_parallel)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
@@ -8091,11 +8266,11 @@ namespace JPFITS
 		}
 
 		/// <summary>Computes the elements for a Gaussian curve G(x|p)
-		/// <para>G(x|p) = p(0) * exp( -((x - p(1))^2) / (2*p(2)^2) ) + p(3)</para></summary>
+		/// <br />G(x|p) = p(0) * exp( -((x - p(1))^2) / (2*p(2)^2) ) + p(3)</summary>
 		/// <param name="xdata">The x-data grid positions of the Gaussian data. If nullptr is passed a vector will be created of appropriate size, centered on zero.</param>
 		/// <param name="G">The values of the data to be computed for the Gaussian.</param>
 		/// <param name="p">The parameters of the Gaussian.
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = sigma; p[3] = bias</para></param>
+		/// <br />p[0] = amplitude; <br />p[1] = x-center; <br />p[2] = sigma; <br />p[3] = bias</param>
 		public static void Gaussian1d(double[] xdata, ref double[] G, double[] p)
 		{
 			int xw = G.Length;
@@ -8113,10 +8288,10 @@ namespace JPFITS
 		}
 
 		/// <summary>Computes the elements for a Moffat curve M(x|p)
-		/// <para>M(x|p) = p(0) * ( 1 + (x - p(1))^2 / p(2)^2 )^(-p(3)) + p(4)</para></summary>
+		/// <br />M(x|p) = p(0) * ( 1 + (x - p(1))^2 / p(2)^2 )^(-p(3)) + p(4)</summary>
 		/// <param name="xdata">The x-data grid positions of the Moffat data. If nullptr is passed a vector will be created of appropriate size, centered on zero.</param>
 		/// <param name="M">The values of the data to be computed for the Moffat.</param>
-		/// <param name="p">The parameters of the Moffat: p[0] = amplitude; p[1] = x-center; p[2] = theta; p[3] = beta; p[4] = bias</param>
+		/// <param name="p">The parameters of the Moffat: <br />p[0] = amplitude; <br />p[1] = x-center; <br />p[2] = theta; <br />p[3] = beta; <br />p[4] = bias</param>
 		public static void Moffat1d(double[] xdata, ref double[] M, double[] p)
 		{
 			int xw = M.Length;
@@ -8134,16 +8309,16 @@ namespace JPFITS
 		}
 
 		/// <summary>Computes the elements for a 2-d Gaussian surface G(x,y|p)
-		/// <para>G(x,y|p) = p(0)*exp( -((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2) ) + p(4)</para>
-		/// <para>or</para>
-		/// <para>G(x,y|p) = p(0)*exp( -((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)</para>
-		/// <para>The form of G(x,y|p) used is determined by the length of the parameter vector p</para></summary>
+		/// <br />G(x,y|p) = p(0)*exp( -((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2) ) + p(4)
+		/// <br />or
+		/// <br />G(x,y|p) = p(0)*exp( -((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)
+		/// <br />The form of G(x,y|p) used is determined by the length of the parameter vector p</summary>
 		/// <param name="xdata">The x-data grid positions of the Gaussian data.</param>
 		/// <param name="ydata">The y-data grid positions of the Gaussian data.</param>
 		/// <param name="p">The parameters of the Gaussian.  Options are:
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias</para>
-		/// <para>or</para>
-		/// <para>p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias</para></param>
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias
+		/// <br />or
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias</param>
 		public static double[,] Gaussian2d(int[] xdata, int[] ydata, double[] p, bool do_parallel)
 		{
 			double[,] G = new double[xdata.Length, ydata.Length];
@@ -8176,16 +8351,16 @@ namespace JPFITS
 		}
 
 		/// <summary>Computes the elements for a 2-d Moffat surface M(x,y|p)
-		/// <para>M(x,y|p) = p(0) * ( 1 + { (x-p(1))^2 + (y-p(2))^2 } / p(3)^2 ) ^ (-p(4)) + p(5)</para>
-		/// <para>or</para>
-		/// <para>M(x,y|p) = p(0) * ( 1 + { ((x-p(1))*cosd(p(3)) + (y-p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x-p(1))*sind(p(3)) + (y-p(2))*cosd(p(3)))^2 } / p(5)^2 ) ^ (-p(6)) + p(7)</para>
-		/// <para>The form of M(x,y|p) used is determined by the length of the parameter vector p</para></summary>
+		/// <br />M(x,y|p) = p(0) * ( 1 + { (x-p(1))^2 + (y-p(2))^2 } / p(3)^2 ) ^ (-p(4)) + p(5)
+		/// <br />or
+		/// <br />M(x,y|p) = p(0) * ( 1 + { ((x-p(1))*cosd(p(3)) + (y-p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x-p(1))*sind(p(3)) + (y-p(2))*cosd(p(3)))^2 } / p(5)^2 ) ^ (-p(6)) + p(7)
+		/// <br />The form of M(x,y|p) used is determined by the length of the parameter vector p</summary>
 		/// <param name="xdata">The x-data grid positions of the Moffat data.</param>
 		/// <param name="ydata">The y-data grid positions of the Moffat data.</param>
 		/// <param name="p">The parameters of the Moffat. Options are:
-		/// <para>p[0] = amplitude, p[1] = x-center, p[2] = y-center, p[3] = theta, p[4] = beta, p[5] = bias</para>
-		/// <para>or</para>
-		/// <para>p[0] = amplitude, p[1] = x-center, p[2] = y-center, p[3] = phi, p[4] = x-theta, p[5] = y-theta, p[6] = beta, p[7] = bias</para></param>
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias;
+		/// <br />or
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias;</param>
 		public static double[,] Moffat2d(int[] xdata, int[] ydata, double[] p, bool do_parallel)
 		{
 			double[,] M = new double[xdata.Length, ydata.Length];

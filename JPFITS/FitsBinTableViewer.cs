@@ -38,12 +38,12 @@ namespace JPFITS
 					((ToolStripMenuItem)this.MenuChooseTable.DropDownItems[MenuChooseTable.DropDownItems.Count - 1]).CheckedChanged += new System.EventHandler(MenuChooseTable_CheckedChanged);
 				}
 
-				this.Show();
+				//this.Show();
 
-				if (list.Length == 1)
-					PopulateTable(list[0]);
-				else
-					MenuChooseTable.ShowDropDown();
+				//if (list.Length == 1)
+				//	PopulateTable(list[0]);
+				//else
+				//	MenuChooseTable.ShowDropDown();
 			}
 			catch (Exception e)
 			{
@@ -51,7 +51,7 @@ namespace JPFITS
 			}
 		}
 
-		private void PopulateTable(String ExtensionName)
+		public void PopulateTable(String ExtensionName)
 		{
 			//try
 			{
@@ -128,8 +128,8 @@ namespace JPFITS
 				MessageBox.Show(e.Data + "	" + e.InnerException + "	" + e.Message + "	" + e.Source + "	" + e.StackTrace + "	" + e.TargetSite);
 			}*/
 
-			this.BringToFront();
-			this.Activate();
+			//this.BringToFront();
+			//this.Activate();
 		}
 
 		private void FitsExtensionTableViewer_SizeChanged(object sender, EventArgs e)
@@ -296,16 +296,6 @@ namespace JPFITS
 			REG.SetReg("JPChart", /*this.Text + */"FitsTableHeight", this.Height);
 		}
 
-		private void toolStripMenuItem1_CheckedChanged(object sender, EventArgs e)
-		{
-			if (PlotXChck.Checked == false)
-				XDrop.Enabled = false;
-			else
-				XDrop.Enabled = true;
-
-			PlotEntryMenu.ShowDropDown();
-		}
-
 		private void FitsExtensionTableViewer_ResizeBegin(object sender, EventArgs e)
 		{
 			this.SuspendLayout();
@@ -401,10 +391,10 @@ namespace JPFITS
 			double[] x = new double[(((double[])DATATABLE[YDrop.SelectedIndex]).Length)];
 			double[] y = new double[(((double[])DATATABLE[YDrop.SelectedIndex]).Length)];
 
-			int xind = -1;
-			if (PlotXChck.Checked)
-				xind = XDrop.SelectedIndex;
+			int xind = XDrop.SelectedIndex;
 			int yind = YDrop.SelectedIndex;
+			if (yind == -1)
+				return;
 
 			for (int i = 0; i < x.Length; i++)
 			{
@@ -425,7 +415,7 @@ namespace JPFITS
 			if (xind != -1)
 				title += " vs. " + xlabel;
 
-			plot.jpChart1.PlotXYData(x, y, title, xlabel, ylabel, System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastPoint, title.Replace(" ", ""));
+			plot.jpChart1.PlotXYData(x, y, title, xlabel, ylabel, System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastPoint, title.Replace(" ", ""), null);
 			plot.Text = title;
 			plot.Show();
 		}
@@ -448,13 +438,30 @@ namespace JPFITS
 
 		private void FitsExtensionTableViewer_MouseEnter(object sender, EventArgs e) 
 		{ 
-			this.BringToFront(); this.Activate(); 
+			//this.BringToFront();
+			//this.Activate(); 
 		}
 
 		private void FitsExtensionTableViewer_MouseHover(object sender, EventArgs e) 
 		{ 
-			this.BringToFront(); 
-			this.Activate(); 
+			//this.BringToFront(); 
+			//this.Activate(); 
+		}
+
+		private void XDrop_KeyDown(object sender, KeyEventArgs e)
+		{
+			//THIS IS WHY THE CHECKBOX WAS THERE!
+			//if (e.KeyCode == Keys.Escape)
+			//{
+			//	XDrop.Items.Clear();
+
+			//	string[] labels = FITSBINTABLE.TableDataLabelsTTYPE;
+
+			//	for (int i = 0; i < labels.Length; i++)
+			//		labels[i] = labels[i].Trim();
+
+			//	XDrop.Items.AddRange(labels);
+			//}
 		}
 	}
 }

@@ -11,7 +11,78 @@ namespace JPFITS
 	/// <summary>WorldCoordinateSolution class for creating, interacting with, and solving the paramaters for World Coordinate Solutions for the FITS image standard.</summary>
 	public class WorldCoordinateSolution
 	{
+		#region CONSTRUCTORS
+
+		/// <summary>Default constructor.</summary>
+		public WorldCoordinateSolution()
+		{
+
+		}
+
+		/// <summary>Constructor based on an existing FITS primary image header which contains FITS standard keywords for a WCS solution. If a WCS solution is not present in the header, then the Exists property will be false.</summary>
+		public WorldCoordinateSolution(JPFITS.FITSHeader header)
+		{
+			EATHEADERFORWCS(header);
+		}
+
+		/// <summary>
+		/// Constructor based on basic parameters of a World Coordinate Solution
+		/// </summary>
+		/// <param name="cdelt">The plate scale in arcseconds per pixel.</param>
+		/// <param name="crpix1">The coordinate reference pixel on the x-axis.</param>
+		/// <param name="crpix2">The coordinate reference pixel on the y-axis.</param>
+		/// <param name="zeroBasedCRpix">True if the CRPIX values are from zero-based indexing. If true will increment CRPIXn internally by 1.</param>
+		/// <param name="crvalRA">The coordinate reference value on the RA axis.</param>
+		/// <param name="crvalDec">The coordinate reference value on the dec axis.</param>
+		/// <param name="rotation">The field rotation, in degrees.</param>
+		public WorldCoordinateSolution(double cdelt, double crpix1, double crpix2, bool zeroBasedCRpix, double crvalRA, double crvalDec, double rotation)
+		{
+			CTYPEN = new string[2];
+			CTYPEN[0] = "RA---TAN";
+			CTYPEN[1] = "DEC--TAN";
+
+			CDELTN = new double[2];
+			CDELTN[0] = cdelt;
+			CDELTN[1] = cdelt;
+
+			CRPIXN = new double[2];
+			CRPIXN[0] = crpix1;
+			CRPIXN[1] = crpix2;
+			if (zeroBasedCRpix)
+			{
+				CRPIXN[0]++;
+				CRPIXN[1]++;
+			}
+
+			CRVALN = new double[2];
+			CRVALN[0] = crvalRA;
+			CRVALN[1] = crvalDec;
+
+			CROTAN = new double[2];
+			CROTAN[0] = rotation;
+			CROTAN[1] = rotation;
+
+			rotation *= Math.PI / 180;
+			CDMATRIX = new double[2, 2];
+			CDMATRIX[0, 0] = -cdelt / 3600 * Math.Cos(rotation);
+			CDMATRIX[1, 0] = cdelt / 3600 * Math.Sin(rotation);
+			CDMATRIX[0, 1] = -cdelt / 3600 * Math.Sin(rotation);
+			CDMATRIX[1, 1] = -cdelt / 3600 * Math.Cos(rotation);
+
+			CD1_1 = CDMATRIX[0, 0];
+			CD1_2 = CDMATRIX[1, 0];
+			CD2_1 = CDMATRIX[0, 1];
+			CD2_2 = CDMATRIX[1, 1];			
+
+			SET_CDMATRIXINV();
+
+			WCSEXISTS = true;
+		}
+
+		#endregion
+
 		#region PRIVATE
+
 		private double[,]? CDMATRIX;
 		private double[,]? CDMATRIXINV;
 		private double[]? CVAL1;
@@ -36,6 +107,31 @@ namespace JPFITS
 		private PointF[]? RAS_LABEL_LOCATIONS;
 		private PointF[]? DEC_LABEL_LOCATIONS;
 		bool VALIDWCSGRIDLINES = false;
+		private string[,]? WCS_TABLE;
+
+		private void GENERATE_WCS_TABLE()
+		{
+			WCS_TABLE = new string[7, CVAL1.Length + 1];
+
+			WCS_TABLE[0, 0] = "Source Pixel X-Centroid (pixels)";
+			WCS_TABLE[1, 0] = "Source Pixel Y-Centroid (pixels)";
+			WCS_TABLE[2, 0] = "Source Catalogue RA (degrees)";
+			WCS_TABLE[3, 0] = "Source Catalogue Decl (degrees)";
+			WCS_TABLE[4, 0] = "WCS RA Residual (arcsec)";
+			WCS_TABLE[5, 0] = "WCS Decl Residual (arcsec)";
+			WCS_TABLE[6, 0] = "WCS Residual (arcsec)";
+
+			for (int i = 0; i < CVAL1.Length; i++)
+			{
+				WCS_TABLE[0, i + 1] = CPIX1[i].ToString();
+				WCS_TABLE[1, i + 1] = CPIX2[i].ToString();
+				WCS_TABLE[2, i + 1] = CVAL1[i].ToString();
+				WCS_TABLE[3, i + 1] = CVAL2[i].ToString();
+				WCS_TABLE[4, i + 1] = DVAL1[i].ToString();
+				WCS_TABLE[5, i + 1] = DVAL2[i].ToString();
+				WCS_TABLE[6, i + 1] = Math.Sqrt(DVAL1[i] * DVAL1[i] + DVAL2[i] * DVAL2[i]).ToString();
+			}
+		}
 
 		private void SET_CDMATRIXINV()
 		{
@@ -234,78 +330,6 @@ namespace JPFITS
 
 		#endregion
 
-		#region CONSTRUCTORS
-		/// <summary>Default constructor.</summary>
-		public WorldCoordinateSolution()
-		{
-
-		}
-
-		/// <summary>Constructor based on an existing FITS primary image header which contains FITS standard keywords for a WCS solution.</summary>
-		public WorldCoordinateSolution(JPFITS.FITSHeader header)
-		{
-			EATHEADERFORWCS(header);
-
-			/*if (!WCSEXISTS)
-				throw new Exception("Error: WCS keywords not found in specified header '" + header + "'");*/
-		}
-
-		/// <summary>
-		/// Constructor based on basic parameters of a World Coordinate Solution
-		/// </summary>
-		/// <param name="cdelt">The plate scale in arcseconds per pixel.</param>
-		/// <param name="crpix1">The coordinate reference pixel on the x-axis.</param>
-		/// <param name="crpix2">The coordinate reference pixel on the y-axis.</param>
-		/// <param name="zeroBasedCRpix">True if the CRPIX values are from zero-based indexing. If true will increment CRPIXn internally by 1.</param>
-		/// <param name="crvalRA">The coordinate reference value on the RA axis.</param>
-		/// <param name="crvalDec">The coordinate reference value on the dec axis.</param>
-		/// <param name="rotation">The field rotation, in degrees.</param>
-		public WorldCoordinateSolution(double cdelt, double crpix1, double crpix2, bool zeroBasedCRpix, double crvalRA, double crvalDec, double rotation)
-		{
-			CTYPEN = new string[2];
-			CTYPEN[0] = "RA---TAN";
-			CTYPEN[1] = "DEC--TAN";
-
-			CDELTN = new double[2];
-			CDELTN[0] = cdelt;
-			CDELTN[1] = cdelt;
-
-			CRPIXN = new double[2];
-			CRPIXN[0] = crpix1;
-			CRPIXN[1] = crpix2;
-			if (zeroBasedCRpix)
-			{
-				CRPIXN[0]++;
-				CRPIXN[1]++;
-			}
-
-			CRVALN = new double[2];
-			CRVALN[0] = crvalRA;
-			CRVALN[1] = crvalDec;
-
-			rotation *= Math.PI / 180;
-			CDMATRIX = new double[2, 2];
-			CDMATRIX[0, 0] = -cdelt / 3600 * Math.Cos(rotation);
-			CDMATRIX[1, 0] = cdelt / 3600 * Math.Sin(rotation);
-			CDMATRIX[0, 1] = -cdelt / 3600 * Math.Sin(rotation);
-			CDMATRIX[1, 1] = -cdelt / 3600 * Math.Cos(rotation);
-
-			CD1_1 = CDMATRIX[0, 0];
-			CD1_2 = CDMATRIX[1, 0];
-			CD2_1 = CDMATRIX[0, 1];
-			CD2_2 = CDMATRIX[1, 1];
-
-			CROTAN = new double[2];
-			CROTAN[0] = rotation;
-			CROTAN[1] = rotation;
-
-			SET_CDMATRIXINV();
-
-			WCSEXISTS = true;
-		}
-
-		#endregion
-
 		#region PROPERTIES
 
 		/// <summary>Returns an array of PointF locations created within Grid_MakeWCSGrid for printing labels to the window.</summary>
@@ -389,9 +413,84 @@ namespace JPFITS
 			get { return CVALRS; }
 		}
 
+		public string[,] WCS_Table
+		{
+			get 
+			{
+				GENERATE_WCS_TABLE();
+				return WCS_TABLE; 
+			}
+		}
+
 		#endregion
 
 		#region MEMBERS
+
+		/// <summary>
+		/// Useful when an image containing a WCS solution is binned - the WCS parameters can be binned so that the transformation remains consistent with the new image scale and dimensions.
+		/// </summary>
+		/// <param name="binning">The binning factor, equal for both image axes.</param>
+		/// <param name="header">Optionally provide a header to update the keywords. Pass null if no header present or necessary.</param>
+		public void Bin(int binning, JPFITS.FITSHeader? header)
+		{
+			this.SetCDi_j(1, 1, this.GetCDi_j(1, 1) * (double)binning);
+			this.SetCDi_j(1, 2, this.GetCDi_j(1, 2) * (double)binning);
+			this.SetCDi_j(2, 1, this.GetCDi_j(2, 1) * (double)binning);
+			this.SetCDi_j(2, 2, this.GetCDi_j(2, 2) * (double)binning);
+			this.SetCRPIXn(1, this.GetCRPIXn(1) / (double)binning);
+			this.SetCRPIXn(2, this.GetCRPIXn(2) / (double)binning);
+
+			if (header == null)
+				return;
+
+			header.SetKey("CD1_1", this.GetCDi_j(1, 1).ToString(), true, -1);
+			header.SetKey("CD1_2", this.GetCDi_j(1, 2).ToString(), true, -1);
+			header.SetKey("CD2_1", this.GetCDi_j(2, 1).ToString(), true, -1);
+			header.SetKey("CD2_2", this.GetCDi_j(2, 2).ToString(), true, -1);
+			header.SetKey("CRPIX1", this.GetCRPIXn(1).ToString(), true, -1);
+			header.SetKey("CRPIX2", this.GetCRPIXn(2).ToString(), true, -1);
+		}
+
+		/// <summary>
+		/// Useful when an image containing a WCS is snipped or cut to a smaller region - the WCS parameters can be adjusted so that the transformation remains consistent with the new image size.
+		/// </summary>
+		/// <param name="cutregion_xmin">The minimum x-value of the snipped or cut region.</param>
+		/// <param name="cutregion_ymin">The minimum y-value of the snipped or cut region.</param>
+		/// <param name="header">Optionally provide a header to update the keywords. Pass null if no header present or necessary.</param> 
+		public void Cut(double cutregion_xmin, double cutregion_ymin, JPFITS.FITSHeader? header)
+		{
+			this.SetCRPIXn(1, this.GetCRPIXn(1) - cutregion_xmin);
+			this.SetCRPIXn(2, this.GetCRPIXn(2) - cutregion_ymin);
+
+			if (header == null)
+				return;
+
+			header.SetKey("CRPIX1", this.GetCRPIXn(1).ToString(), true, -1);
+			header.SetKey("CRPIX2", this.GetCRPIXn(2).ToString(), true, -1);
+		}
+
+		/// <summary>
+		/// Rotate the parameters of a WCS solution by some angle.
+		/// </summary>
+		/// <param name="rotation">The rotation, in degrees.</param>
+		/// <param name="header">Optionally provide a header to update the keywords. Pass null if no header present or necessary.</param>
+		public void Rotate(double rotation, FITSHeader? header)
+		{
+			CDMATRIX[0, 0] = -CDELTN[0] / 3600 * Math.Cos((CROTAN[0] + rotation) * Math.PI / 180);
+			CDMATRIX[1, 0] = CDELTN[1] / 3600 * Math.Sin((CROTAN[1] + rotation) * Math.PI / 180);
+			CDMATRIX[0, 1] = -CDELTN[0] / 3600 * Math.Sin((CROTAN[0] + rotation) * Math.PI / 180);
+			CDMATRIX[1, 1] = -CDELTN[1] / 3600 * Math.Cos((CROTAN[1] + rotation) * Math.PI / 180);
+
+			CD1_1 = CDMATRIX[0, 0];
+			CD1_2 = CDMATRIX[1, 0];
+			CD2_1 = CDMATRIX[0, 1];
+			CD2_2 = CDMATRIX[1, 1];
+
+			CROTAN[0] += rotation;
+			CROTAN[1] += rotation;
+
+			SET_CDMATRIXINV();
+		}
 
 		/// <summary>Recomputes the existing grid so that it can be updated for new display settings.</summary>
 		public void Grid_Refresh()
@@ -414,48 +513,99 @@ namespace JPFITS
 			CD2_1 = CDMATRIX[0, 1];
 			CD2_2 = CDMATRIX[1, 1];
 			SET_CDMATRIXINV();
-		}		
+		}
 
-		/// <summary>Gets the array of coordinate values on one-based axis i used for this World Coordinate Solution.</summary>
-		public double[] GetCVALValues(int coordinate_Axis)
+		public double[] GetWCSResiduals(int coordinate_Axis)
 		{
 			if (coordinate_Axis == 1)
-				return CVAL1;
+				return DVAL1;
 			if (coordinate_Axis == 2)
-				return CVAL2;
+				return DVAL2;
+
 			throw new Exception("coordinate_Axis '" + coordinate_Axis + "' not either 1 or 2");
 		}
 
-		/// <summary>Sets the array of coordinate values on one-based axis i used for this World Coordinate Solution.</summary>
-		public void SetCVALValues(int coordinate_Axis, double[] cvals)
+		/// <summary>Gets the array of coordinate values on one-based axis i used for this World Coordinate Solution.</summary>
+		/// <param name="coordinate_Axis"></param>
+		/// <param name="asPixelLocations"></param>
+		/// <param name="returnZeroBasedPixels"></param>
+		public double[] GetCVALValues(int coordinate_Axis, bool asPixelLocations, bool returnZeroBasedPixels)
 		{
-			if (coordinate_Axis == 1)
-				CVAL1 = cvals;
-			else if (coordinate_Axis == 2)
-				CVAL2 = cvals;
+			if (!asPixelLocations)
+			{
+				if (coordinate_Axis == 1)
+					return CVAL1;
+				if (coordinate_Axis == 2)
+					return CVAL2;
+			}
 			else
-				throw new Exception("coordinate_Axis '" + coordinate_Axis + "' not either 1 or 2");
+			{
+				double[] x;
+				double[] y;
+				this.Get_Pixels(CVAL1, CVAL2, "TAN", out x, out y, returnZeroBasedPixels);
+
+				if (coordinate_Axis == 1)
+					return x;
+				if (coordinate_Axis == 2)
+					return y;
+			}
+
+			throw new Exception("coordinate_Axis '" + coordinate_Axis + "' not either 1 or 2");
 		}
 
 		/// <summary>Gets the array of one-based coordinate pixels on one-based axis n (Coordinate_Pixels[n]) used for this World Coordinate Solution.</summary>
-		public double[] GetCPIXPixels(int coordinate_Axis)
+		/// <param name="coordinate_Axis"></param>
+		/// <param name="returnZeroBasedPixels"></param>
+		public double[] GetCPIXPixels(int coordinate_Axis, bool returnZeroBasedPixels)
 		{
-			if (coordinate_Axis == 1)
-				return CPIX1;
-			if (coordinate_Axis == 2)
-				return CPIX2;
+			if (!returnZeroBasedPixels)
+			{
+				if (coordinate_Axis == 1)
+					return CPIX1;
+				if (coordinate_Axis == 2)
+					return CPIX2;
+			}
+			else
+			{
+				if (coordinate_Axis == 1)
+				{
+					double[] x = new double[CPIX1.Length];
+					for (int i = 0; i < x.Length; i++)
+						x[i] = CPIX1[i] - 1;
+					return x;
+				}
+
+				if (coordinate_Axis == 2)
+				{
+					double[] y = new double[CPIX2.Length];
+					for (int i = 0; i < y.Length; i++)
+						y[i] = CPIX2[i] - 1;
+					return y;
+				}	
+			}
+
 			throw new Exception("coordinate_Axis '" + coordinate_Axis + "' not either 1 or 2");
 		}
 
-		/// <summary>Sets the array of one-based coordinate pixels on one-based axis n (Coordinate_Pixels[n]) used for this World Coordinate Solution.</summary>
-		public void SetCPIXPixels(int coordinate_Axis, double[] cpixs)
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="cpix1"></param>
+		/// <param name="cpix2"></param>
+		/// <param name="cpixAreZeroBased"></param>
+		public void SetCPIXPixels(double[] cpix1, double[] cpix2, bool cpixAreZeroBased)
 		{
-			if (coordinate_Axis == 1)
-				CPIX1 = cpixs;
-			else if (coordinate_Axis == 2)
-				CPIX2 = cpixs;
-			else
-				throw new Exception("coordinate_Axis '" + coordinate_Axis + "' not either 1 or 2");
+			CPIX1 = new double[cpix1.Length];
+			CPIX2 = new double[cpix2.Length];
+			double zb = 0;
+			if (cpixAreZeroBased)
+				zb = 1;
+
+			for (int i = 0; i < cpix1.Length; i++)
+			{
+				CPIX1[i] = cpix1[i] + zb;
+				CPIX2[i] = cpix2[i] + zb;
+			}
 		}
 
 		/// <summary>Gets the Coordinate Reference Value for the one-based axis n: CRVALn[int n].</summary>
@@ -583,7 +733,7 @@ namespace JPFITS
 			CDELTN[0] = Math.Sqrt(CD1_1 * CD1_1 + CD1_2 * CD1_2) * 3600;
 			CDELTN[1] = Math.Sqrt(CD2_1 * CD2_1 + CD2_2 * CD2_2) * 3600;
 
-			CROTAN = new double[(2)];
+			CROTAN = new double[2];
 			CROTAN[0] = Math.Atan2(CD1_2, -CD1_1) * 180 / Math.PI;
 			CROTAN[1] = Math.Atan2(-CD2_1, -CD2_2) * 180 / Math.PI;
 
@@ -632,7 +782,7 @@ namespace JPFITS
 			CCVALS1 = ccvals1;
 			CCVALS2 = ccvals2;
 
-			Clear(header);
+			ClearWCS(header);
 			this.CopyTo(header);
 		}
 
@@ -788,30 +938,30 @@ namespace JPFITS
 
 				this.CD_Matrix = wcs_source.CD_Matrix;
 
-				this.CTYPEN = new string[(2)];
+				this.CTYPEN = new string[2];
 				this.CTYPEN[0] = wcs_source.GetCTYPEn(1);
 				this.CTYPEN[1] = wcs_source.GetCTYPEn(2);
 
-				this.CRPIXN = new double[(2)];
+				this.CRPIXN = new double[2];
 				this.CRPIXN[0] = wcs_source.GetCRPIXn(1);
 				this.CRPIXN[1] = wcs_source.GetCRPIXn(2);
 
-				this.CRVALN = new double[(2)];
+				this.CRVALN = new double[2];
 				this.CRVALN[0] = wcs_source.GetCRVALn(1);
 				this.CRVALN[1] = wcs_source.GetCRVALn(2);
 
-				this.CDELTN = new double[(2)];
+				this.CDELTN = new double[2];
 				this.CDELTN[0] = wcs_source.GetCDELTn(1);
 				this.CDELTN[1] = wcs_source.GetCDELTn(2);
 
-				this.CROTAN = new double[(2)];
+				this.CROTAN = new double[2];
 				this.CROTAN[0] = wcs_source.GetCROTAn(1);
 				this.CROTAN[1] = wcs_source.GetCROTAn(2);
 
-				this.CPIX1 = wcs_source.GetCPIXPixels(1);
-				this.CPIX2 = wcs_source.GetCPIXPixels(2);
-				this.CVAL1 = wcs_source.GetCVALValues(1);
-				this.CVAL2 = wcs_source.GetCVALValues(2);
+				this.CPIX1 = wcs_source.GetCPIXPixels(1, false);
+				this.CPIX2 = wcs_source.GetCPIXPixels(2, false);
+				this.CVAL1 = wcs_source.GetCVALValues(1, false, false);
+				this.CVAL2 = wcs_source.GetCVALValues(2, false, false);
 
 				this.CCVALD1 = wcs_source.CCVALD1;
 				this.CCVALD2 = wcs_source.CCVALD2;
@@ -912,7 +1062,7 @@ namespace JPFITS
 		/// <summary>
 		/// Clear all WCS parameters from this instance.
 		/// </summary>
-		public void Clear()
+		public void ClearWCS()
 		{
 			CDMATRIX = new double[0, 0];
 			CDMATRIXINV = new double[0, 0];
@@ -1020,8 +1170,8 @@ namespace JPFITS
 		}
 
 		/// <summary>Generates arrays of PointF arrays which represent grid lines in Right Ascension and Declination.
-		/// <para>The lines are accessed via Grid_RightAscensionPoints and Grid_DeclinationPoints.</para>
-		/// <para>The sexagesimal labels for each grid line are accessed via Grid_RightAscensionLabels and Grid_DeclinationLabels.</para></summary>
+		/// <br />The lines are accessed via Grid_RightAscensionPoints and Grid_DeclinationPoints.
+		/// <br />The sexagesimal labels for each grid line are accessed via Grid_RightAscensionLabels and Grid_DeclinationLabels.</summary>
 		/// <param name="imagepixels_width">Image pixels width.</param>
 		/// <param name="imagepixels_height">Image pixels height.</param>
 		/// <param name="windowpixels_width">Window pixels width.</param>
@@ -1257,6 +1407,35 @@ namespace JPFITS
 				return 30;
 		}
 
+		//public void Plot_PlotWCSQuiver(System.Windows.Forms.PictureBox pictureBox, PaintEventArgs e, double residualScaleFactor, int imagepixels_width, int imagepixels_height, int windowpixels_width, int windowpixels_height)
+		//{
+		//	float xsc = (float)windowpixels_width / (float)imagepixels_width;
+		//	float ysc = (float)windowpixels_height / (float)imagepixels_height;
+
+		//	AdjustableArrowCap bigArrow = new AdjustableArrowCap(4, 4);
+		//	Pen p = new Pen(Color.LimeGreen);
+		//	p.CustomEndCap = bigArrow;
+
+		//	for (int i = 0; i < CPIX1.Length; i++)
+		//	{
+		//		double xend = CPIX1[i] + DVAL1[i] * residualScaleFactor;
+		//		double yend = CPIX2[i] + DVAL2[i] * residualScaleFactor;
+		//		e.Graphics.DrawLine(p, ((float)(CPIX1[i] - 1) + 0.5f) * xsc, ((float)(CPIX2[i] - 1) + 0.5f) * ysc, ((float)(xend - 1) + 0.5f) * xsc, ((float)(yend - 1) + 0.5f) * ysc);
+		//	}
+
+		//	double[] cv1 = this.GetCVALValues(1, true, true);
+		//	double[] cv2 = this.GetCVALValues(2, true, true);
+		//	Rectangle[] MARKCOORDRECTS = new Rectangle[cv1.Length];
+		//	for (int i = 0; i < MARKCOORDRECTS.Length; i++)
+		//		MARKCOORDRECTS[i] = new Rectangle((int)(((float)(cv1[i]) + 1) * xsc - 6), (int)(((float)(cv2[i]) + 1) * ysc - 6), 13, 13);
+		//	p = new Pen(Color.Violet);
+		//	p.Width = 2;
+		//	for (int i = 0; i < MARKCOORDRECTS.Length; i++)
+		//		e.Graphics.DrawEllipse(p, MARKCOORDRECTS[i]);
+		//
+		////also plot the cpix points
+		//}
+
 		#endregion
 
 		#region STATIC MEMBERS
@@ -1275,7 +1454,7 @@ namespace JPFITS
 		/// <summary>
 		/// Clears the WCS keywords from the header.
 		/// </summary>
-		public static void Clear(JPFITS.FITSHeader header)
+		public static void ClearWCS(JPFITS.FITSHeader header)
 		{
 			header.RemoveKey("CTYPE1");
 			header.RemoveKey("CTYPE2");
@@ -1574,7 +1753,6 @@ namespace JPFITS
 				sr.ReadLine();
 				Nlines++;
 			}
-			//sr.BaseStream.Position = 0;
 			sr.Close();
 			sr = new StreamReader(file);
 
@@ -1614,6 +1792,7 @@ namespace JPFITS
 		/// <param name="ra_sexa">The right ascension in sexagesimal format, returned as a String.</param>
 		/// <param name="dec_sexa">The declination in sexagesimal format, returned as a String.</param>
 		/// <param name="delimitter">The scale delimiter; if an empty String is passed then a colon will be used.</param>
+		/// <param name="decimals">The number of decimal places for the smallest scale element. Pass -1 for all decimals.</param>
 		public static void DegreeElementstoSexagesimalElements(double ra_deg, double dec_deg, out string ra_sexa, out string dec_sexa, string delimitter, int decimals)
 		{
 			if (delimitter == "")
@@ -1621,7 +1800,12 @@ namespace JPFITS
 
 			double h = Math.Floor(ra_deg / 360 * 24);
 			double m = Math.Floor((ra_deg / 360 * 24 - h) * 60);
-			double s = Math.Round((ra_deg / 360 * 24 - h - m / 60) * 3600, decimals);
+			double s;
+			if (decimals == -1)
+				s = (ra_deg / 360 * 24 - h - m / 60) * 3600;
+			else
+				s = Math.Round((ra_deg / 360 * 24 - h - m / 60) * 3600, decimals);
+			
 			if (s == 60)
 			{
 				s = 0;
@@ -1631,7 +1815,12 @@ namespace JPFITS
 			double decdeg = Math.Abs(dec_deg);
 			double deg = Math.Floor(decdeg);
 			double am = Math.Floor((decdeg - deg) * 60);
-			double ars = Math.Round((decdeg - deg - am / 60) * 3600, decimals);
+			double ars;
+			if (decimals == -1)
+				ars = (decdeg - deg - am / 60) * 3600;
+			else
+				ars = Math.Round((decdeg - deg - am / 60) * 3600, decimals);
+
 			if (ars == 60)
 			{
 				ars = 0;
@@ -1642,8 +1831,8 @@ namespace JPFITS
 			if (dec_deg < 0)
 				sign = "-";
 
-			ra_sexa = h.ToString("00") + delimitter + m.ToString("00") + delimitter + s.ToString("00.#######");
-			dec_sexa = sign + deg.ToString("00") + delimitter + am.ToString("00") + delimitter + ars.ToString("00.#######");
+			ra_sexa = h.ToString("00") + delimitter + m.ToString("00") + delimitter + s.ToString("00.############");
+			dec_sexa = sign + deg.ToString("00") + delimitter + am.ToString("00") + delimitter + ars.ToString("00.############");
 		}
 
 		/// <summary>Convert degree coordinates found in the first two columns of a String line into sexigesimal coordinate format.</summary>
@@ -1651,6 +1840,7 @@ namespace JPFITS
 		/// <param name="ra_sexa">The right ascension in sexagesimal format, returned as a String.</param>
 		/// <param name="dec_sexa">The declination in sexagesimal format, returned as a String.</param>
 		/// <param name="delimitter">The scale delimiter; if an empty String is passed then a colon will be used.</param>
+		/// <param name="decimals">The number of decimal places for the smallest scale element. Pass -1 for all decimals.</param>
 		public static void DegreeLineToSexagesimalElements(string line, out string ra_sexa, out string dec_sexa, string delimitter, int decimals)
 		{
 			line = line.Trim();//clean leading and trailing white space
@@ -1694,9 +1884,10 @@ namespace JPFITS
 		/// <summary>Open a file whose first two columns are degree entries, and optionally save the file as a new file with a SaveFileDialog and return the coordinate columns as arrays in sexigesimal coordinate format.</summary>
 		/// <param name="file">The full path of the textual file to open, to scan the first two columns for degree unit entries.</param>
 		/// <param name="saveSexigesimalFile">True to be given a SaveFileDialog to save a new file with just the two coordinate columns; False to not save a file.</param>
-		/// <param name="raSexagesimal">A declared array for the RA coordinates in sexigesimal format. The array will be initialized internally to the appropriate size. The user may not require this array, but it still must be supplied.</param>
-		/// <param name="decSexagesimal">A declared array for the Declination coordinates in sexigesimal format. The array will be initialized internally to the appropriate size. The user may not require this array, but it still must be supplied.</param>
+		/// <param name="raSexagesimal">An array for the RA coordinates in sexigesimal format. The array will be initialized internally to the appropriate size. The user may not require this array, but it still must be supplied.</param>
+		/// <param name="decSexagesimal">An array for the Declination coordinates in sexigesimal format. The array will be initialized internally to the appropriate size. The user may not require this array, but it still must be supplied.</param>
 		/// <param name="delimitter">The scale delimitter; if an empty String is passed then a colon will be used.</param>
+		/// <param name="decimals">The number of decimal places for the smallest scale element. Pass -1 for all decimals.</param>
 		public static void DegreeFileToSexagesimalFile(string file, bool saveSexigesimalFile, out string[] raSexagesimal, out string[] decSexagesimal, string delimitter, int decimals)
 		{
 			String ra;
@@ -1709,7 +1900,6 @@ namespace JPFITS
 				sr.ReadLine();
 				Nlines++;
 			}
-			//sr.BaseStream.Position = 0;
 			sr.Close();
 			sr = new StreamReader(file);
 
@@ -1746,3 +1936,4 @@ namespace JPFITS
 		#endregion
 	}
 }
+

@@ -153,7 +153,7 @@ namespace JPFITS
 				if (crpix2_lb > PSE_PTS[i].Y)
 					crpix2_lb = PSE_PTS[i].Y;
 			}
-			crpix1_init /= (double)PSE_PTS.Length;//the reference value initial guesses can be the means
+			crpix1_init /= (double)PSE_PTS.Length;//the reference pixel initial guesses can be the means
 			crpix2_init /= (double)PSE_PTS.Length;
 
 			for (int i = 0; i < CAT_PTS.Length; i++)
@@ -238,7 +238,7 @@ namespace JPFITS
 			DATE = DateTime.Now;
 			TimeSpan ts = new TimeSpan();
 			int prog = 0, threadnum = 0;
-			ulong ncompares = 0, nfalsepositives = 0, nfalsenegatives = 0;
+			ulong ncompares = 0, nfalsepositives = 0, nfalsenegatives = 0, similartriangles = 0;
 			bool compare_fieldvectors = ROTATION_LB != -Math.PI && ROTATION_UB != Math.PI;
 
 			ParallelOptions opts  = new ParallelOptions();
@@ -258,7 +258,7 @@ namespace JPFITS
 				if (SOLVED || CANCELLED)
 					loopState.Stop();
 
-				ulong ncompareslocal = 0, nfalsepositives_local = 0, nfalsenegatives_local = 0;
+				ulong ncompareslocal = 0, nfalsepositives_local = 0, nfalsenegatives_local = 0, similartriangles_local = 0;
 				//create these here so that each thread when parallel has own copy
 				double[] xpix_triplet = new double[3];
 				double[] ypix_triplet = new double[3];
@@ -324,7 +324,9 @@ namespace JPFITS
 							PUB[1] = theta + WCS_VERTEX_TOL;// provide some tolerance bounds
 						}
 
-						Xintrmdt_triplet[0] = CATtriangles_intrmdt[j].GetVertex(0).X;
+                        similartriangles_local++;
+
+                        Xintrmdt_triplet[0] = CATtriangles_intrmdt[j].GetVertex(0).X;
 						Yintrmdt_triplet[0] = CATtriangles_intrmdt[j].GetVertex(0).Y;
 						Xintrmdt_triplet[1] = CATtriangles_intrmdt[j].GetVertex(1).X;
 						Yintrmdt_triplet[1] = CATtriangles_intrmdt[j].GetVertex(1).Y;
@@ -378,7 +380,7 @@ namespace JPFITS
 							p01 = P0[1];
 							p02 = P0[2];
 							p03 = P0[3];
-							threadnum = Thread.CurrentThread.ManagedThreadId;
+							threadnum = i / thrgrpsz;// Thread.CurrentThread.ManagedThreadId;
 						}
 						else
 							nfalsepositives_local++;
@@ -386,6 +388,7 @@ namespace JPFITS
 				}
 				lock (locker)
 				{
+					similartriangles += similartriangles_local;
 					ncompares += ncompareslocal;
 					nfalsepositives += nfalsepositives_local;
 					nfalsenegatives += nfalsenegatives_local;
@@ -405,6 +408,7 @@ namespace JPFITS
 			BGWRKR.ReportProgress(0, "Field Rotation: " + Math.Round(p01 * 180 / 3.14159265, 3));
 			BGWRKR.ReportProgress(0, "N Pt. Matches: " + total_pt_matches + " (" + (total_pt_matches * 100 / CATpts_intrmdt.Length).ToString("00.0") + "%)");
 			BGWRKR.ReportProgress(0, "N Comparisons: " + ncompares.ToString("0.00e00") + " (" + Math.Round((double)(ncompares * 100) / (double)(PSEtriangles.Length) / (double)(CATtriangles_intrmdt.Length), 1) + "%)");
+			BGWRKR.ReportProgress(0, "Similar Triangles: " + similartriangles.ToString());
 			BGWRKR.ReportProgress(0, "N False Negatives: " + nfalsenegatives);
 			BGWRKR.ReportProgress(0, "N False Postives: " + nfalsepositives);
 			BGWRKR.ReportProgress(0, "Thread: " + threadnum);
@@ -552,7 +556,7 @@ namespace JPFITS
 			if (CANCELLED)
 				return;
 
-			WorldCoordinateSolution.Clear(FITS_IMG.Header);
+			WorldCoordinateSolution.ClearWCS(FITS_IMG.Header);
 			WCS.Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header);
 			BGWRKR.ReportProgress(0, Environment.NewLine + nmatches + " sources of " + N_POINTS + " were able to be used for WCS refinement.");
 			BGWRKR.ReportProgress(0, Environment.NewLine + "Refined solution:" + Environment.NewLine);

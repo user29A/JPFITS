@@ -151,6 +151,9 @@
     <EmbeddedResource Include="AstraCarta.resx">
       <DependentUpon>AstraCarta.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="FitsBinTableViewer.resx">
+      <DependentUpon>FitsBinTableViewer.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="FITSFinder.resx">
       <DependentUpon>FITSFinder.cs</DependentUpon>
     </EmbeddedResource>

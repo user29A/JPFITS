@@ -71,7 +71,7 @@ namespace JPFITS
 
 		#endregion
 
-		private void MAKEBINTABLEBYTEARRAY(object[] ExtensionEntryData)
+		private void MAKEBINTABLEBYTEARRAY(Array[] ExtensionEntryData)
 		{
 			for (int i = 0; i < ExtensionEntryData.Length; i++)
 				if (!ExtensionEntryData[i].GetType().IsArray)
@@ -386,7 +386,7 @@ namespace JPFITS
 			}
 		}
 
-		private void MAKEHEAPBYTEARRAY(object[] ExtensionEntryData)
+		private void MAKEHEAPBYTEARRAY(Array[] ExtensionEntryData)
 		{
 			long totalbytes;
 			MAKETTYPEHEAPARRAYNELSPOS(ExtensionEntryData, out totalbytes);
@@ -630,7 +630,7 @@ namespace JPFITS
 			}
 		}
 
-		private void MAKETTYPEHEAPARRAYNELSPOS(object[] ExtensionEntryData, out long totalBytes)
+		private void MAKETTYPEHEAPARRAYNELSPOS(Array[] ExtensionEntryData, out long totalBytes)
 		{
 			int pos = 0, nels;
 			totalBytes = 0;
@@ -1363,7 +1363,7 @@ namespace JPFITS
 			}
 		}
 
-		private object GETHEAPTTYPE(int ttypeindex, out TypeCode objectTypeCode, out int[] dimNElements)
+		private Array GETHEAPTTYPE(int ttypeindex, out TypeCode objectTypeCode, out int[] dimNElements)
 		{
 			objectTypeCode = HEAPTCODES[ttypeindex];
 
@@ -1806,9 +1806,9 @@ namespace JPFITS
 		public FITSBinTable(string fileName, string extensionName)
 		{
 			FileStream fs = new FileStream(fileName, FileMode.Open);
-			bool hasext = false;
+			bool hasext;
 			ArrayList header = null;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, ref hasext) || !hasext)
+			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, out hasext) || !hasext)
 			{
 				fs.Close();
 				if (!hasext)
@@ -1892,7 +1892,7 @@ namespace JPFITS
 		/// <summary>Return a binary table entry as a double 1-D array.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="dimNElements">A vector to return the number of elements along each dimension of the Object. 
-		/// <para>Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats, i.e. columns) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</para></param>
+		/// <br />Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats, i.e. columns) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</param>
 		public double[] GetTTYPEEntry(string ttypeEntry, out int[] dimNElements)
 		{
 			for (int i = 0; i < TTYPES.Length; i++)
@@ -2129,8 +2129,8 @@ namespace JPFITS
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="objectTypeCode">The TypeCode precision of the underlying array in the object.</param>
 		/// <param name="dimNElements">A vector to return the number of elements along each dimension of the Object. 
-		/// <para>Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats, i.e. columns) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</para></param>
-		public object GetTTYPEEntry(string ttypeEntry, out TypeCode objectTypeCode, out int[] dimNElements)
+		/// <br />Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats, i.e. columns) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</param>
+		public Array GetTTYPEEntry(string ttypeEntry, out TypeCode objectTypeCode, out int[] dimNElements)
 		{
 			int ttypeindex = -1;
 			for (int i = 0; i < TTYPES.Length; i++)
@@ -3128,7 +3128,7 @@ namespace JPFITS
 				throw new Exception("Extension Entry TTYPE wasn't found: '" + ttypeEntry + "'");
 			}
 
-			object[] newEntryDataObjs = new object[(TFIELDS - 1)];
+			Array[] newEntryDataObjs = new Array[(TFIELDS - 1)];
 			string[] newTTYPES = new string[(TFIELDS - 1)];
 			string[] newTFORMS = new string[(TFIELDS - 1)];
 			string[] newTUNITS = new string[(TFIELDS - 1)];
@@ -3188,9 +3188,9 @@ namespace JPFITS
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
 		/// <param name="entryUnits">The physical units of the values of the array. Pass empty string if not required.</param>
 		/// <param name="entryArray">The vector or 2D array to enter into the table.</param>
-		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, object entryArray)
+		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray)
 		{
-			if (((Array)entryArray).Rank > 2)
+			if ((entryArray).Rank > 2)
 			{
 				throw new Exception("Error: Do not use this function to add an n &gt; 2 dimensional array. Use an overload.");
 			}
@@ -3200,11 +3200,11 @@ namespace JPFITS
 		}
 
 		/// <summary>Add an n &gt; 2 dimensional and/or complex entry to the binary table or heap area. If entries already exist then the user must have formatted the n &gt; 2 dimensional array to match the existing table height NAXIS2.
-		/// <para>Otherwise it is recommended to create this table with ONLY the n &gt; 2 dimensional entry formatted simply as a vector, non-repeated instance. The height or NAXIS2 will then be the number of elements of the n &gt; 2 dimensional array.</para>
-		/// <para>If dimensions need to be recorded then supply the dimNelements argument.</para>
-		/// <para>If adding a complex number array to the binary table, the entryArray must be either single or double floating point.</para>
-		/// <para>If complex the entryArray must be a factor of two columns repeats where the 1st and odd numbered columns are the spatial part, and the 2nd and even numbered columns are the temporal part.</para>
-		/// <para>If it is a variable repeat heap array then the entry must be supplied as an array of arrays, or an array of Strings; if complex each subarray must contain an even pairing of values.</para></summary>
+		/// <br />Otherwise it is recommended to create this table with ONLY the n &gt; 2 dimensional entry formatted simply as a vector, non-repeated instance. The height or NAXIS2 will then be the number of elements of the n &gt; 2 dimensional array.
+		/// <br />If dimensions need to be recorded then supply the dimNelements argument.
+		/// <br />If adding a complex number array to the binary table, the entryArray must be either single or double floating point.
+		/// <br />If complex the entryArray must be a factor of two columns repeats where the 1st and odd numbered columns are the spatial part, and the 2nd and even numbered columns are the temporal part.
+		/// <br />If it is a variable repeat heap array then the entry must be supplied as an array of arrays, or an array of Strings; if complex each subarray must contain an even pairing of values.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
 		/// <param name="entryUnits">The physical units of the values of the array. Pass empty string if not required.</param>
@@ -3212,16 +3212,8 @@ namespace JPFITS
 		/// <param name="dimNElements">A vector giving the number of elements along each dimension of the array, to write as the TDIM key for the entry IF the entry is n &gt; 2 dimensional; pass null if the entry is not n &gt; 2 dimensional.</param>
 		/// <param name="isComplex">A boolean to set whether the array should be interpreted as complex value pairings.</param>
 		/// <param name="addAsHeapVarRepeatArray">A boolean to set whether to save the array as a variable repeat array in the heap area. If true, the entryArray must be an array of arrays or an array of Strings.</param>
-		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, object entryArray, int[]? dimNElements, bool isComplex, bool addAsHeapVarRepeatArray)
+		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray, int[]? dimNElements, bool isComplex, bool addAsHeapVarRepeatArray)
 		{
-			//int heapentryarrayLengthNRowsNAXIS2 = ((Array^)entryArray).Length;
-			//int heapentryarrayindexRowLengthRepeatsNels = ((Array^)(((Array^)entryArray).GetValue(i))).Length;//this is the variable repeat count
-			//int heapentryarrayindexRowRank = ((Array^)(((Array^)entryArray).GetValue(i))).Rank;//all must be 1
-			//TypeCode heapentryarrayTypeCode = Type.GetTypeCode((((Array^)entryArray).GetValue(0)).GetType().GetElementType());
-			//bool isarray = (((Array^)entryArray).GetValue(0)).GetType().IsArray;//???????????????????
-			//TypeCode heapentryarrayTypeCodeSTRING = Type.GetTypeCode(entryArray.GetType().GetElementType());
-			//return;
-
 			int ttypeindex = -1;
 			if (TTYPES != null)
 				for (int i = 0; i < TTYPES.Length; i++)
@@ -3248,15 +3240,15 @@ namespace JPFITS
 
 			if (isComplex && !addAsHeapVarRepeatArray)
 			{
-				if (((Array)entryArray).Rank == 1)
+				if (entryArray.Rank == 1)
 				{
 					throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' is supposed to be complex, but has a rank of 1. A complex array must have a rank of at least 2 for spatial and temporal pairings.");
 				}
-				if (Type.GetTypeCode((((Array)entryArray).GetType()).GetElementType()) != TypeCode.Double && Type.GetTypeCode((((Array)entryArray).GetType()).GetElementType()) != TypeCode.Single)
+				if (Type.GetTypeCode((entryArray.GetType()).GetElementType()) != TypeCode.Double && Type.GetTypeCode((entryArray.GetType()).GetElementType()) != TypeCode.Single)
 				{
-					throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' may only be single or double precision floating point if complex, but was " + Type.GetTypeCode((((Array)entryArray).GetType()).GetElementType()).ToString());
+					throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' may only be single or double precision floating point if complex, but was " + Type.GetTypeCode((entryArray.GetType()).GetElementType()).ToString());
 				}
-				if (!JPMath.IsEven(((Array)entryArray).GetLength(0)))
+				if (!JPMath.IsEven(entryArray.GetLength(0)))
 				{
 					throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' is supposed to be complex, but is not an even pairing of spatial and temporal columns.");
 				}
@@ -3264,27 +3256,27 @@ namespace JPFITS
 
 			if (isComplex && addAsHeapVarRepeatArray)
 			{
-				for (int i = 0; i < ((Array)entryArray).Length; i++)
-					if (!JPMath.IsEven(((Array)(((Array)entryArray).GetValue(i))).Length))
+				for (int i = 0; i < entryArray.Length; i++)
+					if (!JPMath.IsEven(((Array)(entryArray.GetValue(i))).Length))
 					{
 						throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' is supposed to be complex, but is not an even pairing of spatial and temporal columns.");
 					}
 
-				if (Type.GetTypeCode((((Array)entryArray).GetValue(0)).GetType().GetElementType()) != TypeCode.Double && Type.GetTypeCode((((Array)entryArray).GetValue(0)).GetType().GetElementType()) != TypeCode.Single)
+				if (Type.GetTypeCode((entryArray.GetValue(0)).GetType().GetElementType()) != TypeCode.Double && Type.GetTypeCode((entryArray.GetValue(0)).GetType().GetElementType()) != TypeCode.Single)
 				{
-					throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' may only be single or double precision floating point if complex, but was " + Type.GetTypeCode((((Array)entryArray).GetValue(0)).GetType().GetElementType()).ToString());
+					throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' may only be single or double precision floating point if complex, but was " + Type.GetTypeCode((entryArray.GetValue(0)).GetType().GetElementType()).ToString());
 				}
 			}
 
 			if (addAsHeapVarRepeatArray && !isheapvarrepeatString)
-				for (int i = 0; i < ((Array)entryArray).Length; i++)
-					if (((Array)(((Array)entryArray).GetValue(i))).Rank != 1)
+				for (int i = 0; i < entryArray.Length; i++)
+					if (((Array)(entryArray.GetValue(i))).Rank != 1)
 					{
-						throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' must be an array of rank = 1 arrays. Index '" + i.ToString() + "' is rank = " + ((Array)(((Array)entryArray).GetValue(i))).Rank);
+						throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' must be an array of rank = 1 arrays. Index '" + i.ToString() + "' is rank = " + ((Array)(entryArray.GetValue(i))).Rank);
 					}
 
-			if (!addAsHeapVarRepeatArray && Type.GetTypeCode((((Array)entryArray).GetType()).GetElementType()) == TypeCode.String)
-				if (((Array)entryArray).Rank == 2)
+			if (!addAsHeapVarRepeatArray && Type.GetTypeCode((entryArray.GetType()).GetElementType()) == TypeCode.String)
+				if (entryArray.Rank == 2)
 				{
 					throw new Exception("Error: Cannot pass a 2d String array '" + ttypeEntry + "' . Only a 1D array of Strings is allowed.");
 				}
@@ -3306,23 +3298,23 @@ namespace JPFITS
 
 			//either it was an add to a blank table, or a replacement, or an additional, so these either need set for the first time, or updated
 			if (TFIELDS == 0)
-				if (((Array)entryArray).Rank == 1)//true for heapentry too as array of arrays
-					NAXIS2 = ((Array)entryArray).Length;
+				if (entryArray.Rank == 1)//true for heapentry too as array of arrays
+					NAXIS2 = entryArray.Length;
 				else
-					NAXIS2 = ((Array)entryArray).GetLength(1);
+					NAXIS2 = entryArray.GetLength(1);
 			else
-					if (((Array)entryArray).Rank == 1 && ((Array)entryArray).Length != NAXIS2 || ((Array)entryArray).Rank > 1 && ((Array)entryArray).GetLength(1) != NAXIS2)
+					if (entryArray.Rank == 1 && entryArray.Length != NAXIS2 || entryArray.Rank > 1 && entryArray.GetLength(1) != NAXIS2)
 			{
 				int naxis2;
-				if (((Array)entryArray).Rank == 1)//true for heapentry too as array of arrays
-					naxis2 = ((Array)entryArray).Length;
+				if (entryArray.Rank == 1)//true for heapentry too as array of arrays
+					naxis2 = entryArray.Length;
 				else
-					naxis2 = ((Array)entryArray).GetLength(1);
+					naxis2 = entryArray.GetLength(1);
 				throw new Exception("Error: Existing NAXIS2 = " + NAXIS2 + "; new entryArray '" + ttypeEntry + "'  NAXIS2 = " + naxis2 + ".");
 			}
 
 			TFIELDS++;
-			object[] newEntryDataObjs = new object[(TFIELDS)];
+			Array[] newEntryDataObjs = new Array[(TFIELDS)];
 			string[] newTTYPES = new string[(TFIELDS)];
 			string[] newTFORMS = new string[(TFIELDS)];
 			string[] newTUNITS = new string[(TFIELDS)];
@@ -3340,12 +3332,12 @@ namespace JPFITS
 				if (i == ttypeindex)
 				{
 					int instances = 1;
-					if (((Array)entryArray).Rank > 1)
-						instances = ((Array)entryArray).GetLength(0);
+					if (entryArray.Rank > 1)
+						instances = entryArray.GetLength(0);
 
 					if (!addAsHeapVarRepeatArray)
 					{
-						newTCODES[i] = Type.GetTypeCode((((Array)entryArray).GetType()).GetElementType());
+						newTCODES[i] = Type.GetTypeCode((entryArray.GetType()).GetElementType());
 						if (newTCODES[i] == TypeCode.String)
 						{
 							newTCODES[i] = TypeCode.Char;
@@ -3368,7 +3360,7 @@ namespace JPFITS
 						if (isheapvarrepeatString)
 							newHEAPTCODES[i] = TypeCode.Char;
 						else
-							newHEAPTCODES[i] = Type.GetTypeCode((((Array)entryArray).GetValue(0)).GetType().GetElementType());
+							newHEAPTCODES[i] = Type.GetTypeCode((entryArray.GetValue(0)).GetType().GetElementType());
 						newTTYPEISHEAPARRAYDESC[i] = addAsHeapVarRepeatArray;
 						//newTTYPEHEAPARRAYNELSPOS[i] = null;//this gets set in MAKEBINTABLEBYTEARRAY......
 						if (isComplex)
@@ -3430,18 +3422,18 @@ namespace JPFITS
 		}
 
 		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES INCLUDING THE HEAP.
-		/// <para>Do not use for n &gt; 2 dimensional and/or complex entries.</para></summary>
+		/// <br />Do not use for n &gt; 2 dimensional and/or complex entries.</summary>
 		/// <param name="ttypeEntries">The names of the binary table extension entries, i.e. the TTYPE values.</param>
 		/// <param name="entryUnits">The physical units of the values of the arrays. Pass null if not needed, or with null elements or empty elements where not required, etc.</param>
 		/// <param name="entryArrays">An array of vectors or 2D arrays to enter into the table.</param>
-		public void SetTTYPEEntries(string[] ttypeEntries, string[]? entryUnits, object[] entryArrays)
+		public void SetTTYPEEntries(string[] ttypeEntries, string[]? entryUnits, Array[] entryArrays)
 		{
 			for (int i = 0; i < entryArrays.Length; i++)
-				if (((Array)entryArrays[i]).Rank > 2)
+				if (entryArrays[i].Rank > 2)
 				{
 					throw new Exception("Error: Do not use this function to add an n &gt; 2 dimensional array. Use AddTTYPEEntry.");
 				}
-				else if (((Array)entryArrays[i]).Rank == 1 && Type.GetTypeCode(entryArrays[i].GetType().GetElementType()) == TypeCode.String)
+				else if (entryArrays[i].Rank == 1 && Type.GetTypeCode(entryArrays[i].GetType().GetElementType()) == TypeCode.String)
 				{
 					string[] strarr = (string[])entryArrays[i];
 					int nels = strarr[0].Length;
@@ -3455,14 +3447,14 @@ namespace JPFITS
 			bool equalnaxis2 = true;
 			bool stringarrayrank2 = false;
 			int naxis2;
-			if (((Array)entryArrays[0]).Rank == 1)
-				naxis2 = ((Array)entryArrays[0]).Length;
+			if (entryArrays[0].Rank == 1)
+				naxis2 = entryArrays[0].Length;
 			else
-				naxis2 = ((Array)entryArrays[0]).GetLength(1);
+				naxis2 = entryArrays[0].GetLength(1);
 			for (int i = 1; i < entryArrays.Length; i++)
-				if (((Array)entryArrays[i]).Rank == 1)
+				if (entryArrays[i].Rank == 1)
 				{
-					if (((Array)entryArrays[i]).Length != naxis2)
+					if (entryArrays[i].Length != naxis2)
 					{
 						equalnaxis2 = false;
 						break;
@@ -3470,7 +3462,7 @@ namespace JPFITS
 				}
 				else
 				{
-					if (((Array)entryArrays[i]).GetLength(1) != naxis2)
+					if (entryArrays[i].GetLength(1) != naxis2)
 					{
 						equalnaxis2 = false;
 						break;
@@ -3509,12 +3501,12 @@ namespace JPFITS
 
 			for (int i = 0; i < entryArrays.Length; i++)
 			{
-				TCODES[i] = Type.GetTypeCode((((Array)entryArrays[i]).GetType()).GetElementType());
+				TCODES[i] = Type.GetTypeCode((entryArrays[i].GetType()).GetElementType());
 				if (TCODES[i] != TypeCode.String)
-					if (((Array)entryArrays[i]).Rank == 1)
+					if (entryArrays[i].Rank == 1)
 						TREPEATS[i] = 1;
 					else
-						TREPEATS[i] = ((Array)entryArrays[i]).GetLength(0);
+						TREPEATS[i] = entryArrays[i].GetLength(0);
 				else
 				{
 					TCODES[i] = TypeCode.Char;
@@ -3530,10 +3522,10 @@ namespace JPFITS
 			NAXIS1 = 0;
 			for (int i = 0; i < entryArrays.Length; i++)
 				NAXIS1 += TBYTES[i];
-			if (((Array)entryArrays[0]).Rank == 1)
-				NAXIS2 = ((Array)entryArrays[0]).Length;
+			if (entryArrays[0].Rank == 1)
+				NAXIS2 = entryArrays[0].Length;
 			else
-				NAXIS2 = ((Array)entryArrays[0]).GetLength(1);
+				NAXIS2 = entryArrays[0].GetLength(1);
 
 			MAKEBINTABLEBYTEARRAY(entryArrays);
 			HEAPDATA = null;
@@ -3666,9 +3658,9 @@ namespace JPFITS
 
 			FileStream fs = new FileStream(FILENAME, FileMode.Open);
 
-			bool hasext = false;
+			bool hasext;
 			ArrayList headerret = null;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref headerret, ref hasext))
+			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref headerret, out hasext))
 			{
 				fs.Close();
 				throw new Exception("File '" + FileName + "' not formatted as FITS file. Use a new file.");
@@ -3676,7 +3668,7 @@ namespace JPFITS
 			if (!hasext)
 			{
 				fs.Position = 0;
-				FITSFILEOPS.SCANPRIMARYUNIT(fs, false, ref headerret, ref hasext);
+				FITSFILEOPS.SCANPRIMARYUNIT(fs, false, ref headerret, out hasext);
 				byte[] primarydataarr = new byte[((int)(fs.Length - fs.Position))];
 				fs.Read(primarydataarr, 0, primarydataarr.Length);
 				fs.Close();
@@ -3712,7 +3704,7 @@ namespace JPFITS
 				fs.Close();
 
 				fs = new FileStream(FILENAME, FileMode.Open);
-				FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref headerret, ref hasext);
+				FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref headerret, out hasext);
 			}
 
 			long extensionstartposition, extensionendposition, tableendposition, pcount, theap;
@@ -3793,9 +3785,9 @@ namespace JPFITS
 		public static void RemoveExtension(string FileName, string ExtensionName)
 		{
 			FileStream fs = new FileStream(FileName, FileMode.Open);
-			bool hasext = false;
+			bool hasext;
 			ArrayList header = null;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, ref hasext) || !hasext)
+			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, out hasext) || !hasext)
 			{
 				fs.Close();
 				if (!hasext)
@@ -3834,9 +3826,9 @@ namespace JPFITS
 		public static bool ExtensionExists(string FileName, string ExtensionName)
 		{
 			FileStream fs = new FileStream(FileName, FileMode.Open);
-			bool hasext = false;
+			bool hasext;
 			ArrayList header = null;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, ref hasext) || !hasext)
+			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, out hasext) || !hasext)
 			{
 				fs.Close();
 				if (!hasext)

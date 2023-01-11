@@ -1,12 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO;
 
@@ -93,9 +86,7 @@ namespace JPFITS
 		{
 			string dir = DirectoryTxt.Text;
 			if (!Directory.Exists(dir))
-			{
 				throw new Exception("Directory doesn't exist...");
-			}
 
 			bool subdirs = SubFoldersChck.Checked;
 			REG.SetReg("CCDLAB", "SubFoldersChck", subdirs);
@@ -107,7 +98,14 @@ namespace JPFITS
 			else
 				extension = ExtensionDrop.Items[ExtensionDrop.SelectedIndex].ToString();
 
-			string filetemplate = String.Concat(FileTemplateTxt.Text, extension);//file template for cursory directory search, which we'll start with
+			if (FileTemplateTxt.Text == "")
+			{
+				FileTemplateTxt.Text = "*";
+				this.Refresh();
+			}
+
+            string filetemplate = String.Concat(FileTemplateTxt.Text, extension);//file template for cursory directory search, which we'll start with
+
 			int count = 0;
 			System.Windows.Forms.TextBox[] k = new System.Windows.Forms.TextBox[] { Key1, Key2, Key3, Key4 };
 			System.Windows.Forms.RichTextBox[] kv = new System.Windows.Forms.RichTextBox[] { Key1Value, Key2Value, Key3Value, Key4Value };
@@ -172,8 +170,17 @@ namespace JPFITS
 				}
 				FitsFinderWrkr.ReportProgress(ii + 1, filelist.Count);
 
-				FITSImage f1 = new FITSImage(fullfilesinit[ii], null, true, false, false, false);
+				FITSImage f1;
 
+				try
+				{
+					f1 = new FITSImage(fullfilesinit[ii], null, true, false, false, false);
+				}
+				catch
+				{
+					continue;
+				}
+				
 				match = 0;
 				for (int j = 0; j < f1.Header.Length; j++)
 				{
@@ -186,7 +193,7 @@ namespace JPFITS
 					filelist.Add(fullfilesinit[ii]);
 			}
 
-			string[] matchedfiles = new string[(filelist.Count)];
+			string[] matchedfiles = new string[filelist.Count];
 			for (int h = 0; h < filelist.Count; h++)
 				matchedfiles[h] = (string)filelist[h];
 

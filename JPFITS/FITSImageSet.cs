@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections.Concurrent;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Threading;
-using System.IO;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 #nullable enable
 
@@ -86,15 +84,17 @@ namespace JPFITS
 				bool do_parallel = (bool)(arg[3]);
 				int[] imgrange = (int[])arg[4];
 				string waitbar_message = (string)arg[5];
+
 				ParallelOptions opts = new ParallelOptions();
 				if (do_parallel)
 					opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
 				else
 					opts.MaxDegreeOfParallelism = 1;
 				var rangePartitioner = Partitioner.Create(0, files.Length);
-				int count = 0;
-				JPFITS.FITSImage[] set = new JPFITS.FITSImage[files.Length];
+				int count = 0;				
 				int prog = 0;
+
+				JPFITS.FITSImage[] set = new JPFITS.FITSImage[files.Length];
 
 				Parallel.ForEach(rangePartitioner, opts, (range, loopState) =>
 				{
@@ -117,7 +117,7 @@ namespace JPFITS
 						}
 
 						set[i] = new FITSImage(files[i], imgrange, true, true, do_stats, !do_parallel);
-					}					
+					}
 				});
 
 				if (WAITBAR.DialogResult == DialogResult.Cancel)
@@ -125,6 +125,33 @@ namespace JPFITS
 
 				for (int i = 0; i < files.Length; i++)
 					FITSLIST.Add(set[i]);
+				return;
+			}
+
+			if (op.Equals("loadextensions"))
+			{
+				string file = (string)arg[0];
+				bool do_stats = (bool)(arg[2]);
+				int[] extensionIndexes = (int[])(arg[3]);
+				int[] imgrange = (int[])arg[4];
+				string waitbar_message = (string)arg[5];
+				
+				JPFITS.FITSImage[] set = new JPFITS.FITSImage[extensionIndexes.Length];
+				int prog = 0;
+
+				for (int i = 0; i < extensionIndexes.Length; i++)
+				{
+					if (WAITBAR.DialogResult == DialogResult.Cancel)
+						break;
+
+					if (i * 100 / extensionIndexes.Length > prog)
+					{
+						prog = i * 100 / extensionIndexes.Length;
+						BGWRKR.ReportProgress(i, "load " + waitbar_message);
+					}
+
+					FITSLIST.Add(new JPFITS.FITSImage(file, extensionIndexes[i], imgrange, true, true, do_stats, true));
+				}
 				return;
 			}
 
@@ -157,8 +184,8 @@ namespace JPFITS
 					{
 						double min = Double.MaxValue;
 						for (int k = 0; k < L; k++)
-							if (ImageSet[k].Image[i, j] < min)
-								min = ImageSet[k].Image[i, j];
+							if (ImageSet[k][i, j] < min)
+								min = ImageSet[k][i, j];
 						img[i, j] = min;
 					}
 				});
@@ -196,8 +223,8 @@ namespace JPFITS
 					{
 						double max = Double.MinValue;
 						for (int k = 0; k < L; k++)
-							if (ImageSet[k].Image[i, j] > max)
-								max = ImageSet[k].Image[i, j];
+							if (ImageSet[k][i, j] > max)
+								max = ImageSet[k][i, j];
 						img[i, j] = max;
 					}
 				});
@@ -235,7 +262,7 @@ namespace JPFITS
 					{
 						double mean = 0;
 						for (int k = 0; k < L; k++)
-							mean = mean + ImageSet[k].Image[i, j];
+							mean = mean + ImageSet[k][i, j];
 						img[i, j] = mean / N;
 					}
 				});
@@ -273,7 +300,7 @@ namespace JPFITS
 					{
 						double sum = 0;
 						for (int k = 0; k < L; k++)
-							sum = sum + ImageSet[k].Image[i, j];
+							sum = sum + ImageSet[k][i, j];
 						img[i, j] = sum;
 					}
 				});
@@ -311,7 +338,7 @@ namespace JPFITS
 					{
 						double quadsum = 0;
 						for (int k = 0; k < L; k++)
-							quadsum += (ImageSet[k].Image[i, j] * ImageSet[k].Image[i, j]);
+							quadsum += (ImageSet[k][i, j] * ImageSet[k][i, j]);
 						img[i, j] = Math.Sqrt(quadsum);
 					}
 				});
@@ -350,7 +377,7 @@ namespace JPFITS
 					{
 						double[] medarray = new double[L];
 						for (int k = 0; k < L; k++)
-							medarray[k] = ImageSet[k].Image[i, j];
+							medarray[k] = ImageSet[k][i, j];
 						img[i, j] = JPMath.Median(medarray);
 					}
 				});
@@ -389,10 +416,10 @@ namespace JPFITS
 						double std = 0;
 						double mean = 0;
 						for (int k = 0; k < L; k++)
-							mean = mean + ImageSet[k].Image[i, j];
+							mean = mean + ImageSet[k][i, j];
 						mean = mean / N;
 						for (int q = 0; q < L; q++)
-							std = std + (ImageSet[q].Image[i, j] - mean) * (ImageSet[q].Image[i, j] - mean);
+							std = std + (ImageSet[q][i, j] - mean) * (ImageSet[q][i, j] - mean);
 						std = Math.Sqrt(std / (N - 1.0));
 						img[i, j] = std;
 					}
@@ -413,6 +440,7 @@ namespace JPFITS
 
 				int RefImgIndex = (int)arg[2];
 				bool Do_Stats = (bool)arg[3];
+				string style = (string)arg[4];
 
 				double[,] refim = new double[ImageSet[RefImgIndex].Width, ImageSet[RefImgIndex].Height];
 				Array.Copy(ImageSet[RefImgIndex].Image, refim, ImageSet[RefImgIndex].Image.LongLength);
@@ -422,8 +450,8 @@ namespace JPFITS
 				refim = JPMath.Hanning(refim, true);
 				double[] Href = JPMath.Sum(refim, 1, true);
 				double[] Vref = JPMath.Sum(refim, 0, true);
-				Href = JPMath.VectorSubScalar(Href, JPMath.Mean(Href, true), true);
-				Vref = JPMath.VectorSubScalar(Vref, JPMath.Mean(Vref, true), true);
+				Href = JPMath.VectorSubScalar(Href, JPMath.Mean(Href, false), true);
+				Vref = JPMath.VectorSubScalar(Vref, JPMath.Mean(Vref, false), true);
 
 				for (int c = 0; c < ImageSet.Count; c++)//create the array with the missing reference index
 				{
@@ -432,110 +460,137 @@ namespace JPFITS
 					if (WAITBAR.DialogResult == DialogResult.Cancel)
 						continue;
 					if (c == RefImgIndex)
-						continue;//don't register to one's self
+						continue;//don't register to ones' self
 
 					double xshift, yshift;
 					JPMath.XCorrImageLagShifts(Href, Vref, ImageSet[c].Image, true, true, true, out xshift, out yshift, true);
 
-					int intxshift = (int)Math.Round(xshift);
-					int intyshift = (int)Math.Round(yshift);
-
-					double[,] COM = new double[ImageSet[c].Width, ImageSet[c].Height];
-					Array.Copy(ImageSet[c].Image, COM, ImageSet[c].Image.LongLength);
-
-					double mean = JPMath.Median(COM);
-
-					if (intxshift > 0)//shift REL in horizontal dim (0) to the left
-					{
-						Parallel.For(0, COM.GetLength(1), j =>
-						{
-							for (int i = 0; i < COM.GetLength(0) - intxshift; i++)
-								COM[i, j] = COM[i + intxshift, j];
-							for (int i = COM.GetLength(0) - intxshift; i < COM.GetLength(0); i++)
-								COM[i, j] = mean;
-						});
-					}
-
-					if (intxshift < 0)//shift REL in horizontal dim (0) to the right
-					{
-						intxshift = -intxshift;
-
-						Parallel.For(0, COM.GetLength(1), j =>
-						{
-							for (int i = 0; i < COM.GetLength(0) - intxshift; i++)
-								COM[COM.GetLength(0) - i - 1, j] = COM[COM.GetLength(0) - intxshift - i - 1, j];
-							for (int i = 0; i < intxshift; i++)
-								COM[i, j] = mean;
-						});
-					}
-
-					if (intyshift > 0)//shift REL in horizontal dim (0) to the left
-					{
-						Parallel.For(0, COM.GetLength(0), i =>
-						{
-							for (int j = 0; j < COM.GetLength(1) - intyshift; j++)
-								COM[i, j] = COM[i, j + intyshift];
-							for (int j = COM.GetLength(1) - intyshift; j < COM.GetLength(1); j++)
-								COM[i, j] = mean;
-						});
-					}
-
-					if (intyshift < 0)//shift REL in horizontal dim (0) to the right
-					{
-						intyshift = -intyshift;
-
-						Parallel.For(0, COM.GetLength(0), i =>
-						{
-							for (int j = 0; j < COM.GetLength(1) - intyshift; j++)
-								COM[i, COM.GetLength(1) - j - 1] = COM[i, COM.GetLength(1) - intyshift - j - 1];
-							for (int j = 0; j < intyshift; j++)
-								COM[i, j] = mean;
-						});
-					}
-
-					ImageSet[c].SetImage(COM, Do_Stats, true);
-				}
+					ImageSet[c].SetImage(JPMath.RotateShiftArray(ImageSet[c].Image, 0, Double.MaxValue, Double.MaxValue, style, -xshift, -yshift, true), true, true);
+                }
 				return;
 			}
 
 			if (op.Equals("SCM"))
 			{
+				//FITSImageSet ImageSet = (FITSImageSet)arg[0];
+				//double sigma = (double)arg[2];
+				//double[,] result = new double[ImageSet[0].Width, ImageSet[0].Height];
+
+				//ParallelOptions opts = new ParallelOptions();
+				//opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
+
+				//Parallel.For(0, ImageSet[0].Width, opts, (x, state) =>
+				//{
+				//	if (WAITBAR.DialogResult == DialogResult.Cancel)
+				//		state.Stop();
+
+				//	if (x < ImageSet[0].Width / Environment.ProcessorCount)
+				//	{
+				//		//BGWRKR.ReportProgress(waitbar_count + 1, String.Concat("Iteration: ", iteration_count + 1, ". # of Offending Points: ", xinds.Length));
+				//	}
+
+				//	double[] pixstack = new double[ImageSet.Count];
+				//	double stdv;
+
+				//	for (int y = 0; y < ImageSet[0].Height; y++)
+				//	{
+				//		for (int z = 0; z < ImageSet.Count; z++)
+				//			pixstack[z] = ImageSet[z][x, y];
+
+				//		while (true)
+				//		{
+				//			for (int z = 0; z < ImageSet.Count; z++)
+				//				result[x, y] += pixstack[z];
+
+				//			result[x, y] /= (double)ImageSet.Count;
+				//			stdv = JPMath.Stdv(pixstack, result[x, y], false);
+
+				//			int zoffind = -1;
+				//			double maxoffend = 0;
+
+				//			for (int z = 0; z < ImageSet.Count; z++)
+				//			{
+				//				double delta = Math.Abs(pixstack[z] - result[x, y]);
+				//				if (delta > sigma * stdv && delta > maxoffend)
+				//				{
+				//					zoffind = z;
+				//					maxoffend = delta;
+
+				//					//MessageBox.Show(x + " " + y + " " + stdv + " " + (sigma * stdv) + " " + pixstack[z] + " " + result[x, y] + " " + delta);
+				//				}
+				//			}
+
+				//			if (zoffind >= 0)
+				//				pixstack[zoffind] = JPMath.Median(pixstack);
+				//			else
+				//				break;
+
+				//			result[x, y] = 0;
+				//		}
+				//	}
+				//});
+
+				//e.Result = result;
+				//return;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 				FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				double[,] img = new double[ImageSet[0].Width, ImageSet[0].Height];
-				int width = img.GetLength(0);
-				int height = img.GetLength(1);
+				double[,] meanimg = new double[ImageSet[0].Width, ImageSet[0].Height];
+				int width = meanimg.GetLength(0);
+				int height = meanimg.GetLength(1);
 				int L = ImageSet.Count;
 				double N = (double)L;
 
 				double sigma = (double)arg[2];
-				double[,] simg = (double[,])arg[3];
-				img = (double[,])arg[4];
+				double[,] stdvimg = (double[,])arg[3];
+				meanimg = (double[,])arg[4];
 
-				bool global_need = true;
-				int global_count = 0;
-				int psuedo_global_count = 0;
+				int iteration_count = 0;
+				int waitbar_count = 0;
 
 				int nptsrepeat1 = 0;
 				int nptsrepeat2 = 0;
 
-				while (global_need == true)
+				while (true)
 				{
 					if (WAITBAR.DialogResult == DialogResult.Cancel)
-					{
-						//still return image because we are just stopping the iteration
-						global_need = false;
-						goto stop_scm;
-					}
+						break;
 
-					double std = JPMath.Stdv(simg, true);
-					double mean = JPMath.Mean(simg, true);
+					double std = JPMath.Stdv(stdvimg, true);
+					double mean = JPMath.Mean(stdvimg, true);
 					int[] xinds, yinds;
-					JPMath.Find(simg, mean + sigma * std, ">", true, out xinds, out yinds);//find pts > clip range
+					JPMath.Find(stdvimg, mean + sigma * std, ">", true, out xinds, out yinds);//find pts > clip range
 
 					if (xinds.Length == 0)
-						goto stop_scm;
+						break;
 
-					BGWRKR.ReportProgress(psuedo_global_count + 1, String.Concat("Iteration: ", global_count + 1, ". # of Offending Points: ", xinds.Length));
+					BGWRKR.ReportProgress(waitbar_count + 1, String.Concat("Iteration: ", iteration_count + 1, ". # of Offending Points: ", xinds.Length));
 
 					if (xinds.Length != 0)//then do some clippin!
 					{
@@ -545,8 +600,6 @@ namespace JPFITS
 							nptsrepeat2++;
 
 						double med;
-						bool need = true;
-						bool first = true;
 						int count = 0;//breakout counter if too high
 						double[] clipvec = new double[L];
 						double max;
@@ -554,48 +607,38 @@ namespace JPFITS
 
 						for (int c = 0; c < xinds.Length; c++)
 						{
-							need = true;
-							first = true;
-							while (need == true)
+							for (int i = 0; i < L; i++)
+								clipvec[i] = ImageSet[i][xinds[c], yinds[c]];
+
+							while (true)
 							{
-								if (first == true)
-								{
-									for (int i = 0; i < L; i++)
-									{
-										clipvec[i] = ImageSet[i].Image[xinds[c], yinds[c]];
-									}
-									first = false;
-								}
 								med = JPMath.Median(clipvec);
 								max = JPMath.Max(JPMath.Abs(JPMath.VectorSubScalar(clipvec, med, false), false), out index, false);
 								if (max > sigma * std)
 								{
 									clipvec[index] = med;
-									img[xinds[c], yinds[c]] = JPMath.Mean(clipvec, true);
-									simg[xinds[c], yinds[c]] = JPMath.Stdv(clipvec, true);
+									meanimg[xinds[c], yinds[c]] = JPMath.Mean(clipvec, true);
+									stdvimg[xinds[c], yinds[c]] = JPMath.Stdv(clipvec, true);
 								}
 								else
-								{
-									need = false;
-								}
-								count++;
-								if (count > 3 * xinds.Length)//?arbitrary? number of iterations limit
-									need = false;//and go to next point
+									break;
+
+								if (++count > 3 * xinds.Length)//?arbitrary? number of iterations limit
+									break;//and go to next point
 							}
 						}
 					}
 					else
-					{
-						global_need = false;
-					}
-					global_count++;
-					if (global_count > 2000 || nptsrepeat2 > 5)
-						global_need = false;
-					psuedo_global_count++;
-					if (psuedo_global_count >= 100)
-						psuedo_global_count = 0;
+						break;
+
+					if (++iteration_count > 2000 || nptsrepeat2 > 5)
+						break;
+
+					if (++waitbar_count >= 100)
+						waitbar_count = 0;
 				}
-			stop_scm:;
+
+				e.Result = meanimg;
 				return;
 			}
 		}
@@ -632,7 +675,9 @@ namespace JPFITS
 
 		#endregion
 
-		/// <summary>Constructor. Images can be added via .Add.</summary>
+		#region CONSTRUCTORS
+
+		/// <summary>Constructor. Images can be added via Add, or Load, etc.</summary>
 		public FITSImageSet()
 		{
 			FITSLIST = new ArrayList();
@@ -645,6 +690,52 @@ namespace JPFITS
 			BGWRKR.RunWorkerCompleted += new RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
 		}
 
+		/// <summary>
+		/// Constructor with a list of file names, and file reading settings as with the Load function. Displays a cancellable WaitBar when loading the files.
+		/// </summary>
+		/// <param name="fullFileNames">The full path list of files to load into the set.</param>
+		/// <param name="range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass null or Range[0] = -1 to default to full image size.</param>
+		/// <param name="doStats">Determine stats for each FITS object when loaded.</param>
+		/// <param name="diskParallel">Load the FITS files in parallel off of disk. Requires high-performance hard disk.</param>
+		/// <param name="waitbarMessage">Message to display on Waitbar progress if it is shown.</param>
+		public FITSImageSet(string[] fullFileNames, int[]? range, bool doStats, bool diskParallel, string waitbarMessage)
+		{
+			FITSLIST = new ArrayList();
+			CODIMENSIONAL = true;
+			BGWRKR = new BackgroundWorker();
+			BGWRKR.WorkerReportsProgress = true;
+			BGWRKR.WorkerSupportsCancellation = true;
+			BGWRKR.DoWork += new DoWorkEventHandler(BGWRKR_DoWork);
+			BGWRKR.ProgressChanged += new ProgressChangedEventHandler(BGWRKR_ProgressChanged);
+			BGWRKR.RunWorkerCompleted += new RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
+
+			this.Load(fullFileNames, range, doStats, diskParallel, waitbarMessage);
+		}
+
+		/// <summary>
+		/// Constructor with a list of file names, and file reading settings as with the Load function.
+		/// </summary>
+		/// <param name="fullFileNames">The full path list of files to load into the set.</param>
+		/// <param name="range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass null or Range[0] = -1 to default to full image size.</param>
+		/// <param name="doStats">Determine stats for each FITS object when loaded.</param>
+		/// <param name="diskParallel">Load the FITS files in parallel off of disk. Requires high-performance hard disk.</param>
+		public FITSImageSet(string[] fullFileNames, int[]? range, bool doStats, bool diskParallel)
+		{
+			FITSLIST = new ArrayList();
+			CODIMENSIONAL = true;
+			BGWRKR = new BackgroundWorker();
+			BGWRKR.WorkerReportsProgress = true;
+			BGWRKR.WorkerSupportsCancellation = true;
+			BGWRKR.DoWork += new DoWorkEventHandler(BGWRKR_DoWork);
+			BGWRKR.ProgressChanged += new ProgressChangedEventHandler(BGWRKR_ProgressChanged);
+			BGWRKR.RunWorkerCompleted += new RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
+
+			this.Load(fullFileNames, range, doStats, diskParallel);
+		}
+
+		#endregion
+
+		#region PROPERTIES
 		/// <summary>FITSImageSet indexer accesses the FITSImage object in the FITSImageSet at a given index, i.e. FITSImage f = FITSImageSet[i].</summary>
 		public FITSImage this[int i]
 		{
@@ -690,116 +781,169 @@ namespace JPFITS
 			}
 		}
 
-		/// <summary>Returns a String array of the file paths (excluding file names) of all FITSImage objects in the current FITSImageSet.</summary>
+		/// <summary>
+		/// Getter returns a String array of the file paths (excluding file names) of all FITSImage objects in the current FITSImageSet. If Setting, argument can be either a 1-element array, which therefore changes all file paths to the same value, or an array the same length as the number of members to set each individually. User is responsible for managing possibility of identical full file names in the members.
+		/// </summary>
 		public string[] FilePaths
 		{
 			get
 			{
-				string[] names = new string[FITSLIST.Count];
+				string[] paths = new string[FITSLIST.Count];
 				for (int i = 0; i < FITSLIST.Count; i++)
-					names[i] = ((FITSImage)(FITSLIST[i])).FilePath;
+					paths[i] = ((FITSImage)(FITSLIST[i])).FilePath;
 
-				return names;
+				return paths;
 			}
+
+			set
+			{
+				if (value.Length == 1)
+					for (int i = 0; i < FITSLIST.Count; i++)
+						((FITSImage)FITSLIST[i]).FilePath = value[0];
+				else
+					for (int i = 0; i < FITSLIST.Count; i++)
+						((FITSImage)FITSLIST[i]).FilePath = value[i];
+			}
+		}
+		#endregion
+
+		#region FILEIO
+		/// <summary>Loads FITS objects into the FITSImageSet with a cancellable WaitBar. If the FITSImageSet already has members (not previously cleared), then the new memers are added (appended) to this FITSImageSet.</summary>
+		/// <param name="fullFileNames">The full path list of files to load into the set.</param>
+		/// <param name="range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass null or Range[0] = -1 to default to full image size.</param>
+		/// <param name="doStats">Determine stats for each FITS object when loaded.</param>
+		/// <param name="diskParallel">True to load the FITS files with parallelized requests to disk, false for serial disk access. True requires high-performance hard disk.</param>
+		/// <param name="waitbarMessage">Message to display on Waitbar progress.</param>
+		public bool Load(string[] fullFileNames, int[]? range, bool doStats, bool diskParallel, string waitbarMessage)
+		{
+			WAITBAR = new WaitBar();
+			WAITBAR.ProgressBar.Maximum = fullFileNames.Length;
+			WAITBAR.Text = "Loading Image Set: " + fullFileNames.Length + " files...";
+			object[] arg = new object[6];
+			arg[0] = fullFileNames;
+			arg[1] = "load";
+			arg[2] = doStats;
+			arg[3] = diskParallel;
+			arg[4] = range;
+			arg[5] = waitbarMessage;
+			BGWRKR.RunWorkerAsync(arg);
+			WAITBAR.ShowDialog();
+			if (WAITBAR.DialogResult == DialogResult.Cancel)
+				return false;
+			else
+				return true;
 		}
 
 		/// <summary>Loads FITS objects into the FITSImageSet. If the FITSImageSet already has members (not previously cleared), then the new memers are added (appended) to this FITSImageSet.</summary>
 		/// <param name="fullFileNames">The full path list of files to load into the set.</param>
 		/// <param name="range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass null or Range[0] = -1 to default to full image size.</param>
-		/// <param name="doStats">Determine stats for each FITS object when loaded.</param>
-		/// <param name="doParallel">Load the FITS files in parallel.</param>
-		/// <param name="waitbar">Optionally show a cancellable waitbar when loading. If cancelled, return value is false.</param>
-		/// <param name="waitbarMessage">Message to display on Waitbar progress if it is shown.</param>
-		public bool Load(string[] fullFileNames, int[]? range, bool doStats, bool doParallel, bool waitbar, string waitbarMessage)
+		/// <param name="doStats">Determine stats for each FITS image.</param>
+		/// <param name="diskParallel">True to load the FITS files with parallelized requests to disk, false for serial disk access. True requires high-performance hard disk.</param>
+		public void Load(string[] fullFileNames, int[]? range, bool doStats, bool diskParallel)
 		{
-			if (!waitbar)
-			{
-				ParallelOptions opts = new ParallelOptions();
-				if (doParallel)
-					opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
-				else
-					opts.MaxDegreeOfParallelism = 1;
-
-				JPFITS.FITSImage[] set = new JPFITS.FITSImage[fullFileNames.Length];
-
-				Parallel.For(0, fullFileNames.Length, opts, i =>
-				{
-					set[i] = new FITSImage(fullFileNames[i], range, true, true, doStats, !doParallel);
-				});
-
-				for (int i = 0; i < fullFileNames.Length; i++)
-					FITSLIST.Add(set[i]);
-
-				return true;
-			}
+			ParallelOptions opts = new ParallelOptions();
+			if (diskParallel)
+				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
 			else
+				opts.MaxDegreeOfParallelism = 1;
+
+			JPFITS.FITSImage[] set = new JPFITS.FITSImage[fullFileNames.Length];
+
+			Parallel.For(0, fullFileNames.Length, opts, i =>
 			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = fullFileNames.Length;
-				WAITBAR.Text = "Loading Image Set: " + fullFileNames.Length + " files...";
-				WAITBAR.TopMost = true;// StartPosition = Windows.Forms.FormStartPosition.;
-				object[] arg = new object[6];
-				arg[0] = fullFileNames;
-				arg[1] = "load";
-				arg[2] = doStats;
-				arg[3] = doParallel;
-				arg[4] = range;
-				arg[5] = waitbarMessage;
-				BGWRKR.RunWorkerAsync(arg);
-				WAITBAR.ShowDialog();
-				if (WAITBAR.DialogResult == DialogResult.Cancel)
-					return false;
-				else
-					return true;
-			}
+				set[i] = new FITSImage(fullFileNames[i], range, true, true, doStats, !diskParallel);
+			});
+
+			for (int i = 0; i < fullFileNames.Length; i++)
+				FITSLIST.Add(set[i]);
+		}
+
+		/// <summary>
+		/// Load FITSImage from the extensions in the FITS file as a FITSImageSet.
+		/// </summary>
+		/// <param name="fullFileName">The full path file name of the FITS file containing the IMAGE extensions.</param>
+		/// <param name="extensionIndexes">The indices of the extensions to read.</param>
+		/// <param name="range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass null or Range[0] = -1 to default to full image size.</param>
+		/// <param name="doStats">>Determine stats for each FITS image.</param>
+		/// <param name="waitbarMessage">Message to display on Waitbar progress.</param>
+		/// <returns></returns>
+		public bool LoadExtensions(string fullFileName, int[] extensionIndexes, int[]? range, bool doStats, string waitbarMessage)
+		{
+			WAITBAR = new WaitBar();
+			WAITBAR.ProgressBar.Maximum = extensionIndexes.Length;
+			WAITBAR.Text = "Loading Image Set from extensions: " + extensionIndexes.Length + " files...";
+			WAITBAR.TopMost = true;
+			object[] arg = new object[6];
+			arg[0] = fullFileName;
+			arg[1] = "loadextensions";
+			arg[2] = doStats;
+			arg[3] = extensionIndexes;
+			arg[4] = range;
+			arg[5] = waitbarMessage;
+			BGWRKR.RunWorkerAsync(arg);
+			WAITBAR.ShowDialog();
+			if (WAITBAR.DialogResult == DialogResult.Cancel)
+				return false;
+			else
+				return true;
+		}
+
+		/// <summary>
+		/// Load FITSImage from the extensions in the FITS file as a FITSImageSet.
+		/// </summary>
+		/// <param name="fullFileName">The full path file name of the FITS file containing the IMAGE extensions.</param>
+		/// <param name="extensionIndexes">The indices of the extensions to read.</param>
+		/// <param name="range">Range is ZERO based 1-D int array [xmin xmax ymin ymax].  Pass null or Range[0] = -1 to default to full image size.</param>
+		/// <param name="doStats">>Determine stats for each FITS image.</param>
+		public void LoadExtensions(string fullFileName, int[] extensionIndexes, int[]? range, bool doStats)
+		{
+			for (int i = 0; i < extensionIndexes.Length; i++)
+				FITSLIST.Add(new JPFITS.FITSImage(fullFileName, extensionIndexes[i], range, true, true, doStats, true));
 		}
 
 		/// <summary>Write the FITSImage objects from the FITSImageSet to disk.</summary>
 		/// <param name="precision">The precision at which to write the image data.</param>
 		/// <param name="doParallel">Write the images with parallelism. In the past with platter drives this would have been impossible, but fast solid state drives can handle it. If there's only a few images then don't bother, but useful when writing hundreds.</param>
-		/// <param name="waitbar">Optionally show a cancellable waitbar when saving. If cancelled, return value is false.</param>
 		/// <param name="waitbarMessage">Message to display on Waitbar progress if it is shown.</param>
-		public bool Write(TypeCode precision, bool doParallel, bool waitbar, string waitbarMessage)
-		{
-			if (!waitbar)
-			{
-				ParallelOptions opts = new ParallelOptions();
-				if (doParallel)
-					opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
-				else
-					opts.MaxDegreeOfParallelism = 1;
-
-				Parallel.For(0, FITSLIST.Count, opts, i =>
-				{
-					((FITSImage)FITSLIST[i]).WriteImage(precision, !doParallel);
-				});
-
-				return true;
-			}
+		public bool Write(TypeCode precision, bool doParallel, string waitbarMessage)
+		{			
+			WAITBAR = new WaitBar();
+			WAITBAR.ProgressBar.Maximum = FITSLIST.Count;
+			WAITBAR.Text = "Saving Image Set: " + FITSLIST.Count + " files...";
+			object[] arg = new object[5];
+			arg[0] = "";
+			arg[1] = "save";
+			arg[2] = doParallel;
+			arg[3] = precision;
+			arg[4] = waitbarMessage;
+			BGWRKR.RunWorkerAsync(arg);
+			WAITBAR.ShowDialog();
+			if (WAITBAR.DialogResult == DialogResult.Cancel)
+				return false;
 			else
+				return true;
+		}
+
+		/// <summary>Write the FITSImage objects from the FITSImageSet to disk.</summary>
+		/// <param name="precision">The precision at which to write the image data.</param>
+		/// <param name="doParallel">Write the images with parallelism. In the past with platter drives this would have been impossible, but fast solid state drives can handle it. If there's only a few images then don't bother, but useful when writing hundreds.</param>
+		public void Write(TypeCode precision, bool doParallel)
+		{
+			ParallelOptions opts = new ParallelOptions();
+			if (doParallel)
+				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
+			else
+				opts.MaxDegreeOfParallelism = 1;
+
+			Parallel.For(0, FITSLIST.Count, opts, i =>
 			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = FITSLIST.Count;
-				WAITBAR.Text = "Saving Image Set: " + FITSLIST.Count + " files...";
-				WAITBAR.TopMost = true;// StartPosition = Windows.Forms.FormStartPosition.;
-				object[] arg = new object[5];
-				arg[0] = "";
-				arg[1] = "save";
-				arg[2] = doParallel;
-				arg[3] = precision;
-				arg[4] = waitbarMessage;
-				BGWRKR.RunWorkerAsync(arg);
-				WAITBAR.ShowDialog();
-				if (WAITBAR.DialogResult == DialogResult.Cancel)
-					return false;
-				else
-					return true;
-			}
+				((FITSImage)FITSLIST[i]).WriteImage(precision, !doParallel);
+			});
 		}
 
 		/// <summary>Write the FITSImage objects from the FITSImageSet as extensions.</summary>
 		/// <param name="fileName">The file name to write to.</param>
-		/// <param name="appendToExistingFile">Option to write extensions into existing FITS file. Throws an exception if firstAsPrimary is true.</param>
+		/// <param name="appendToExistingFile">Option to write extensions into existing FITS file. Throws an exception if firstAsPrimary is true. If the file doesn't exist, will create a new file with the logic for the following parameters.</param>
 		/// <param name="firstAsPrimary">Option to write the first image in the set as the primary data block, otherwise all images to be written as extensions. If true, will overwrite any existing file.</param>
 		/// <param name="primaryHeader">If the first image is not to be written as the primary data block, then a header may be supplied for the primary block. Pass null for default header. Throws an exception if firstAsPrimary is true and primaryHeader is not null.</param>
 		/// <param name="extensionNames">The names of the extensions. No elements may be empty strings; all elements must be unique. Pass null for automatic incremenetal naming as number ######.</param>
@@ -822,7 +966,7 @@ namespace JPFITS
 			}
 			else
 				if (extensionNames.Length != this.Count)
-				throw new Exception("The number of images (" + this.Count + ") is not equal to the number of extensionNames (" + extensionNames.Length + ")");
+					throw new Exception("The number of images (" + this.Count + ") is not equal to the number of extensionNames (" + extensionNames.Length + ")");
 
 			if (!extnameWASnull)
 			{
@@ -835,7 +979,7 @@ namespace JPFITS
 					if (i == 0 && firstAsPrimary)
 						continue;
 					else if (extensionNames[i] == "")
-						throw new Exception("Extension name at element " + (i + 1) + " is an emppty String. Please use good practice and name your extensions...");
+						throw new Exception("Extension name at element " + (i + 1) + " is an empty String. Please use good practice and name your extensions...");
 			}
 
 			if (imagePrecisions.Length == 1 && this.Count > 1)
@@ -856,7 +1000,7 @@ namespace JPFITS
 
 				if (this.Count > 1)
 					this[0].Header.SetKey("EXTEND", "T", "File may contain extensions", true, 7);
-				this[0].WriteImage(fileName, imagePrecisions[0], false);
+				this[0].WriteImage(fileName, imagePrecisions[0], true);
 			}
 
 			FileStream fs;
@@ -895,7 +1039,7 @@ namespace JPFITS
 						writedata[i * 80 + j] = (byte)head[i][j];
 				fs.Write(writedata, 0, writedata.Length);
 
-				writedata = this[c].GetFormattedDataBlock(imagePrecisions[c], false);
+				writedata = FITSFILEOPS.GETBYTEFORMATTEDDATAUNIT(imagePrecisions[c], true, this[c].Image);
 				fs.Write(writedata, 0, writedata.Length);
 			}
 			fs.Close();
@@ -903,6 +1047,28 @@ namespace JPFITS
 			return true;
 		}
 
+		///// <summary>Write the FITSImage objects from the FITSImageSet as layers of a 3D image cube.</summary>
+		///// <param name="fileName">The file name to write to.</param>		
+		///// <param name="primaryHeader">Pass null for default header which is the header will all identical key values over all headers in the current FITSImageSet.</param>
+		///// <param name="primaryPrecision">The precision at which to write the primary data block.</param>
+		//public bool WriteAsImageLayerCube(string fileName, JPFITS.FITSHeader? primaryHeader, TypeCode primaryPrecision)
+		//{
+		//	if (primaryHeader == null)
+		//		primaryHeader = new JPFITS.FITSHeader(true, this, true);
+
+		//	string[] phead = primaryHeader.GetFormattedHeaderBlock(false, false);
+
+		//	for (int z = 0; z < this.Count; z++)
+		//	{
+
+		//	}
+
+		//	return false;
+		//}
+
+		#endregion
+
+		#region INSTANCE MEMBERS
 		/// <summary>Appends a FITSImage object to the ArrayList FITSImageSet object.</summary>
 		public void Add(FITSImage FITS)
 		{
@@ -911,7 +1077,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Inserts a FITSImage object to the ArrayList FITSImageSet object at a given index.
-		/// <para>If index is larger than the FITSImageSet count, the FITS object will be appended to the end.</para></summary>
+		/// <br />If index is larger than the FITSImageSet count, the FITS object will be appended to the end.<br /></summary>
 		public void AddAt(int index, FITSImage FITS)
 		{
 			if (index >= FITSLIST.Count)
@@ -922,39 +1088,36 @@ namespace JPFITS
 		}
 
 		/// <summary>Removes the FITSImage object at index from the FITSImageSet.
-		/// <para>If index is beyond the set size, nothing happens.</para></summary>
+		/// <br />If index is beyond the set size, nothing happens.</summary>
 		public void RemoveAt(int index)
 		{
 			if (index < FITSLIST.Count)
 			{
 				FITSLIST.RemoveAt(index);
 				FITSLIST.TrimToSize();
-				CHECK_CODIMENSIONAL();
 			}
 		}
 
 		/// <summary>Removes the FITSImage objects starting at index from the FITSImageSet.
-		/// <para>If index is beyond the set size, nothing happens.</para></summary>
+		/// <br />If index is beyond the set size, nothing happens.</summary>
 		public void RemoveFrom(int index)
 		{
 			if (index < FITSLIST.Count)
 			{
 				FITSLIST.RemoveRange(index, FITSLIST.Count - index);
 				FITSLIST.TrimToSize();
-				CHECK_CODIMENSIONAL();
 			}
 		}
 
 		/// <summary>Removes the count range of FITSImage objects starting at index from the FITSImageSet.
-		/// <para>If index is beyond the set size, nothing happens.</para>
-		/// <para>If index plus count is beyond the set size, all elements from index are removed.</para></summary>
+		/// <br />If index is beyond the set size, nothing happens.
+		/// <br />If index plus count is beyond the set size, all elements from index are removed.</summary>
 		public void RemoveRange(int index, int count)
 		{
 			if (index < FITSLIST.Count && index + count <= FITSLIST.Count)
 			{
 				FITSLIST.RemoveRange(index, count);
 				FITSLIST.TrimToSize();
-				CHECK_CODIMENSIONAL();
 				return;
 			}
 
@@ -962,42 +1125,26 @@ namespace JPFITS
 			{
 				FITSLIST.RemoveRange(index, FITSLIST.Count - index);
 				FITSLIST.TrimToSize();
-				CHECK_CODIMENSIONAL();
 			}
+		}
+
+		/// <summary>
+		/// Removes a series of FITSImage indexed entries in the FITSImageSet
+		/// </summary>
+		/// <param name="indices">The indexes of the items to remove.</param>
+		public void RemoveRange(int[] indices)
+		{
+			for (int i = indices.Length - 1; i >= 0; i--)
+				FITSLIST.RemoveAt(indices[i]);
+
+			FITSLIST.TrimToSize();
 		}
 
 		/// <summary>Gets the common directory of the FITSImage objects in the FITSImageSet based on their file paths.</summary>
 		public string GetCommonDirectory()
 		{
 			return FITSImageSet.GetCommonDirectory(this.FilePaths);
-		}
-
-		/// <summary>Gets the common directory of a series of file names, based on their file paths.</summary>
-		public static string GetCommonDirectory(string[] filelist)
-		{
-			string first = filelist[0];
-			for (int i = 1; i < filelist.Length; i++)
-			{
-				string second = filelist[i];
-				int N = first.Length;
-				for (int j = 0; j < second.Length; j++)
-				{
-					if (j == N || first[j] != second[j])
-					{
-						first = first.Substring(0, j);
-						break;
-					}
-				}
-			}
-			if (!Directory.Exists(first))
-				first = first.Substring(0, first.LastIndexOf("\\"));
-			return first;
-		}
-
-		public void SubtractImage(FITSImage image, bool doParallel, bool fineGrainParallel)
-		{
-
-		}
+		}		
 
 		/// <summary>Clears the ArrayList FITSImageSet object of all members.</summary>
 		public void Clear()
@@ -1007,12 +1154,12 @@ namespace JPFITS
 		}
 
 		/// <summary>Sort sorts the FITSImageSet list given the key. Returns -1 if there was an error with the sort.</summary>
-		/// <param name="key">If key is &quot;filename&quot; then the FITSImageSet list is sorted according to the member file names.
-		/// <para> For example if the file names are alphabetical or numeric then the FITSImageSet list will be sorted by increasing file name.</para>
-		/// <para> Otherwise key is a primary header key and then their corresponding values will be used to sort by increasing value the FITSImageSet list.</para></param>
-		public int Sort(string key)
+		/// <param name="headerkey">If key is &quot;filename&quot; then the FITSImageSet list is sorted according to the member file names.
+		/// <br /> For example if the file names are alphabetical or numeric then the FITSImageSet list will be sorted by increasing file name.
+		/// <br /> Otherwise key is a primary header key and then their corresponding values will be used to sort by increasing value the FITSImageSet list.</param>
+		public int Sort(string headerkey)
 		{
-			if (key == "filename")//filenames are nice because they are always unique
+			if (headerkey == "filename")//filenames are nice because they are always unique
 			{
 				string[] keys = new string[FITSLIST.Count];
 
@@ -1044,7 +1191,7 @@ namespace JPFITS
 			bool numeric = true;
 			try
 			{
-				double d = Convert.ToDouble(((FITSImage)(FITSLIST[0])).Header.GetKeyValue(key));
+				double d = Convert.ToDouble(((FITSImage)(FITSLIST[0])).Header.GetKeyValue(headerkey));
 			}
 			catch
 			{
@@ -1059,7 +1206,7 @@ namespace JPFITS
 
 				for (int i = 0; i < FITSLIST.Count; i++)
 				{
-					keys[i] = ((FITSImage)(FITSLIST[i])).Header.GetKeyValue(key);
+					keys[i] = ((FITSImage)(FITSLIST[i])).Header.GetKeyValue(headerkey);
 
 					if (keys[i] == "" && keycheck)
 					{
@@ -1073,11 +1220,11 @@ namespace JPFITS
 
 				for (int i = 0; i < FITSLIST.Count; i++)
 				{
-					if (keys[i] == ((FITSImage)(FITSLIST[i])).Header.GetKeyValue(key))
+					if (keys[i] == ((FITSImage)(FITSLIST[i])).Header.GetKeyValue(headerkey))
 						continue;
 
 					for (int j = i + 1; j < FITSLIST.Count; j++)
-						if (keys[i] == ((FITSImage)(FITSLIST[j])).Header.GetKeyValue(key))
+						if (keys[i] == ((FITSImage)(FITSLIST[j])).Header.GetKeyValue(headerkey))
 						{
 							FITSImage tempfits = (FITSImage)FITSLIST[i];
 							FITSLIST[i] = FITSLIST[j];
@@ -1094,7 +1241,7 @@ namespace JPFITS
 
 				for (int i = 0; i < FITSLIST.Count; i++)
 				{
-					string k = ((FITSImage)(FITSLIST[i])).Header.GetKeyValue(key);
+					string k = ((FITSImage)(FITSLIST[i])).Header.GetKeyValue(headerkey);
 
 					if (k == "" && keycheck)
 					{
@@ -1105,7 +1252,7 @@ namespace JPFITS
 
 					try
 					{
-						keys[i] = Convert.ToDouble(((FITSImage)(FITSLIST[i])).Header.GetKeyValue(key));
+						keys[i] = Convert.ToDouble(((FITSImage)(FITSLIST[i])).Header.GetKeyValue(headerkey));
 					}
 					catch
 					{
@@ -1118,11 +1265,11 @@ namespace JPFITS
 
 				for (int i = 0; i < FITSLIST.Count; i++)
 				{
-					if (keys[i] == Convert.ToDouble(((FITSImage)(FITSLIST[i])).Header.GetKeyValue(key)))
+					if (keys[i] == Convert.ToDouble(((FITSImage)(FITSLIST[i])).Header.GetKeyValue(headerkey)))
 						continue;
 
 					for (int j = i + 1; j < FITSLIST.Count; j++)
-						if (keys[i] == Convert.ToDouble(((FITSImage)(FITSLIST[j])).Header.GetKeyValue(key)))
+						if (keys[i] == Convert.ToDouble(((FITSImage)(FITSLIST[j])).Header.GetKeyValue(headerkey)))
 						{
 							FITSImage tempfits = (FITSImage)FITSLIST[i];
 							FITSLIST[i] = FITSLIST[j];
@@ -1131,6 +1278,31 @@ namespace JPFITS
 				}
 				return 0;
 			}
+		}
+		#endregion
+
+		#region STATIC MEMBERS
+		/// <summary>Gets the common directory of a series of file names, based on their file paths.</summary>
+		public static string GetCommonDirectory(string[] filelist)
+		{
+			string first = filelist[0];
+			for (int i = 1; i < filelist.Length; i++)
+			{
+				string second = filelist[i];
+				int N = first.Length;
+				for (int j = 0; j < second.Length; j++)
+				{
+					if (j == N || first[j] != second[j])
+					{
+						first = first.Substring(0, j);
+						break;
+					}
+				}
+			}
+			if (!Directory.Exists(first))
+				first = first.Substring(0, first.LastIndexOf("\\"));
+
+			return first;// + "\\";
 		}
 
 		/// <summary>Create a FITSImage object with primary image that is the pixel-wise mean of the FITSImageSet primary images.</summary>
@@ -1158,7 +1330,7 @@ namespace JPFITS
 					return null;
 				}
 
-				return new FITSImage("Mean", (double[,])BGWRKR_RESULT, doStats, true);
+				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "mean.fits"), (double[,])BGWRKR_RESULT, doStats, true);
 			}
 			else
 			{
@@ -1175,19 +1347,19 @@ namespace JPFITS
 						double sum = 0;
 						for (int k = 0; k < L; k++)
 						{
-							sum = sum + fitsImageSet[k].Image[i, j];
+							sum = sum + fitsImageSet[k][i, j];
 						}
 						img[i, j] = sum / N;
 					}
 				});
 
-				return new FITSImage("c:\\Mean.fits", img, doStats, true);
+				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "mean.fits"), img, doStats, true);
 			}
 		}
 
 		/// <summary>Create a FITSImage object with primary image that is the pixel-wise sigma-clipped mean of the FITSImageSet primary images.
-		/// <para>The computation is iterative and may take a long time in some situations and so a cancellable WaitBar is mandatory.</para>
-		/// <para>If the computation is cancelled the function will return with the most recent iteration of the sigma-clipped stack.</para></summary>
+		/// <br />The computation is iterative and may take a long time in some situations and so a cancellable WaitBar is mandatory.
+		/// <br />If the computation is cancelled the function will return with the most recent iteration of the sigma-clipped stack.</summary>
 		/// <param name="fitsImageSet">The FITSImageSet object.</param>
 		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
 		/// <param name="sigma">The maximum standard deviation allowed for each pixel column; values beyond sigma are clipped and replaced with the median of the pixel column.</param>
@@ -1214,7 +1386,7 @@ namespace JPFITS
 			object[] arg = new object[] { fitsImageSet, "SCM", sigma, simg, img };
 			BGWRKR.RunWorkerAsync(arg);
 			WAITBAR.ShowDialog();
-			return new FITSImage("c:\\ClippedMean.fits", (double[,])BGWRKR_RESULT, doStats, true);
+			return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "ClippedMean.fits"), (double[,])BGWRKR_RESULT, doStats, true);
 		}
 
 		/// <summary>Create a FITSImage object with primary image that is the pixel-wise median of the FITSImageSet primary images.</summary>
@@ -1239,7 +1411,7 @@ namespace JPFITS
 				WAITBAR.ShowDialog();
 				if (WAITBAR.DialogResult == DialogResult.OK)
 				{
-					return new FITSImage("Median", (double[,])BGWRKR_RESULT, doStats, true);
+					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "median.fits"), (double[,])BGWRKR_RESULT, doStats, true);
 				}
 				else
 					return null;
@@ -1257,12 +1429,12 @@ namespace JPFITS
 					{
 						double[] medarray = new double[L];
 						for (int k = 0; k < L; k++)
-							medarray[k] = fitsImageSet[k].Image[i, j];
+							medarray[k] = fitsImageSet[k][i, j];
 						img[i, j] = JPMath.Median(medarray);
 					}
 				});
 
-				return new FITSImage("c:\\Median.fits", img, doStats, true);
+				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "median.fits"), img, doStats, true);
 			}
 		}
 
@@ -1287,7 +1459,7 @@ namespace JPFITS
 				WAITBAR.ShowDialog();
 				if (WAITBAR.DialogResult == DialogResult.OK)
 				{
-					return new FITSImage("Sum", (double[,])BGWRKR_RESULT, doStats, true);
+					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "sum.fits"), (double[,])BGWRKR_RESULT, doStats, true);
 				}
 				else
 					return null;
@@ -1305,12 +1477,12 @@ namespace JPFITS
 					{
 						double sum = 0;
 						for (int k = 0; k < L; k++)
-							sum = sum + fitsImageSet[k].Image[i, j];
+							sum = sum + fitsImageSet[k][i, j];
 						img[i, j] = sum;
 					}
 				});
 
-				return new FITSImage("c:\\Sum.fits", img, doStats, true);
+				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "sum.fits"), img, doStats, true);
 			}
 		}
 
@@ -1335,7 +1507,7 @@ namespace JPFITS
 				WAITBAR.ShowDialog();
 				if (WAITBAR.DialogResult == DialogResult.OK)
 				{
-					return new FITSImage("Quadrature", (double[,])BGWRKR_RESULT, doStats, true);
+					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "quadrature.fits"), (double[,])BGWRKR_RESULT, doStats, true);
 				}
 				else
 					return null;
@@ -1353,12 +1525,12 @@ namespace JPFITS
 					{
 						double quadsum = 0;
 						for (int k = 0; k < L; k++)
-							quadsum += (fitsImageSet[k].Image[i, j] * fitsImageSet[k].Image[i, j]);
+							quadsum += (fitsImageSet[k][i, j] * fitsImageSet[k][i, j]);
 						img[i, j] = Math.Sqrt(quadsum);
 					}
 				});
 
-				return new FITSImage("c:\\Quadrature.fits", img, doStats, true);
+				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "quadrature.fits"), img, doStats, true);
 			}
 		}
 
@@ -1383,7 +1555,7 @@ namespace JPFITS
 				WAITBAR.ShowDialog();
 				if (WAITBAR.DialogResult == DialogResult.OK)
 				{
-					return new FITSImage("Max", (double[,])BGWRKR_RESULT, doStats, true);
+					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "max.fits"), (double[,])BGWRKR_RESULT, doStats, true);
 				}
 				else
 				{
@@ -1404,13 +1576,13 @@ namespace JPFITS
 					{
 						double max = Double.MinValue;
 						for (int k = 0; k < L; k++)
-							if (fitsImageSet[k].Image[i, j] > max)
-								max = fitsImageSet[k].Image[i, j];
+							if (fitsImageSet[k][i, j] > max)
+								max = fitsImageSet[k][i, j];
 						img[i, j] = max;
 					}
 				});
 
-				return new FITSImage("c:\\Max.fits", img, doStats, true);
+				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "max.fits"), img, doStats, true);
 			}
 		}
 
@@ -1435,7 +1607,7 @@ namespace JPFITS
 				WAITBAR.ShowDialog();
 				if (WAITBAR.DialogResult == DialogResult.OK)
 				{
-					return new FITSImage("Min", (double[,])BGWRKR_RESULT, doStats, true);
+					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "min.fits"), (double[,])BGWRKR_RESULT, doStats, true);
 				}
 				else
 				{
@@ -1456,13 +1628,13 @@ namespace JPFITS
 					{
 						double min = Double.MaxValue;
 						for (int k = 0; k < L; k++)
-							if (fitsImageSet[k].Image[i, j] < min)
-								min = fitsImageSet[k].Image[i, j];
+							if (fitsImageSet[k][i, j] < min)
+								min = fitsImageSet[k][i, j];
 						img[i, j] = min;
 					}
 				});
 
-				return new FITSImage("c:\\Min.fits", img, doStats, true);
+				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "min.fits"), img, doStats, true);
 			}
 		}
 
@@ -1487,7 +1659,7 @@ namespace JPFITS
 				WAITBAR.ShowDialog();
 				if (WAITBAR.DialogResult == DialogResult.OK)
 				{
-					return new FITSImage("Stdv", (double[,])BGWRKR_RESULT, doStats, true);
+					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "stdv.fits"), (double[,])BGWRKR_RESULT, doStats, true);
 				}
 				else
 					return null;
@@ -1507,36 +1679,37 @@ namespace JPFITS
 						double std = 0;
 						double mean = 0;
 						for (int k = 0; k < L; k++)
-							mean = mean + fitsImageSet[k].Image[i, j];
+							mean = mean + fitsImageSet[k][i, j];
 						mean = mean / N;
 						for (int q = 0; q < L; q++)
-							std = std + (fitsImageSet[q].Image[i, j] - mean) * (fitsImageSet[q].Image[i, j] - mean);
+							std = std + (fitsImageSet[q][i, j] - mean) * (fitsImageSet[q][i, j] - mean);
 						std = Math.Sqrt(std / (N - 1.0));
 						img[i, j] = std;
 					}
 				});
-				return new FITSImage("c:\\Stdv.fits", img, doStats, true);
+				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "stdv.fits"), img, doStats, true);
 			}
 		}
 
-		/// <summary>Auto-register non-rotational primary images from the FITSImageSet. Only works when there is no field rotation in the image set, only translational shifts, and the shifts are less than half of the field.</summary>
-		/// <param name="fitsImageSet">The FITSImageSet object.</param>
-		/// <param name="refImgIndex">The index in the FitSet list of the reference image to register all the other images to.</param>
-		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the registered images - saves time if you don't need those.</param>
-		public static void Register(JPFITS.FITSImageSet fitsImageSet, int refImgIndex, bool doStats)
+        /// <summary>Auto-register non-rotational primary images from the FITSImageSet. Only works when there is no field rotation in the image set, only translational shifts, and the shifts are less than half of the field.</summary>
+        /// <param name="fitsImageSet">The FITSImageSet object.</param>
+        /// <param name="refImgIndex">The index in the FitSet list of the reference image to register all the other images to.</param>
+        /// <param name="interpStyle">&quot;nearest&quot; - nearest-neighbor pixel, or, &quot;bilinear&quot; - for 2x2 interpolation, or, &quot;lanc_n&quot; - for Lanczos interpolation of order n = 3, 4, 5.</param>
+        /// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the registered images - saves time if you don't need those.</param>
+        public static void Register(JPFITS.FITSImageSet fitsImageSet, int refImgIndex, string interpStyle, bool doStats)
 		{
 			WAITBAR = new WaitBar();
 			WAITBAR.ProgressBar.Maximum = 100;
 			WAITBAR.Text = "Auto-Registering Images";
-			object[] arg = new object[] { fitsImageSet, "AutoReg", refImgIndex, doStats };
+			object[] arg = new object[] { fitsImageSet, "AutoReg", refImgIndex, doStats, interpStyle };
 			BGWRKR.RunWorkerAsync(arg);
 			WAITBAR.ShowDialog();
 		}
 
 		/// <summary>Scans all primary FITS headers in the FITSImageSet for identical lines and copies such lines to the specified FITSImage destination primary header.
-		/// <para>Usage is that perhaps you form the mean of the FITSImageSet as a new FITSImage, and this new FITSImage should contain all the primary header</para>
-		/// <para> lines which are identical in the FITSImageSet.</para>
-		/// <para>The existing primary header of the FITS_destination is cleared before the operation, except for essential keywords.</para></summary>
+		/// <br />Usage is that perhaps you form the mean of the FITSImageSet as a new FITSImage, and this new FITSImage should contain all the primary header
+		/// <br /> lines which are identical in the FITSImageSet.
+		/// <br /> The existing primary header of the FITS_destination is cleared before the operation, except for essential keywords.</summary>
 		public static void GatherHeaders(JPFITS.FITSImageSet fitsImageSet, FITSImage FITS_destination)
 		{
 			FITS_destination.Header.RemoveAllKeys(FITS_destination.Image);
@@ -1568,9 +1741,9 @@ namespace JPFITS
 		}
 
 		/// <summary>Scans all primary FITS headers from the file names for identical lines and copies such lines to the specified FITSImage destination primary header.
-		/// <para>Usage is that perhaps you form the mean of the FITSImageSet as a new FITSImage, and this new FITSImage should contain all the primary header</para>
-		/// <para> lines which are identical in the file names.</para>
-		/// <para>The existing primary header of the FITSImage is cleared before the operation, except for essential keywords.</para></summary>
+		/// <br />Usage is that perhaps you form the mean of the FITSImageSet as a new FITSImage, and this new FITSImage should contain all the primary header
+		/// <br /> lines which are identical in the file names.
+		/// <br />The existing primary header of the FITSImage is cleared before the operation, except for essential keywords.</summary>
 		public static void GatherHeaders(string[] filenames, JPFITS.FITSImage FITS_destination)
 		{
 			JPFITS.FITSImageSet mergeset = new JPFITS.FITSImageSet();
@@ -1580,5 +1753,39 @@ namespace JPFITS
 			JPFITS.FITSImageSet.GatherHeaders(mergeset, FITS_destination);
 		}
 
+		/// <summary></summary>
+		/// <param name="sourceFullFileName"></param>
+		public static FITSImageSet ReadPrimaryImageLayerCubeAsSet(string sourceFullFileName)
+		{
+			int[] axesN;
+			double[] cube = FITSImage.ReadPrimaryNDimensionalData(sourceFullFileName, out axesN);
+
+			if (axesN.Length != 3)
+				throw new Exception("File does not contain a data cube: NAXIS = " + axesN.Length);
+			if (axesN[3] == 1)
+				throw new Exception("File does not contain a data cube: NAXIS3 = 1");
+
+			string destFullFileName = sourceFullFileName.Substring(0, sourceFullFileName.LastIndexOf("\\")) + "\\";
+
+			FITSImageSet set = new FITSImageSet();
+
+			for (int z = 0; z < axesN[2]; z++)//z is each layer of the cube
+			{
+				double[,] layer = new double[axesN[0], axesN[1]];
+
+				Parallel.For(0, axesN[1], y =>
+				{
+					for (int x = 0; x < axesN[0]; x++)
+						layer[x, y] = cube[z * axesN[1] * axesN[0] + y * axesN[0] + x];
+				});
+
+				FITSImage fi = new FITSImage(destFullFileName + z.ToString("000000000") + ".fits", layer, false, true);
+				set.Add(fi);
+			}
+
+			return set;
+		}
+		#endregion
 	}
 }
+
