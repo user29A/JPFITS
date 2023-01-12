@@ -1,11 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace JPFITS
@@ -81,6 +74,11 @@ namespace JPFITS
 			}
 			else
 				CommentKeyLineChck.Checked = false;
+		}
+
+		private void KeyCommentTxt_TextChanged(object sender, EventArgs e)
+		{
+			label3.Text = String.Format("Key Comment ({0})", (48 - KeyCommentTxt.Text.Length).ToString());
 		}
 	}
 }

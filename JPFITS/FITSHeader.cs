@@ -28,12 +28,6 @@ namespace JPFITS
 				HEADERKEYS = new JPFITS.FITSHeaderKey[headerlines.Count];
 			else
 				HEADERKEYS = new JPFITS.FITSHeaderKey[0];
-			/*{
-				int N = 10;
-				if (headerlines.Count < 10)
-					N = headerlines.Count;
-				HEADERKEYS = new JPFITS.FITSHeaderKey[N];
-			}*/
 
 			for (int i = 0; i < HEADERKEYS.Length; i++)
 				HEADERKEYS[i] = new FITSHeaderKey((string)headerlines[i]);
@@ -113,7 +107,6 @@ namespace JPFITS
 					c++;
 				}
 
-			//END
 			newheaderkeys[newheaderkeys.Length - 1] = new FITSHeaderKey("END");
 
 			HEADERKEYS = newheaderkeys;

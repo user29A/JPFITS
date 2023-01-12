@@ -61,9 +61,6 @@ namespace JPFITS
 
 		public void UpdateImageSetHeaderIndex(int index)
 		{
-			//if (index < 0 || index >= IMAGESET.Count)
-			//	return;
-
 			if (index == IMAGESETHEADERINDEX)
 				return;
 

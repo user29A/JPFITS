@@ -3,9 +3,6 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
 using System.Collections.Concurrent;
-using System.Windows.Forms.DataVisualization.Charting;
-using System.Windows.Forms;
-
 #nullable enable
 
 namespace JPFITS
@@ -1748,8 +1745,8 @@ namespace JPFITS
 				for (int i = 0; i < naxnisn.Length; i++)
 					HEADER.SetKey("NAXIS" + (i + 1).ToString(), naxnisn[i].ToString(), "number of elements on this axis", true, 3 + i);
 
-				HEADER.SetKey("BZERO", bzero.ToString(), "data offset", true, 0);
-				HEADER.SetKey("BSCALE", bscale.ToString(), "data scaling", true, 0);
+				HEADER.SetKey("BZERO", bzero.ToString(), "data offset", true, 3 + naxnisn.Length);
+				HEADER.SetKey("BSCALE", bscale.ToString(), "data scaling", true, 3 + naxnisn.Length + 1);
 			}
 		}
 

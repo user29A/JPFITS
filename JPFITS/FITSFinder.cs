@@ -78,8 +78,6 @@ namespace JPFITS
 
 			CustomExtensionChck.Checked = Convert.ToBoolean(REG.GetReg("CCDLAB", "CustomExtChck"));
 			CustomExtensionTxtBox.Text = (string)REG.GetReg("CCDLAB", "CustomExtTxt");
-
-			//FOUNDFILES = new string[0];
 		}
 
 		private void FindBtn_Click(object sender, EventArgs e)
@@ -232,10 +230,7 @@ namespace JPFITS
 
 		private void CustomExtensionTxtBox_TextChanged(object sender, EventArgs e)
 		{
-			/*if (CustomExtensionTxtBox.Text.Substring(0, 1) != ".")
-				CustomExtensionTxtBox.Text = "." + CustomExtensionTxtBox.Text;
-
-			CustomExtensionTxtBox.Cur*/
+			
 		}
 	}
 }

@@ -88,6 +88,7 @@
 			this.KeyCommentTxt.Name = "KeyCommentTxt";
 			this.KeyCommentTxt.Size = new System.Drawing.Size(347, 21);
 			this.KeyCommentTxt.TabIndex = 2;
+			this.KeyCommentTxt.TextChanged += new System.EventHandler(this.KeyCommentTxt_TextChanged);
 			// 
 			// label3
 			// 

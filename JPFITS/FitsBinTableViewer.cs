@@ -1,13 +1,19 @@
 ﻿using System;
 using System.Windows.Forms;
 using System.Threading.Tasks;
-
+#nullable enable
 
 namespace JPFITS
 {
 	/// <summary>FitsExtensionTableViewer class for viewing any of the FITS binary table extensions which may exist in a file as a table.</summary>
 	public partial class FitsBinTableViewer : Form
 	{
+		private string? FILENAME;
+		private string? EXTENSIONNAME;
+		private Array[]? DATATABLE;
+		private FITSBinTable? FITSBINTABLE;
+		private bool HEADERFRONT = false;
+
 		/// <summary>FitsExtensionTableViewer class constructor.</summary>
 		/// <param name="FileName">The fill file name to open the extensions from.</param>
 		public FitsBinTableViewer(String FileName)
@@ -37,13 +43,6 @@ namespace JPFITS
 					this.MenuChooseTable.DropDownItems[MenuChooseTable.DropDownItems.Count - 1].Click += new System.EventHandler(MenuChooseTable_Click);
 					((ToolStripMenuItem)this.MenuChooseTable.DropDownItems[MenuChooseTable.DropDownItems.Count - 1]).CheckedChanged += new System.EventHandler(MenuChooseTable_CheckedChanged);
 				}
-
-				//this.Show();
-
-				//if (list.Length == 1)
-				//	PopulateTable(list[0]);
-				//else
-				//	MenuChooseTable.ShowDropDown();
 			}
 			catch (Exception e)
 			{
@@ -53,83 +52,73 @@ namespace JPFITS
 
 		public void PopulateTable(String ExtensionName)
 		{
-			//try
+			EXTENSIONNAME = ExtensionName;
+
+			FITSBINTABLE = new FITSBinTable(FILENAME, EXTENSIONNAME);
+			string[] labels = FITSBINTABLE.TableDataLabelsTTYPE;
+
+			for (int i = 0; i < labels.Length; i++)
+				labels[i] = labels[i].Trim();
+
+			for (int i = 0; i < labels.Length; i++)
 			{
-				EXTENSIONNAME = ExtensionName;
+				MenuChooseTableEntries.DropDownItems.Add(labels[i]);
+				((ToolStripMenuItem)MenuChooseTableEntries.DropDownItems[MenuChooseTableEntries.DropDownItems.Count - 1]).CheckOnClick = true;
+				((ToolStripMenuItem)MenuChooseTableEntries.DropDownItems[MenuChooseTableEntries.DropDownItems.Count - 1]).Checked = true;
+				this.MenuChooseTableEntries.DropDownItems[MenuChooseTableEntries.DropDownItems.Count - 1].Click += new System.EventHandler(MenuChooseTableEntries_Click);
+				((ToolStripMenuItem)this.MenuChooseTableEntries.DropDownItems[MenuChooseTableEntries.DropDownItems.Count - 1]).CheckedChanged += new System.EventHandler(ViewAllChck_CheckedChanged);
+			}
 
-				FITSBINTABLE = new FITSBinTable(FILENAME, EXTENSIONNAME);
-				string[] labels = FITSBINTABLE.TableDataLabelsTTYPE;
+			XDrop.Items.AddRange(labels);
+			YDrop.Items.AddRange(labels);
 
-				for (int i = 0; i < labels.Length; i++)
-					labels[i] = labels[i].Trim();
+			ExtensionTableGrid.Columns.Clear();
+			ExtensionTableGrid.Rows.Clear();
+			ExtensionTableGrid.ColumnCount = labels.Length;
+			ExtensionTableGrid.RowCount = FITSBINTABLE.Naxis2;
 
-				for (int i = 0; i < labels.Length; i++)
+			for (int i = 0; i < labels.Length; i++)
+				ExtensionTableGrid.Columns[i].HeaderText = labels[i];
+
+			DATATABLE = new Array[labels.Length];
+
+			for (int i = 0; i < labels.Length; i++)
+			{
+				int[] dimNElements;
+				TypeCode type;
+				Object entry;
+
+				if (FITSBINTABLE.GetTableDataTypes(i) == TypeCode.Char || FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
+					entry = FITSBINTABLE.GetTTYPEEntry(labels[i], out type, out dimNElements);
+				else
 				{
-					MenuChooseTableEntries.DropDownItems.Add(labels[i]);
-					((ToolStripMenuItem)MenuChooseTableEntries.DropDownItems[MenuChooseTableEntries.DropDownItems.Count - 1]).CheckOnClick = true;
-					((ToolStripMenuItem)MenuChooseTableEntries.DropDownItems[MenuChooseTableEntries.DropDownItems.Count - 1]).Checked = true;
-					this.MenuChooseTableEntries.DropDownItems[MenuChooseTableEntries.DropDownItems.Count - 1].Click += new System.EventHandler(MenuChooseTableEntries_Click);
-					((ToolStripMenuItem)this.MenuChooseTableEntries.DropDownItems[MenuChooseTableEntries.DropDownItems.Count - 1]).CheckedChanged += new System.EventHandler(ViewAllChck_CheckedChanged);
+					entry = FITSBINTABLE.GetTTYPEEntry(labels[i], out dimNElements);
+					type = TypeCode.Double;
 				}
 
-				XDrop.Items.AddRange(labels);
-				YDrop.Items.AddRange(labels);
-
-				ExtensionTableGrid.Columns.Clear();
-				ExtensionTableGrid.Rows.Clear();
-				ExtensionTableGrid.ColumnCount = labels.Length;
-				ExtensionTableGrid.RowCount = FITSBINTABLE.Naxis2;
-
-				for (int i = 0; i < labels.Length; i++)
-					ExtensionTableGrid.Columns[i].HeaderText = labels[i];
-
-				DATATABLE = new object[labels.Length];
-
-				for (int i = 0; i < labels.Length; i++)
-				{
-					int[] dimNElements;
-					TypeCode type;
-					Object entry;
-
-					if (FITSBINTABLE.GetTableDataTypes(i) == TypeCode.Char || FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
-						entry = FITSBINTABLE.GetTTYPEEntry(labels[i], out type, out dimNElements);
-					else
-					{
-						entry = FITSBINTABLE.GetTTYPEEntry(labels[i], out dimNElements);
-						type = TypeCode.Double;
-					}
-
-					if (type != TypeCode.Char && !FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
-						if (dimNElements.Length != 1)
-						{
-							DATATABLE[i] = new double[(FITSBINTABLE.Naxis2)];
-
-							Parallel.For(0, FITSBINTABLE.Naxis2, j =>
-							{
-								((double[])DATATABLE[i])[j] = Double.NaN;
-							});
-						}
-						else
-							DATATABLE[i] = (double[])entry;
-					else if (type == TypeCode.Char)
-						DATATABLE[i] = (string[])entry;
-					else if (FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
+				if (type != TypeCode.Char && !FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
+					if (dimNElements.Length != 1)
 					{
 						DATATABLE[i] = new double[(FITSBINTABLE.Naxis2)];
+
 						Parallel.For(0, FITSBINTABLE.Naxis2, j =>
 						{
 							((double[])DATATABLE[i])[j] = Double.NaN;
 						});
 					}
+					else
+						DATATABLE[i] = (double[])entry;
+				else if (type == TypeCode.Char)
+					DATATABLE[i] = (string[])entry;
+				else if (FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
+				{
+					DATATABLE[i] = new double[(FITSBINTABLE.Naxis2)];
+					Parallel.For(0, FITSBINTABLE.Naxis2, j =>
+					{
+						((double[])DATATABLE[i])[j] = Double.NaN;
+					});
 				}
 			}
-			/*catch (Exception e)
-			{
-				MessageBox.Show(e.Data + "	" + e.InnerException + "	" + e.Message + "	" + e.Source + "	" + e.StackTrace + "	" + e.TargetSite);
-			}*/
-
-			//this.BringToFront();
-			//this.Activate();
 		}
 
 		private void FitsExtensionTableViewer_SizeChanged(object sender, EventArgs e)
@@ -251,22 +240,15 @@ namespace JPFITS
 
 		private void FitsExtensionTableViewer_Load(object sender, EventArgs e)
 		{
-			//try
-			{
-				this.Left = (int)REG.GetReg("JPChart", /*this.Text + */"FitsTableLeft");
-				this.Top = (int)REG.GetReg("JPChart", /*this.Text + */"FitsTableTop");
-				this.Width = (int)REG.GetReg("JPChart", /*this.Text + */"FitsTableWidth");
-				this.Height = (int)REG.GetReg("JPChart", /*this.Text + */"FitsTableHeight");
-			}
-			//catch (...) {}
+			this.Left = (int)REG.GetReg("JPChart", "FitsTableLeft");
+			this.Top = (int)REG.GetReg("JPChart", "FitsTableTop");
+			this.Width = (int)REG.GetReg("JPChart", "FitsTableWidth");
+			this.Height = (int)REG.GetReg("JPChart", "FitsTableHeight");
 		}
 
 		private void FitsExtensionTableViewer_Shown(object sender, EventArgs e)
 		{
-			//this.Left = (int)REG.GetReg("JPChart", /*this.Text + */"FitsTableLeft");
-			//this.Top = (int)REG.GetReg("JPChart", /*this.Text + */"FitsTableTop");
-			//this.Width = (int)REG.GetReg("JPChart", /*this.Text + */"FitsTableWidth");
-			//this.Height = (int)REG.GetReg("JPChart", /*this.Text + */"FitsTableHeight");
+			
 		}
 
 		private void FileOpenMenu_Click(object sender, EventArgs e)
@@ -290,10 +272,10 @@ namespace JPFITS
 
 		private void FitsExtensionTableViewer_FormClosing(object sender, System.Windows.Forms.FormClosingEventArgs e)
 		{
-			REG.SetReg("JPChart", /*this.Text + */"FitsTableLeft", this.Left);
-			REG.SetReg("JPChart", /*this.Text + */"FitsTableTop", this.Top);
-			REG.SetReg("JPChart", /*this.Text + */"FitsTableWidth", this.Width);
-			REG.SetReg("JPChart", /*this.Text + */"FitsTableHeight", this.Height);
+			REG.SetReg("JPChart", "FitsTableLeft", this.Left);
+			REG.SetReg("JPChart", "FitsTableTop", this.Top);
+			REG.SetReg("JPChart", "FitsTableWidth", this.Width);
+			REG.SetReg("JPChart", "FitsTableHeight", this.Height);
 		}
 
 		private void FitsExtensionTableViewer_ResizeBegin(object sender, EventArgs e)
@@ -437,15 +419,13 @@ namespace JPFITS
 		}
 
 		private void FitsExtensionTableViewer_MouseEnter(object sender, EventArgs e) 
-		{ 
-			//this.BringToFront();
-			//this.Activate(); 
+		{
+			 
 		}
 
 		private void FitsExtensionTableViewer_MouseHover(object sender, EventArgs e) 
-		{ 
-			//this.BringToFront(); 
-			//this.Activate(); 
+		{
+			 
 		}
 
 		private void XDrop_KeyDown(object sender, KeyEventArgs e)

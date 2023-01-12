@@ -105,7 +105,6 @@ namespace JPFITS
 				if (PIX_SAT > 0)//check for saturation islands
 				{
 					Parallel.For(SOURCE_SEPARATION, IMAGEWIDTH - SOURCE_SEPARATION, x =>
-					//for (int x = SOURCE_SEPARATION; x < IMAGEWIDTH - SOURCE_SEPARATION; x++)
 					{
 						for (int y = SOURCE_SEPARATION; y < IMAGEHEIGHT - SOURCE_SEPARATION; y++)
 						{
@@ -180,14 +179,13 @@ namespace JPFITS
 				int n0 = (IMAGEWIDTH - 2 * SOURCE_SEPARATION) / Environment.ProcessorCount + SOURCE_SEPARATION;
 
 				Parallel.For(SOURCE_SEPARATION, IMAGEWIDTH - SOURCE_SEPARATION, (int x, ParallelLoopState state) =>
-				//for (int x = SOURCE_SEPARATION; x < IMAGEWIDTH - SOURCE_SEPARATION; x++)
 				{
 					if (SHOWWAITBAR)
 					{
 						if (WAITBAR.DialogResult == DialogResult.Cancel)
 							state.Stop();
 
-						if (/*(x - SOURCE_SEPARATION) * 100 / (IMAGEWIDTH - 2 * SOURCE_SEPARATION) > intprg*/x < n0 && (x - SOURCE_SEPARATION) * 100 / (n0 - SOURCE_SEPARATION) > intprg)//keep the update of progress bar to only one thread of the team...avoids locks
+						if (x < n0 && (x - SOURCE_SEPARATION) * 100 / (n0 - SOURCE_SEPARATION) > intprg)//keep the update of progress bar to only one thread of the team...avoids locks
 						{
 							intprg = x * 100 / n0;
 							BGWRKR.ReportProgress(intprg + 1);
@@ -386,7 +384,6 @@ namespace JPFITS
 			int np = N_SRC / Environment.ProcessorCount;
 
 			Parallel.For(0, N_SRC, (int k, ParallelLoopState state) =>
-			//for (int k = 0; k < N_SRC; k++)
 			{
 				if (WAITBAR.DialogResult == DialogResult.Cancel)
 				{
@@ -663,7 +660,7 @@ namespace JPFITS
 		[MethodImpl(256)]
 		private bool SAFETOMAPSATURATION(int x, int y)
 		{
-			return (x >= 0) && (x < IMAGEWIDTH) && (y >= 0) && (y < IMAGEHEIGHT) && (IMAGE[x, y] >= PIX_SAT) && /*!SOURCE_BOOLEAN_MAP[x, y] &&*/ (SOURCE_INDEX_MAP[x, y] == -1);
+			return (x >= 0) && (x < IMAGEWIDTH) && (y >= 0) && (y < IMAGEHEIGHT) && (IMAGE[x, y] >= PIX_SAT) && (SOURCE_INDEX_MAP[x, y] == -1);
 		}
 
 		[MethodImpl(256)]
@@ -1104,63 +1101,6 @@ namespace JPFITS
 				}
 			});
 		}
-
-		///// <summary>Attempt to find N strongest sources in an image.</summary>
-		///// <param name="N">The number of strongest sources to try to find.</param>
-		///// <param name="image">The 2D image array to find sources in.</param>
-		///// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
-		///// <param name="pix_min">The minimum pixel threshold value (or SN) to consider a potential source.</param>
-		///// <param name="pix_max">The maximum pixel threshold value (or SN) to consider a potential source.</param>
-		///// <param name="kernel_min">The minimum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
-		///// <param name="kernel_max">The maximum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
-		///// <param name="threshholds_as_SN">Treat the thresholds as Signal to Noise instead of pixel values.</param>
-		///// <param name="kernel_radius">The radius (pixels) of the kernel to find sources within. Secondary sources within the radius will be ignored.</param>
-		///// <param name="source_separation">The separation (pixels) between sources. Only the brightest source within the separation radius is kept.</param>
-		///// <param name="auto_background">Automatically determine the local background for potential sources.  Not required if background is known to be zeroed, but should have no effect if used in this case.</param>
-		///// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
-		///// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
-		///// <param name="show_waitbar">Show a cancellable wait bar.</param>
-		//public void Extract_Attempt_N_Sources(int N, double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar)
-		//{
-		//	//JPFITS.FITSImage^ FITS = new FITSImage("", image, true, true);
-
-		//	double immax = JPMath.Max(image, true);
-		//	double pixthresh = immax / 16;
-		//	double div = 2;
-		//	double amp = pixthresh;
-		//	int PSEiters = 0;
-		//	int maxPSEiters = 20;
-		//	int nPSEpts_min = N;
-		//	int nPSEpts_max = N + 1;
-		//	while (this.N_Sources < nPSEpts_min || this.N_Sources > nPSEpts_max)
-		//	{
-		//		PSEiters++;
-		//		if (PSEiters > maxPSEiters)
-		//			break;
-
-		//		if (this.N_SaturatedSources >= nPSEpts_min)
-		//			break;
-
-		//		if (this.N_Sources >= nPSEpts_min)
-		//			break;
-
-		//		Extract_Sources(image, pix_saturation, pixthresh, pix_max, kernel_min, kernel_max, threshholds_as_SN, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar);
-
-		//		if (this.N_Sources < nPSEpts_min)
-		//			pixthresh -= amp / div;
-		//		if (this.N_Sources > nPSEpts_max)
-		//			pixthresh += amp / div;
-		//		div *= 2;
-
-		//		if (pixthresh < pix_min)
-		//		{
-		//			Extract_Sources(image, pix_saturation, pix_min, pix_max, kernel_min, kernel_max, threshholds_as_SN, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar);
-		//			break;
-		//		}
-		//	}
-		//	if (this.N_Sources > nPSEpts_min)
-		//		this.ClipToNBrightest(nPSEpts_min);
-		//}
 
 		/// <summary>Attempt to find N strongest sources in an image.</summary>
 		/// <param name="nBrightestSources">The number of strongest sources to try to find.</param>

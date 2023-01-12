@@ -274,13 +274,6 @@
 
 		#endregion
 
-		private string FILENAME;
-		private string EXTENSIONNAME;
-		private object[] DATATABLE;
-		private FITSBinTable FITSBINTABLE;
-		//private bool MenuChooseTable_OPENED = false;
-		private bool HEADERFRONT = false;
-
 		private System.Windows.Forms.DataGridView ExtensionTableGrid;
 		private System.Windows.Forms.MenuStrip menuStrip1;
 		private System.Windows.Forms.ToolStripMenuItem MenuChooseTableEntries;

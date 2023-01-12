@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Collections;
 
 namespace JPFITS
 {
@@ -14,7 +9,10 @@ namespace JPFITS
 		private string COMMENT;
 		private bool LINEISCOMMENTFORMAT;
 
-		/// <summary>Constructor. Creates an instance of a FITSHeaderKey, out of a supplied String line. The line may be empty, but not more than 80 elements length. The key will be formatted as a FITS comment line if its internal structure appears to be configured as such.</summary>
+		/// <summary>
+		/// Creates an instance of a FITSHeaderKey, out of a supplied String line. The line may be empty, but not more than 80 elements length. The key will be formatted as a FITS comment line if its internal structure appears to be configured as such.
+		/// </summary>
+		/// <param name="line">The header key line,up to 80 elements in length.</param>
 		public FITSHeaderKey(string line)
 		{
 			if (line.Length > 80)
@@ -80,7 +78,12 @@ namespace JPFITS
 			}
 		}
 
-		/// <summary>Constructor. Creates an instance of a FITSHeaderKey, out of a supplied key name, key value, and key comment. If name is either "COMMENT" or an empty String the key will be formatted as a FITS comment line.</summary>
+		/// <summary>
+		/// Creates an instance of a FITSHeaderKey, out of a supplied key name, key value, and key comment. If name is either "COMMENT" or an empty String the key will be formatted as a FITS comment line using value and comment as the comment.
+		/// </summary>
+		/// <param name="name">The header key name.</param>
+		/// <param name="value">The header key value.</param>
+		/// <param name="comment">The header key comment.</param>
 		public FITSHeaderKey(string name, string value, string comment)
 		{
 			if (name.Length > 8)
@@ -125,6 +128,7 @@ namespace JPFITS
 			set { COMMENT = value; }
 		}
 
+		/// <summary>Returns whether the key line is a comment.</summary>
 		public bool IsCommentKey
 		{
 			get { return LINEISCOMMENTFORMAT; }
@@ -136,11 +140,14 @@ namespace JPFITS
 			return GETFULLYFORMATTEDFITSLINE();
 		}
 
+		/// <summary>Returns whether the key value is numeric.</summary>
 		public bool ValueIsNumeric()
 		{
 			return JPMath.IsNumeric(VALUE);
 		}
 
+		/// <summary>Returns the key value as a double. Will throw a conversion exception if the value is not numeric.</summary>
+		/// <returns></returns>
 		public double ValueAsDouble()
 		{
 			return Convert.ToDouble(VALUE);
