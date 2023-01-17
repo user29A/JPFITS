@@ -55,9 +55,9 @@ namespace JPFITS
 				BGWRKR.ReportProgress(0, "Reading the Catalogue FITS binary tables...");
 
 				FITSBinTable bt = new JPFITS.FITSBinTable(CAT_FILENAME, CAT_EXTNAME);
-				CAT_CVAL1s = bt.GetTTYPEEntry(CAT_CVAL1NAME);
-				CAT_CVAL2s = bt.GetTTYPEEntry(CAT_CVAL2NAME);
-				CAT_MAGs = bt.GetTTYPEEntry(CAT_MAGNAME);
+				CAT_CVAL1s = (double[])(double[])bt.GetTTYPEEntry(CAT_CVAL1NAME, out _, out _);
+				CAT_CVAL2s = (double[])(double[])bt.GetTTYPEEntry(CAT_CVAL2NAME, out _, out _);
+				CAT_MAGs = (double[])(double[])bt.GetTTYPEEntry(CAT_MAGNAME, out _, out _);
 
 				//need to check mag for NaN's and re-form ra dec mag
 				BGWRKR.ReportProgress(0, "Formatting the Catalogue FITS binary tables...");

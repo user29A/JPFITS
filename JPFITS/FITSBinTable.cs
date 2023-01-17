@@ -84,7 +84,6 @@ namespace JPFITS
 			int TBytes = NAXIS1 * NAXIS2;
 			BINTABLE = new byte[TBytes];			
 			bool exception = false;
-			TypeCode exceptiontypecode = TypeCode.Empty;
 
 			ParallelOptions opts = new ParallelOptions();
 			if (NAXIS2 >= Environment.ProcessorCount)
@@ -359,18 +358,10 @@ namespace JPFITS
 						}
 
 						default:
-						{
-							exception = true;
-							exceptiontypecode = TCODES[j];
-							break;
-						}
+							throw new Exception("Data type not recognized for writing as FITS table: '" + TCODES[j].ToString() + "'");
 					}
 				}
-			});
-			if (exception)
-			{
-				throw new Exception("Data type not recognized for writing as FITS table: '" + exceptiontypecode.ToString() + "'");
-			}
+			});				
 		}
 
 		private void MAKEHEAPBYTEARRAY(Array[] ExtensionEntryData)
@@ -601,9 +592,7 @@ namespace JPFITS
 					}
 
 					default:
-					{
 						throw new Exception("Data type not recognized for writing as FITS table: '" + HEAPTCODES[i].ToString() + "'");
-					}
 				}
 			}
 		}
@@ -1339,24 +1328,17 @@ namespace JPFITS
 			}
 		}
 
-		private Array GETHEAPTTYPE(int ttypeindex, out TypeCode objectTypeCode, out int[] dimNElements)
+		private Array GETHEAPTTYPE(int ttypeIndex, out TypeCode entryTypeCode, out int[] entryNElements)
 		{
-			objectTypeCode = HEAPTCODES[ttypeindex];
+			entryTypeCode = HEAPTCODES[ttypeIndex];
 
-			if (TDIMS[ttypeindex] != null)
-				dimNElements = TDIMS[ttypeindex];
+			if (TDIMS[ttypeIndex] != null)
+				entryNElements = TDIMS[ttypeIndex];
 			else
 			{
-				dimNElements = new int[2];
-				dimNElements[1] = NAXIS2;
-				int max = 0;
-
+				entryNElements = new int[NAXIS2];
 				for (int i = 0; i < NAXIS2; i++)
-					if (TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i] > max)
-						max = TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i];
-				dimNElements[0] = max;
-				if (TTYPEISCOMPLEX[ttypeindex])
-					dimNElements[0] /= 2;
+					entryNElements[i] = TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i];
 			}
 
 			ParallelOptions opts = new ParallelOptions();
@@ -1365,15 +1347,15 @@ namespace JPFITS
 			else
 				opts.MaxDegreeOfParallelism = 1;
 
-			switch (objectTypeCode)
+			switch (entryTypeCode)
 			{
 				case TypeCode.Double:
 				{
 					double[][] arrya = new double[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						double[] row = new double[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 						byte[] dbl = new byte[(8)];
 
 						for (int j = 0; j < row.Length; j++)
@@ -1399,8 +1381,8 @@ namespace JPFITS
 					float[][] arrya = new float[(NAXIS2)][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						float[] row = new float[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						float[] row = new float[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 						byte[] sng = new byte[(4)];
 
 						for (int j = 0; j < row.Length; j++)
@@ -1422,8 +1404,8 @@ namespace JPFITS
 					long[][] arrya = new long[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						long[] row = new long[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						long[] row = new long[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 						byte[] i64 = new byte[(8)];
 
 						for (int j = 0; j < row.Length; j++)
@@ -1449,8 +1431,8 @@ namespace JPFITS
 					ulong[][] arrya = new ulong[(NAXIS2)][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						ulong[] row = new ulong[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						ulong[] row = new ulong[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 						byte[] ui64 = new byte[8];
 
 						for (int j = 0; j < row.Length; j++)
@@ -1476,8 +1458,8 @@ namespace JPFITS
 					int[][] arrya = new int[(NAXIS2)][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						int[] row = new int[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						int[] row = new int[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 						byte[] int32 = new byte[4];
 
 						for (int j = 0; j < row.Length; j++)
@@ -1499,8 +1481,8 @@ namespace JPFITS
 					uint[][] arrya = new uint[(NAXIS2)][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						uint[] row = new uint[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						uint[] row = new uint[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 						byte[] uint32 = new byte[4];
 
 						for (int j = 0; j < row.Length; j++)
@@ -1522,8 +1504,8 @@ namespace JPFITS
 					short[][] arrya = new short[(NAXIS2)][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						short[] row = new short[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						short[] row = new short[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 						byte[] int16 = new byte[(2)];
 
 						for (int j = 0; j < row.Length; j++)
@@ -1543,8 +1525,8 @@ namespace JPFITS
 					ushort[][] arrya = new ushort[(NAXIS2)][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						ushort[] row = new ushort[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						ushort[] row = new ushort[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 						byte[] uint16 = new byte[2];
 
 						for (int j = 0; j < row.Length; j++)
@@ -1564,8 +1546,8 @@ namespace JPFITS
 					sbyte[][] arrya = new sbyte[(NAXIS2)][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						sbyte[] row = new sbyte[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						sbyte[] row = new sbyte[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 
 						for (int j = 0; j < row.Length; j++)
 							row[j] = (sbyte)HEAPDATA[pos + j];
@@ -1579,8 +1561,8 @@ namespace JPFITS
 					byte[][] arrya = new byte[(NAXIS2)][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						byte[] row = new byte[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						byte[] row = new byte[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 
 						for (int j = 0; j < row.Length; j++)
 							row[j] = (byte)HEAPDATA[pos + j];
@@ -1594,8 +1576,8 @@ namespace JPFITS
 					bool[][] arrya = new bool[(NAXIS2)][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						bool[] row = new bool[(TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i])];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i];
+						bool[] row = new bool[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 
 						for (int j = 0; j < row.Length; j++)
 							row[j] = Convert.ToBoolean(HEAPDATA[pos + j]);
@@ -1609,15 +1591,13 @@ namespace JPFITS
 					string[] arrya = new string[(NAXIS2)];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
-						arrya[i] = System.Text.Encoding.ASCII.GetString(HEAPDATA, TTYPEHEAPARRAYNELSPOS[ttypeindex][1, i], TTYPEHEAPARRAYNELSPOS[ttypeindex][0, i]);
+						arrya[i] = System.Text.Encoding.ASCII.GetString(HEAPDATA, TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i], TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]);
 					});
 					return arrya;
 				}
 
 				default:
-				{
-					throw new Exception("Unrecognized TypeCode: '" + objectTypeCode.ToString() + "'");
-				}
+					throw new Exception("Unrecognized TypeCode: '" + entryTypeCode.ToString() + "'");
 			}
 		}
 
@@ -1822,302 +1802,15 @@ namespace JPFITS
 			return false;
 		}
 
-		/// <summary>Return a binary table entry as a double 1-D array, assuming it is a single colunmn entry. If the entry has more than one column, use the overload function to get its dimensions.</summary>
-		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		public double[] GetTTYPEEntry(string ttypeEntry)
-		{
-			int ttypeindex = -1;
-			for (int i = 0; i < TTYPES.Length; i++)
-				if (TTYPES[i] == ttypeEntry)
-				{
-					ttypeindex = i;
-					break;
-				}
-
-			if (ttypeindex == -1)
-			{
-				throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
-			}
-
-			if (TTYPEISCOMPLEX[ttypeindex] || TTYPEISHEAPARRAYDESC[ttypeindex])
-			{
-				string type;
-				if (TTYPEISCOMPLEX[ttypeindex])
-					type = "COMPLEX";
-				else
-					type = "HEAP ARRAY DESCRIPTOR";
-
-				throw new Exception("Cannot return entry '" + ttypeEntry + "' as a vector because it is " + type + ". Use an overload to get as an Object with dimensions returned to user.");
-			}
-
-			int[] dimNElements;
-			return GetTTYPEEntry(ttypeEntry, out dimNElements);
-		}
-
-		/// <summary>Return a binary table entry as a double 1-D array.</summary>
-		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		/// <param name="dimNElements">A vector to return the number of elements along each dimension of the Object. 
-		/// <br />Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats, i.e. columns) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</param>
-		public double[] GetTTYPEEntry(string ttypeEntry, out int[] dimNElements)
-		{
-			for (int i = 0; i < TTYPES.Length; i++)
-				if (TTYPES[i] == ttypeEntry)
-					if (TCODES[i] == TypeCode.Char)
-					{
-						throw new Exception("Cannot return entry '" + ttypeEntry + "' as double array because it is a char (String) array. Use an overload to get as an Object and then cast the object as a (string[])Object.");
-					}
-
-			TypeCode tcode;
-			Array obj = GetTTYPEEntry(ttypeEntry, out tcode, out dimNElements);
-			int rank = obj.Rank;
-			int width, height;
-			if (rank == 1)
-			{
-				width = 1;
-				height = obj.Length;
-			}
-			else
-			{
-				width = obj.GetLength(0);
-				height = obj.GetLength(1);
-			}
-			double[] result = new double[(width * height)];
-
-			switch (tcode)
-			{
-				case TypeCode.Double:
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = ((double[])(obj))[y];
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = ((double[,])(obj))[x, y];
-						});
-					}
-					break;
-				}
-
-				case (TypeCode.Int64):
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = (double)((long[])(obj))[y];
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = (double)((long[,])(obj))[x, y];
-						});
-					}
-					break;
-				}
-
-				case (TypeCode.UInt64):
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = (double)((ulong[])(obj))[y];
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = (double)((ulong[,])(obj))[x, y];
-						});
-					}
-					break;
-				}
-
-				case TypeCode.Single:
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = (double)((float[])(obj))[y];
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = (double)((float[,])(obj))[x, y];
-						});
-					}
-					break;
-				}
-
-				case TypeCode.UInt32:
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = (double)((uint[])(obj))[y];
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = (double)((uint[,])(obj))[x, y];
-						});
-					}
-					break;
-				}
-
-				case TypeCode.Int32:
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = (double)((int[])(obj))[y];
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = (double)((int[,])(obj))[x, y];
-						});
-					}
-					break;
-				}
-
-				case TypeCode.UInt16:
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = (double)((ushort[])(obj))[y];
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = (double)((ushort[,])(obj))[x, y];
-						});
-					}
-					break;
-				}
-
-				case TypeCode.Int16:
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = (double)((short[])(obj))[y];
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = (double)((short[,])(obj))[x, y];
-						});
-					}
-					break;
-				}
-
-				case TypeCode.Byte:
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = (double)((byte[])(obj))[y];
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = (double)((byte[,])(obj))[x, y];
-						});
-					}
-					break;
-				}
-
-				case TypeCode.SByte:
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = (double)((sbyte[])(obj))[y];
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = (double)((sbyte[,])(obj))[x, y];
-						});
-					}
-					break;
-				}
-
-				case TypeCode.Boolean:
-				{
-					if (rank == 1)
-					{
-						Parallel.For(0, height, y =>
-						{
-							result[y] = Convert.ToDouble(((bool[])(obj))[y]);
-						});
-					}
-					else
-					{
-						Parallel.For(0, height, y =>
-						{
-							for (int x = 0; x < width; x++)
-								result[y * width + x] = Convert.ToDouble(((bool[,])(obj))[x, y]);
-						});
-					}
-					break;
-				}
-
-				default:
-					throw new Exception("Unrecognized TypeCode: '" + tcode.ToString() + "'");
-			}
-
-			return result;
-		}
-
 		/// <summary>Return a binary table entry as an Array object. Its type and rank are given to the user. If you just need a double precision array to work on, use the overload for that.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		/// <param name="objectTypeCode">The TypeCode precision of the underlying array in the object.</param>
-		/// <param name="dimNElements">A vector to return the number of elements along each dimension of the Object. 
-		/// <br />Contains the TDIM key values for an n &gt; 2 dimensional array, otherwise contains the instances (repeats, i.e. columns) and NAXIS2. Its length gives the rank of the array Object. If rank = 1 then it contains only NAXIS2.</param>
-		public Array GetTTYPEEntry(string ttypeEntry, out TypeCode objectTypeCode, out int[] dimNElements)
+		/// <param name="entryTypeCode">The TypeCode of the underlying data in the TTYPE. NOTE: strings are TypeCode.Char.</param>
+		/// <param name="entryNElements">A vector to return the properties of the return Array:
+		/// <br />If the return is a numeric vector or vector of strings of all the same length, it contains only one element, being the length of the vector (NAXIS2).
+		/// <br />If the return is a numeric 2D array, it contains the width of the array as the first element, and the height of the array (NASIXS2) as the second element.
+		/// <br />If the return is from the heap, therefore as a vector of vectors (numeric or string), therefore containing a variable number of elements on each row, then it is a vector containing the number of elements of the vector on each row.
+		/// <br />If the ttypeEntry has TDIM keywords for an n &gt;= 3 dimensional array, then it contains the TDIM values for each TDIMn keyword. It therefore should have at least 3 elements.</param>
+		public Array GetTTYPEEntry(string ttypeEntry, out TypeCode entryTypeCode, out int[] entryNElements)
 		{
 			int ttypeindex = -1;
 			for (int i = 0; i < TTYPES.Length; i++)
@@ -2128,22 +1821,20 @@ namespace JPFITS
 				}
 
 			if (ttypeindex == -1)
-			{
-				throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
-			}
+				throw new Exception("Extension entry TTYPE label wasn't found: '" + ttypeEntry + "'");
 
 			if (TTYPEISHEAPARRAYDESC[ttypeindex])//get from heap
-				return GETHEAPTTYPE(ttypeindex, out objectTypeCode, out dimNElements);
+				return GETHEAPTTYPE(ttypeindex, out entryTypeCode, out entryNElements);
 
-			objectTypeCode = TCODES[ttypeindex];
+			entryTypeCode = TCODES[ttypeindex];
 
 			if (TDIMS[ttypeindex] != null)
-				dimNElements = TDIMS[ttypeindex];
+				entryNElements = TDIMS[ttypeindex];
 			else
 				if (TREPEATS[ttypeindex] == 1 || TCODES[ttypeindex] == TypeCode.Char)
-				dimNElements = new int[] { NAXIS2 };
+				entryNElements = new int[] { NAXIS2 };
 			else
-				dimNElements = new int[] { TREPEATS[ttypeindex], NAXIS2 };
+				entryNElements = new int[] { TREPEATS[ttypeindex], NAXIS2 };
 
 			int byteoffset = 0;
 			for (int i = 0; i < ttypeindex; i++)
@@ -2573,13 +2264,11 @@ namespace JPFITS
 				}
 
 				default:
-				{
 					throw new Exception("Unrecognized TypeCode: '" + TCODES[ttypeindex].ToString() + "'");
-				}
 			}
 		}
 
-		/// <summary>Use this to access individual elements of the table with a String return. Useful for looking at TTYPEs with multiple instances.</summary>
+		/// <summary>Use this to access individual elements of the table with a string return of the values. Useful for looking at TTYPEs with multiple elements on a row.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="rowindex">The row index of the column.</param>
 		public string GetTTypeEntryRow(string ttypeEntry, int rowindex)
@@ -2593,9 +2282,7 @@ namespace JPFITS
 				}
 
 			if (ttypeindex == -1)
-			{
 				throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
-			}
 
 			if (!TTYPEISHEAPARRAYDESC[ttypeindex])
 			{
@@ -2641,9 +2328,9 @@ namespace JPFITS
 								dbl[2] = BINTABLE[currentbyte + 5];
 								dbl[1] = BINTABLE[currentbyte + 6];
 								dbl[0] = BINTABLE[currentbyte + 7];
-								str += BitConverter.ToDouble(dbl, 0).ToString() + "; ";
+								str += BitConverter.ToDouble(dbl, 0).ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2667,9 +2354,9 @@ namespace JPFITS
 								sng[2] = BINTABLE[currentbyte + 1];
 								sng[1] = BINTABLE[currentbyte + 2];
 								sng[0] = BINTABLE[currentbyte + 3];
-								str += BitConverter.ToSingle(sng, 0).ToString() + "; ";
+								str += BitConverter.ToSingle(sng, 0).ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2701,9 +2388,9 @@ namespace JPFITS
 								i64[2] = BINTABLE[currentbyte + 5];
 								i64[1] = BINTABLE[currentbyte + 6];
 								i64[0] = BINTABLE[currentbyte + 7];
-								str += BitConverter.ToInt64(i64, 0).ToString() + "; ";
+								str += BitConverter.ToInt64(i64, 0).ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2735,9 +2422,9 @@ namespace JPFITS
 								ui64[2] = BINTABLE[currentbyte + 5];
 								ui64[1] = BINTABLE[currentbyte + 6];
 								ui64[0] = BINTABLE[currentbyte + 7];
-								str += (MapLongToUlong(BitConverter.ToInt64(ui64, 0))).ToString() + "; ";
+								str += (MapLongToUlong(BitConverter.ToInt64(ui64, 0))).ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2761,9 +2448,9 @@ namespace JPFITS
 								uint32[2] = BINTABLE[currentbyte + 1];
 								uint32[1] = BINTABLE[currentbyte + 2];
 								uint32[0] = BINTABLE[currentbyte + 3];
-								str += (MapIntToUint(BitConverter.ToInt32(uint32, 0))).ToString() + "; ";
+								str += (MapIntToUint(BitConverter.ToInt32(uint32, 0))).ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2788,9 +2475,9 @@ namespace JPFITS
 								int32[2] = BINTABLE[currentbyte + 1];
 								int32[1] = BINTABLE[currentbyte + 2];
 								int32[0] = BINTABLE[currentbyte + 3];
-								str += BitConverter.ToInt32(int32, 0).ToString() + "; ";
+								str += BitConverter.ToInt32(int32, 0).ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2810,9 +2497,9 @@ namespace JPFITS
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 2;
 								uint16[1] = BINTABLE[currentbyte];
 								uint16[0] = BINTABLE[currentbyte + 1];
-								str += (MapShortToUshort(BitConverter.ToInt16(uint16, 0))).ToString() + "; ";
+								str += (MapShortToUshort(BitConverter.ToInt16(uint16, 0))).ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2833,9 +2520,9 @@ namespace JPFITS
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 2;
 								int16[1] = BINTABLE[currentbyte];
 								int16[0] = BINTABLE[currentbyte + 1];
-								str += BitConverter.ToInt16(int16, 0).ToString() + "; ";
+								str += BitConverter.ToInt16(int16, 0).ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2852,9 +2539,9 @@ namespace JPFITS
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j;
 								byte ret = (byte)BINTABLE[currentbyte];
-								str += ret.ToString() + "; ";
+								str += ret.ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2867,9 +2554,9 @@ namespace JPFITS
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j;
-								str += ((sbyte)(BINTABLE[currentbyte])).ToString() + "; ";
+								str += ((sbyte)(BINTABLE[currentbyte])).ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2882,9 +2569,9 @@ namespace JPFITS
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j;
-								str += Convert.ToBoolean(BINTABLE[currentbyte]).ToString() + "; ";
+								str += Convert.ToBoolean(BINTABLE[currentbyte]).ToString() + ", ";
 							}
-							return str;
+							return str.Substring(0, str.Length - 2);
 						}
 					}
 
@@ -2919,10 +2606,10 @@ namespace JPFITS
 							dbl[2] = HEAPDATA[currentbyte + 5];
 							dbl[1] = HEAPDATA[currentbyte + 6];
 							dbl[0] = HEAPDATA[currentbyte + 7];
-							str += BitConverter.ToDouble(dbl, 0).ToString() + "; ";
+							str += BitConverter.ToDouble(dbl, 0).ToString() + ", ";
 							currentbyte += 8;
 						}
-						return str;
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.Single:
@@ -2934,10 +2621,10 @@ namespace JPFITS
 							sng[2] = HEAPDATA[currentbyte + 1];
 							sng[1] = HEAPDATA[currentbyte + 2];
 							sng[0] = HEAPDATA[currentbyte + 3];
-							str += BitConverter.ToSingle(sng, 0).ToString() + "; ";
+							str += BitConverter.ToSingle(sng, 0).ToString() + ", ";
 							currentbyte += 4;
 						}
-						return str;
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case (TypeCode.Int64):
@@ -2953,10 +2640,10 @@ namespace JPFITS
 							i64[2] = HEAPDATA[currentbyte + 5];
 							i64[1] = HEAPDATA[currentbyte + 6];
 							i64[0] = HEAPDATA[currentbyte + 7];
-							str += BitConverter.ToInt64(i64, 0).ToString() + "; ";
+							str += BitConverter.ToInt64(i64, 0).ToString() + ", ";
 							currentbyte += 8;
 						}
-						return str;
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case (TypeCode.UInt64):
@@ -2972,10 +2659,10 @@ namespace JPFITS
 							ui64[2] = HEAPDATA[currentbyte + 5];
 							ui64[1] = HEAPDATA[currentbyte + 6];
 							ui64[0] = HEAPDATA[currentbyte + 7];
-							str += MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString() + "; ";
+							str += MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString() + ", ";
 							currentbyte += 8;
 						}
-						return str;
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.Int32:
@@ -2987,10 +2674,10 @@ namespace JPFITS
 							int32[2] = HEAPDATA[currentbyte + 1];
 							int32[1] = HEAPDATA[currentbyte + 2];
 							int32[0] = HEAPDATA[currentbyte + 3];
-							str += BitConverter.ToInt32(int32, 0).ToString() + "; ";
+							str += BitConverter.ToInt32(int32, 0).ToString() + ", ";
 							currentbyte += 4;
 						}
-						return str;
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.UInt32:
@@ -3002,10 +2689,10 @@ namespace JPFITS
 							uint32[2] = HEAPDATA[currentbyte + 1];
 							uint32[1] = HEAPDATA[currentbyte + 2];
 							uint32[0] = HEAPDATA[currentbyte + 3];
-							str += MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString() + "; ";
+							str += MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString() + ", ";
 							currentbyte += 4;
 						}
-						return str;
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.Int16:
@@ -3015,10 +2702,10 @@ namespace JPFITS
 						{
 							int16[1] = HEAPDATA[currentbyte];
 							int16[0] = HEAPDATA[currentbyte + 1];
-							str += BitConverter.ToInt16(int16, 0).ToString() + "; ";
+							str += BitConverter.ToInt16(int16, 0).ToString() + ", ";
 							currentbyte += 2;
 						}
-						return str;
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.UInt16:
@@ -3028,31 +2715,31 @@ namespace JPFITS
 						{
 							uint16[1] = HEAPDATA[currentbyte];
 							uint16[0] = HEAPDATA[currentbyte + 1];
-							str += MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString() + "; ";
+							str += MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString() + ", ";
 							currentbyte += 2;
 						}
-						return str;
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.SByte:
 					{
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-							str += ((sbyte)(HEAPDATA[currentbyte + j])).ToString() + "; ";
-						return str;
+							str += ((sbyte)(HEAPDATA[currentbyte + j])).ToString() + ", ";
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.Byte:
 					{
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-							str += ((byte)HEAPDATA[currentbyte + j]).ToString() + "; ";
-						return str;
+							str += ((byte)HEAPDATA[currentbyte + j]).ToString() + ", ";
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.Boolean:
 					{
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
-							str += Convert.ToBoolean(HEAPDATA[currentbyte + j]).ToString() + "; ";
-						return str;
+							str += Convert.ToBoolean(HEAPDATA[currentbyte + j]).ToString() + ", ";
+						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.Char:
@@ -3140,20 +2827,6 @@ namespace JPFITS
 			MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
 		}
 
-		// /// <summary>Add a vector or 2D array TTYPE entry of either numeric or string values to the binary table.</summary>
-		// /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		// /// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
-		// /// <param name="entryUnits">The TUNITS physical units of the values of the array. Pass empty string if not required.</param>
-		// /// <param name="entryArray">The vector or 2D array to enter into the table.</param>
-		//public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray)
-		//{
-		//	if (entryArray.Rank >= 3)
-		//		throw new Exception("Error: Cannot add an array of rank &gt;= 3 to a FITS binary table.");
-
-		//	int[] dimns = null;
-		//	AddTTYPEEntry(ttypeEntry, replaceIfExists, entryUnits, entryArray, dimns, false, false);
-		//}
-
 		public enum EntryArrayFormat
 		{
 			/// <summary>
@@ -3167,26 +2840,26 @@ namespace JPFITS
 			IsComplex,
 
 			/// <summary>
-			/// The entryArray is an array containing variable-length vector arrays of numeric values, or it is an array of variable-length strings, either of which must therefore be stored in the heap area.
+			/// The entryArray is a vector containing variable-length vectors of numeric values, or it is an array of variable-length strings, either of which must therefore be stored in the heap area.
 			/// </summary>
 			IsHeapVariableRepeatRows,
 
 			/// <summary>
-			/// The entryArray is an array containing variable-length vector arrays of complex value pairings (of either single or double floating point precision) which therefore must be stored in the heap area. The length of each vector of the array must be an even number given the pairings.
+			/// The entryArray is a vector containing variable-length vectors of complex value pairings, of either single or double floating point precision, which therefore must be stored in the heap area. The length of each vector of the rows must be an even number given the pairings.
 			/// </summary>
 			IsHeapComplexVariableRepeatRows,
 
 			/// <summary>
-			/// The entryArray is a vector or 2D array but which is to be interpreted as an n-dimensional array of rank r &gt;= 3, for which the TDIM values will be provided giving the number of elements along each dimension of the array, which will be written into the header as the TDIMn keys.
+			/// The entryArray is a numeric vector but which is to be interpreted as an n-dimensional array of rank r &gt;= 3, for which the TDIM values will be provided giving the number of elements along each dimension of the array, which will be written into the header as the TDIMn keys.
 			/// <br />The optional argument for tdims *MUST* be provided with this option.
 			/// </summary>
 			IsNDimensional
 		}
 
 		/// <summary>
-		/// Add a vector, 2D array, or an array of variable-length arrays, of numeric, complex numeric, string values, or rank &gt;= 3, to the binary table as a TTYPE entry.
-		/// <br />The entryArray must be the same neight NAXIS2 as the previous entry additions, if any.
-		/// <br />If entryArray is a variable repeat heap array then the entry must be supplied as an array of arrays, or an array of Strings; if complex each subarray must contain an even pairing of values.
+		/// Add a vector, 2D array, or a vector of variable-length vectors, of numeric, complex numeric, string values, or rank &gt;= 3, to the binary table as a TTYPE entry.
+		/// <br />The entryArray must be the same neight NAXIS2 as the previous entry additions if any exist.
+		/// <br />If entryArray is a variable repeat heap-area array then the entry must be supplied as an vector of vectors, or an vector of strings; if complex each subarray must contain an even pairing of values.
 		/// <br />If adding a complex number array to the binary table, the entryArray must be either single or double floating point, and must be a factor of two columns repeats where the 1st and odd numbered columns are the spatial part, and the 2nd and even numbered columns are the temporal part.
 		/// <br />If entryArray is to be interpreted as rank &gt;= 3, then array dimensions need to be supplied with the optional tdim argument after the EntryArrayFormat.IsNDimensional option. If entries already exist then the user must have formatted the entryArray to match the existing table height NAXIS2.
 		/// </summary>
@@ -3194,12 +2867,9 @@ namespace JPFITS
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
 		/// <param name="entryUnits">The TUNITS physical units of the values of the array. Pass empty string if not required.</param>
 		/// <param name="entryArray">The array to enter into the table.</param>
-		///<param name="arrayFormat">Specify entryArray format for non-trivial cases.</param>
-		///<param name="tdims">Specify the array dimensions for  rank r &gt;= 3, to be written as the TDIMS keywords.</param>
-		// /// <param name="tdims">A vector giving the number of elements along each dimension of the array, to write as the TDIM key for the entry IF the entry is n &gt;= 3 dimensional; pass null if the entry is not n &gt;= 3 dimensional.</param>
-		// /// <param name="isComplex">A boolean to set whether the array should be interpreted as complex value pairings.</param>
-		// /// <param name="addAsHeapVarRepeatArray">A boolean to set whether to save the array as a variable repeat array in the heap area. If true, the entryArray must be an array of arrays or an array of Strings.</param>
-		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray/*, int[]? tdims, bool isComplex, bool addAsHeapVarRepeatArray*/, EntryArrayFormat arrayFormat = EntryArrayFormat.Default, int[]? tdims = null)
+		///<param name="arrayFormat">Specify entryArray format for non-default (trivial) cases.</param>
+		///<param name="tdims">Specify the array dimensions for rank r &gt;= 3, to be written as the TDIMS keywords.</param>
+		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray, EntryArrayFormat arrayFormat = EntryArrayFormat.Default, int[]? tdims = null)
 		{
 			bool isComplex = false;
 			if (arrayFormat == EntryArrayFormat.IsComplex)
@@ -3211,7 +2881,7 @@ namespace JPFITS
 				throw new Exception("The tdims optional argument must be provided if the array format is n >= 3 dimensional.");
 
 			if (entryArray.Rank >= 3)
-				throw new Exception("Error: Cannot add an array of rank &gt;= 3 to a FITS binary table.");
+				throw new Exception("Error: Cannot add an array of rank &gt;= 3 to a FITS binary table. An rank &gt;= 3 array must be formatted as a vector, and the tdim optional argument supplied to write as the TDIM keywords.");
 
 			int ttypeindex = -1;
 			if (TTYPES != null)
@@ -3255,7 +2925,7 @@ namespace JPFITS
 			if (addAsHeapVarRepeatArray && !isheapvarrepeatString)
 				for (int i = 0; i < entryArray.Length; i++)
 					if (((Array)(entryArray.GetValue(i))).Rank != 1)
-						throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' must be an array of rank = 1 arrays. Index '" + i.ToString() + "' is rank = " + ((Array)(entryArray.GetValue(i))).Rank);
+						throw new Exception("Extension Entry TTYPE '" + ttypeEntry + "' must be a vector of vectors to add to the heap area. Index '" + i.ToString() + "' is rank = " + ((Array)(entryArray.GetValue(i))).Rank);
 
 			if (!addAsHeapVarRepeatArray && Type.GetTypeCode((entryArray.GetType()).GetElementType()) == TypeCode.String)
 				if (entryArray.Rank == 2)

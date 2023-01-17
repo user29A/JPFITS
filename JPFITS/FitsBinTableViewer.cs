@@ -92,7 +92,7 @@ namespace JPFITS
 					entry = FITSBINTABLE.GetTTYPEEntry(labels[i], out type, out dimNElements);
 				else
 				{
-					entry = FITSBINTABLE.GetTTYPEEntry(labels[i], out dimNElements);
+					entry = FITSBINTABLE.GetTTYPEEntry(labels[i], out type, out dimNElements);
 					type = TypeCode.Double;
 				}
 

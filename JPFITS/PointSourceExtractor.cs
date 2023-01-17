@@ -1724,32 +1724,24 @@ namespace JPFITS
 				//SOURCE_INDEX_MAP = new int[,](IMAGEWIDTH, IMAGEHEIGHT);
 			}
 			N_SRC = BinTablePSE.Naxis2;
-			CENTROIDS_X = BinTablePSE.GetTTYPEEntry("PSE X-Centroid");
-			CENTROIDS_Y = BinTablePSE.GetTTYPEEntry("PSE Y-Centroid");
-			CENTROIDS_AMPLITUDE = BinTablePSE.GetTTYPEEntry("PSE Amplitude");
-			CENTROIDS_VOLUME = BinTablePSE.GetTTYPEEntry("PSE Volume");
-			CENTROIDS_BGESTIMATE = BinTablePSE.GetTTYPEEntry("PSE Background");
+			CENTROIDS_X = (double[])BinTablePSE.GetTTYPEEntry("PSE X-Centroid", out _, out _);
+			CENTROIDS_Y = (double[])BinTablePSE.GetTTYPEEntry("PSE Y-Centroid", out _, out _);
+			CENTROIDS_AMPLITUDE = (double[])BinTablePSE.GetTTYPEEntry("PSE Amplitude", out _, out _);
+			CENTROIDS_VOLUME = (double[])BinTablePSE.GetTTYPEEntry("PSE Volume", out _, out _);
+			CENTROIDS_BGESTIMATE = (double[])BinTablePSE.GetTTYPEEntry("PSE Background", out _, out _);
 
 			CENTROID_POINTS = new JPMath.PointD[N_SRC];
 			for (int i = 0; i < N_SRC; i++)
 				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 
 			if (BinTablePSE.TTYPEEntryExists("PSE RA (deg)"))
-				CENTROIDS_RA_DEG = BinTablePSE.GetTTYPEEntry("PSE RA (deg)");
+				CENTROIDS_RA_DEG = (double[])BinTablePSE.GetTTYPEEntry("PSE RA (deg)", out _, out _);
 			if (BinTablePSE.TTYPEEntryExists("PSE Dec (deg)"))
-				CENTROIDS_DEC_DEG = BinTablePSE.GetTTYPEEntry("PSE Dec (deg)");
+				CENTROIDS_DEC_DEG = (double[])BinTablePSE.GetTTYPEEntry("PSE Dec (deg)", out _, out _);
 			if (BinTablePSE.TTYPEEntryExists("PSE RA (sxgsml)"))
-			{
-				TypeCode t;
-				int[] d;
-				CENTROIDS_RA_HMS = (string[])BinTablePSE.GetTTYPEEntry("PSE RA (sxgsml)", out t, out d);
-			}
+				CENTROIDS_RA_HMS = (string[])BinTablePSE.GetTTYPEEntry("PSE RA (sxgsml)", out _, out _);
 			if (BinTablePSE.TTYPEEntryExists("PSE Dec (sxgsml)"))
-			{
-				TypeCode t;
-				int[] d;
-				CENTROIDS_DEC_DMS = (string[])BinTablePSE.GetTTYPEEntry("PSE Dec (sxgsml)", out t, out d);
-			}
+				CENTROIDS_DEC_DMS = (string[])BinTablePSE.GetTTYPEEntry("PSE Dec (sxgsml)", out _, out _);
 		}
 
 		#endregion
