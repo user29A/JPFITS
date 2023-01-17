@@ -249,9 +249,6 @@
 
 		#endregion
 
-		private string[] FOUNDFILES;
-		private WaitBar WAITBAR;
-
 		private System.Windows.Forms.Label NumSelectTxt;
 		private System.Windows.Forms.Button ClearAllBtn;
 		private System.Windows.Forms.Button SaveListBtn;

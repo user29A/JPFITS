@@ -9,8 +9,10 @@ namespace JPFITS
 	public partial class FITSFound : Form
 	{
 		private string[]? SELECTEDFILES;
+        private string[] FOUNDFILES;
+        private WaitBar? WAITBAR;
 
-		public string[] SelectedFiles
+        public string[] SelectedFiles
 		{
 			get
 			{
