@@ -3112,20 +3112,20 @@ namespace JPFITS
 			if (entryUnits != null)
 				TUNITS = entryUnits;
 			else
-				TUNITS = new string[(entryArrays.Length)];
+				TUNITS = new string[entryArrays.Length];
 			TCODES = new TypeCode[entryArrays.Length];
-			TREPEATS = new int[(entryArrays.Length)];
-			TFORMS = new string[(entryArrays.Length)];
-			TBYTES = new int[(entryArrays.Length)];
-			TTYPEISCOMPLEX = new bool[(entryArrays.Length)];
-			TTYPEISHEAPARRAYDESC = new bool[(entryArrays.Length)];
-			TDIMS = new int[(entryArrays.Length)][];
+			TREPEATS = new int[entryArrays.Length];
+			TFORMS = new string[entryArrays.Length];
+			TBYTES = new int[entryArrays.Length];
+			TTYPEISCOMPLEX = new bool[entryArrays.Length];
+			TTYPEISHEAPARRAYDESC = new bool[entryArrays.Length];
+			TDIMS = new int[entryArrays.Length][];
 			HEAPTCODES = new TypeCode[entryArrays.Length];
-			TTYPEHEAPARRAYNELSPOS = new int[(entryArrays.Length)][,];
+			TTYPEHEAPARRAYNELSPOS = new int[entryArrays.Length][,];
 
 			for (int i = 0; i < entryArrays.Length; i++)
 			{
-				TCODES[i] = Type.GetTypeCode((entryArrays[i].GetType()).GetElementType());
+				TCODES[i] = Type.GetTypeCode(entryArrays[i].GetType().GetElementType());
 				if (TCODES[i] != TypeCode.String)
 					if (entryArrays[i].Rank == 1)
 						TREPEATS[i] = 1;

@@ -1,12 +1,23 @@
 ﻿using System;
 using System.Windows.Forms;
 using System.IO;
+#nullable enable
 
 namespace JPFITS
 {
 	/// <summary>FITSFound class to manage a list of FITS files on disk.</summary>
 	public partial class FITSFound : Form
 	{
+		private string[]? SELECTEDFILES;
+
+		public string[] SelectedFiles
+		{
+			get
+			{
+				return SELECTEDFILES;
+            }
+		}
+
 		/// <summary> Constructor </summary>
 		/// <param name="foundFiles">A list of files found on disk.</param>
 		public FITSFound(string[] foundFiles)
@@ -48,7 +59,11 @@ namespace JPFITS
 		private void FileListTxt_SelectedIndexChanged(System.Object sender, System.EventArgs e)
 		{
 			NumSelectTxt.Text = "(" + FileListTxt.SelectedItems.Count + " selected)";
-		}
+
+			SELECTEDFILES = new string[FileListTxt.SelectedItems.Count];
+			for (int i = 0; i < SELECTEDFILES.Length; i++)
+				SELECTEDFILES[i] = FileListTxt.SelectedItems[i].ToString();
+        }
 
 		private void SelectAllBtn_Click(System.Object sender, System.EventArgs e)
 		{
