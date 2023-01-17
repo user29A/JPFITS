@@ -3165,7 +3165,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat heap area vector.</summary>
-		public bool GetTTYPEIsHeapVariableRepeatEntry(int n)
+		public bool TTYPEIsHeapEntry(int n)
 		{
 			return TTYPEISHEAPARRAYDESC[n];
 		}
@@ -3175,27 +3175,42 @@ namespace JPFITS
 		/// </summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <returns></returns>
-		public bool GetTTYPEIsHeapVariableRepeatEntry(string ttypeEntry)
+		public bool TTYPEIsHeapEntry(string ttypeEntry)
 		{
-			int ttypeindex = -1;
-			for (int i = 0; i < TTYPES.Length; i++)
-				if (TTYPES[i] == ttypeEntry)
-				{
-					ttypeindex = i;
-					break;
-				}
+			int ttypeindex = TTYPEIndex(ttypeEntry);
 
-			if (ttypeindex == -1)
-				throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
-
-			return GetTTYPEIsHeapVariableRepeatEntry(ttypeindex);
+            return TTYPEIsHeapEntry(ttypeindex);
 		}
 
-		/// <summary>Returns the number of elements (repeats) for a given heap entry at a given row.</summary>
-		public int GetTTYPERowRepeatsHeapEntry(int ttypeindex, int row)
+        /// <summary>Returns the number of elements (repeats) for a given heap entry at a given row.</summary>
+        /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+        /// <param name="row">The row of the entry.</param>
+        public int TTYPEHeapEntryRowLength(string ttypeEntry, int row)
 		{
-			return TTYPEHEAPARRAYNELSPOS[ttypeindex][0, row];
+            int ttypeindex = TTYPEIndex(ttypeEntry);
+
+            return TTYPEHEAPARRAYNELSPOS[ttypeindex][0, row];
 		}
+
+        /// <summary>
+        /// Returns the column index of the TTYPE entry.
+        /// </summary>
+        /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+        public int TTYPEIndex(string ttypeEntry)
+		{
+            int ttypeindex = -1;
+            for (int i = 0; i < TTYPES.Length; i++)
+                if (TTYPES[i] == ttypeEntry)
+                {
+                    ttypeindex = i;
+                    break;
+                }
+
+            if (ttypeindex == -1)
+                throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
+
+			return ttypeindex;
+        }
 
 		/// <summary>Add an extra key to the extension header. If it is to be a COMMENT, just fill the keyValue with eighteen characters, and the keyComment with 54 characters.</summary>
 		/// <param name="keyName">The name of the key.</param>

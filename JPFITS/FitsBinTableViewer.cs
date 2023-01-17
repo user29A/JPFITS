@@ -88,7 +88,7 @@ namespace JPFITS
 				TypeCode type;
 				Object entry;
 
-				if (FITSBINTABLE.GetTableDataTypeCodes(i) == TypeCode.Char || FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
+				if (FITSBINTABLE.GetTableDataTypeCodes(i) == TypeCode.Char || FITSBINTABLE.TTYPEIsHeapEntry(i))
 					entry = FITSBINTABLE.GetTTYPEEntry(labels[i], out type, out dimNElements);
 				else
 				{
@@ -96,7 +96,7 @@ namespace JPFITS
 					type = TypeCode.Double;
 				}
 
-				if (type != TypeCode.Char && !FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
+				if (type != TypeCode.Char && !FITSBINTABLE.TTYPEIsHeapEntry(i))
 					if (dimNElements.Length != 1)
 					{
 						DATATABLE[i] = new double[(FITSBINTABLE.Naxis2)];
@@ -110,7 +110,7 @@ namespace JPFITS
 						DATATABLE[i] = (double[])entry;
 				else if (type == TypeCode.Char)
 					DATATABLE[i] = (string[])entry;
-				else if (FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
+				else if (FITSBINTABLE.TTYPEIsHeapEntry(i))
 				{
 					DATATABLE[i] = new double[(FITSBINTABLE.Naxis2)];
 					Parallel.For(0, FITSBINTABLE.Naxis2, j =>
