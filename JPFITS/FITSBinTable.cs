@@ -2936,7 +2936,7 @@ namespace JPFITS
 					int nels = strarr[0].Length;
 					for (int j = 1; j < strarr.Length; j++)
 						if (strarr[j].Length != nels)
-							throw new Exception("Error: String array entries '" + ttypeEntry + "' are not all the same namber of characters (repeats) long.");
+							throw new Exception("Error: String array entries '" + ttypeEntry + "' are not all the same namber of characters (repeats) long. Use EntryArrayFormat.IsHeapVariableRepeatRows option to add to the heap.");
 				}
 
 			if (ttypeindex != -1)//then remove it
@@ -3077,20 +3077,16 @@ namespace JPFITS
 		{
 			for (int i = 0; i < entryArrays.Length; i++)
 				if (entryArrays[i].Rank > 2)
-					throw new Exception("Error: Do not use this function to add an n &gt; 2 dimensional array. Use AddTTYPEEntry.");
+					throw new Exception("Error: Do not use this function to add an n &gt; 2 dimensional array. Use AddTTYPEEntry with '" + ttypeEntries[i] + "' formatted as a vector, whilst specifying the option to supply the TDIM keywords.");
 				else if (entryArrays[i].Rank == 1 && Type.GetTypeCode(entryArrays[i].GetType().GetElementType()) == TypeCode.String)
 				{
 					string[] strarr = (string[])entryArrays[i];
 					int nels = strarr[0].Length;
 					for (int j = 1; j < strarr.Length; j++)
 						if (strarr[j].Length != nels)
-						{
-							throw new Exception("Error: String array entries '" + ttypeEntries[i] + "' are not all the same namber of characters (repeats) long. Use AddTTYPEEntry.");
-						}
+							throw new Exception("Error: String array entries '" + ttypeEntries[i] + "' are not all the same number of characters (repeats) long. Use AddTTYPEEntry.");
 				}
 
-			bool equalnaxis2 = true;
-			bool stringarrayrank2 = false;
 			int naxis2;
 			if (entryArrays[0].Rank == 1)
 				naxis2 = entryArrays[0].Length;
@@ -3100,33 +3096,16 @@ namespace JPFITS
 				if (entryArrays[i].Rank == 1)
 				{
 					if (entryArrays[i].Length != naxis2)
-					{
-						equalnaxis2 = false;
-						break;
-					}
+						throw new Exception("Error: all entry column heights, NAXIS2s, are not equal. Error detected for '" + ttypeEntries[i] + "'.");
 				}
 				else
 				{
 					if (entryArrays[i].GetLength(1) != naxis2)
-					{
-						equalnaxis2 = false;
-						break;
-					}
+						throw new Exception("Error: all entry column heights, NAXIS2s, are not equal. Error detected for '" + ttypeEntries[i] + "'.");
 
 					if (Type.GetTypeCode(entryArrays[i].GetType().GetElementType()) == TypeCode.String)
-					{
-						stringarrayrank2 = true;
-						break;
-					}
+						throw new Exception("Error: Cannot pass a 2d String array. Only a 1D array of Strings is allowed. Error detected for '" + ttypeEntries[i] + "'.");
 				}
-			if (!equalnaxis2)
-			{
-				throw new Exception("Error: all entry column heights, NAXIS2s, are not equal. Use an overload to add a variable length array to the heap.");
-			}
-			if (stringarrayrank2)
-			{
-				throw new Exception("Error: Cannot pass a 2d String array. Only a 1D array of Strings is allowed.");
-			}
 
 			TFIELDS = entryArrays.Length;
 			TTYPES = ttypeEntries;
@@ -3177,7 +3156,7 @@ namespace JPFITS
 		}
 
 		/// <summary>TableDataTypes reports the .NET typecodes for each entry in the table.</summary>
-		public TypeCode GetTableDataTypes(int n)
+		public TypeCode GetTableDataTypeCodes(int n)
 		{
 			if (TTYPEISHEAPARRAYDESC[n])
 				return HEAPTCODES[n];
@@ -3185,10 +3164,31 @@ namespace JPFITS
 				return TCODES[n];
 		}
 
-		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat array.</summary>
+		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat heap area vector.</summary>
 		public bool GetTTYPEIsHeapVariableRepeatEntry(int n)
 		{
 			return TTYPEISHEAPARRAYDESC[n];
+		}
+
+		/// <summary>
+		/// Returns wheather the TTYPE entry is a variable repeat heap area vector.
+		/// </summary>
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		/// <returns></returns>
+		public bool GetTTYPEIsHeapVariableRepeatEntry(string ttypeEntry)
+		{
+			int ttypeindex = -1;
+			for (int i = 0; i < TTYPES.Length; i++)
+				if (TTYPES[i] == ttypeEntry)
+				{
+					ttypeindex = i;
+					break;
+				}
+
+			if (ttypeindex == -1)
+				throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
+
+			return GetTTYPEIsHeapVariableRepeatEntry(ttypeindex);
 		}
 
 		/// <summary>Returns the number of elements (repeats) for a given heap entry at a given row.</summary>

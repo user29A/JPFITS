@@ -88,7 +88,7 @@ namespace JPFITS
 				TypeCode type;
 				Object entry;
 
-				if (FITSBINTABLE.GetTableDataTypes(i) == TypeCode.Char || FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
+				if (FITSBINTABLE.GetTableDataTypeCodes(i) == TypeCode.Char || FITSBINTABLE.GetTTYPEIsHeapVariableRepeatEntry(i))
 					entry = FITSBINTABLE.GetTTYPEEntry(labels[i], out type, out dimNElements);
 				else
 				{
@@ -172,7 +172,7 @@ namespace JPFITS
 		{
 			try
 			{
-				if (FITSBINTABLE.GetTableDataTypes(e.ColumnIndex) == TypeCode.Char)
+				if (FITSBINTABLE.GetTableDataTypeCodes(e.ColumnIndex) == TypeCode.Char)
 					e.Value = ((string[])DATATABLE[e.ColumnIndex])[e.RowIndex];
 				else
 					e.Value = ((double[])DATATABLE[e.ColumnIndex])[e.RowIndex];
