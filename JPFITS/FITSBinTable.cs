@@ -3140,19 +3140,19 @@ namespace JPFITS
 			MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
 		}
 
-		/// <summary>Add a vector or 2D array TTYPE entry of either numeric or string values to the binary table.</summary>
-		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
-		/// <param name="entryUnits">The TUNITS physical units of the values of the array. Pass empty string if not required.</param>
-		/// <param name="entryArray">The vector or 2D array to enter into the table.</param>
-		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray)
-		{
-			if (entryArray.Rank >= 3)
-				throw new Exception("Error: Cannot add an array of rank &gt;= 3 to a FITS binary table.");
+		// /// <summary>Add a vector or 2D array TTYPE entry of either numeric or string values to the binary table.</summary>
+		// /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		// /// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
+		// /// <param name="entryUnits">The TUNITS physical units of the values of the array. Pass empty string if not required.</param>
+		// /// <param name="entryArray">The vector or 2D array to enter into the table.</param>
+		//public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray)
+		//{
+		//	if (entryArray.Rank >= 3)
+		//		throw new Exception("Error: Cannot add an array of rank &gt;= 3 to a FITS binary table.");
 
-			int[] dimns = null;
-			AddTTYPEEntry(ttypeEntry, replaceIfExists, entryUnits, entryArray, dimns, false, false);
-		}
+		//	int[] dimns = null;
+		//	AddTTYPEEntry(ttypeEntry, replaceIfExists, entryUnits, entryArray, dimns, false, false);
+		//}
 
 		public enum EntryArrayFormat
 		{
@@ -3188,25 +3188,27 @@ namespace JPFITS
 		/// <br />The entryArray must be the same neight NAXIS2 as the previous entry additions, if any.
 		/// <br />If entryArray is a variable repeat heap array then the entry must be supplied as an array of arrays, or an array of Strings; if complex each subarray must contain an even pairing of values.
 		/// <br />If adding a complex number array to the binary table, the entryArray must be either single or double floating point, and must be a factor of two columns repeats where the 1st and odd numbered columns are the spatial part, and the 2nd and even numbered columns are the temporal part.
-		/// <br />If entryArray is to be interpreted as rank &gt;=3, then array dimensions need to be supplied with the optional tdim argument after the EntryArrayFormat.IsNDimensional option. If entries already exist then the user must have formatted the entryArray to match the existing table height NAXIS2.
+		/// <br />If entryArray is to be interpreted as rank &gt;= 3, then array dimensions need to be supplied with the optional tdim argument after the EntryArrayFormat.IsNDimensional option. If entries already exist then the user must have formatted the entryArray to match the existing table height NAXIS2.
 		/// </summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
 		/// <param name="entryUnits">The TUNITS physical units of the values of the array. Pass empty string if not required.</param>
 		/// <param name="entryArray">The array to enter into the table.</param>
-		/// <param name="tdims">A vector giving the number of elements along each dimension of the array, to write as the TDIM key for the entry IF the entry is n &gt;= 3 dimensional; pass null if the entry is not n &gt;= 3 dimensional.</param>
-		/// <param name="isComplex">A boolean to set whether the array should be interpreted as complex value pairings.</param>
-		/// <param name="addAsHeapVarRepeatArray">A boolean to set whether to save the array as a variable repeat array in the heap area. If true, the entryArray must be an array of arrays or an array of Strings.</param>
-		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray, int[]? tdims, bool isComplex, bool addAsHeapVarRepeatArray/*, EntryArrayFormat arrayFormat = EntryArrayFormat.Default, int[]? tDims = null*/)
+		///<param name="arrayFormat">Specify entryArray format for non-trivial cases.</param>
+		///<param name="tdims">Specify the array dimensions for  rank r &gt;= 3, to be written as the TDIMS keywords.</param>
+		// /// <param name="tdims">A vector giving the number of elements along each dimension of the array, to write as the TDIM key for the entry IF the entry is n &gt;= 3 dimensional; pass null if the entry is not n &gt;= 3 dimensional.</param>
+		// /// <param name="isComplex">A boolean to set whether the array should be interpreted as complex value pairings.</param>
+		// /// <param name="addAsHeapVarRepeatArray">A boolean to set whether to save the array as a variable repeat array in the heap area. If true, the entryArray must be an array of arrays or an array of Strings.</param>
+		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray/*, int[]? tdims, bool isComplex, bool addAsHeapVarRepeatArray*/, EntryArrayFormat arrayFormat = EntryArrayFormat.Default, int[]? tdims = null)
 		{
-			//isComplex = false;
-			//if (arrayFormat == EntryArrayFormat.IsComplex)
-			//	isComplex = true;
-			//addAsHeapVarRepeatArray = false;
-			//if (arrayFormat == EntryArrayFormat.IsHeapVariableRepeatRows || arrayFormat == EntryArrayFormat.IsHeapComplexVariableRepeatRows)
-			//	addAsHeapVarRepeatArray = true;
-			//if (arrayFormat == EntryArrayFormat.IsNDimensional && tDims == null)
-			//	throw new Exception("The tdims optional argument must be provided if the array format is n >= 3 dimensional.");
+			bool isComplex = false;
+			if (arrayFormat == EntryArrayFormat.IsComplex)
+				isComplex = true;
+			bool addAsHeapVarRepeatArray = false;
+			if (arrayFormat == EntryArrayFormat.IsHeapVariableRepeatRows || arrayFormat == EntryArrayFormat.IsHeapComplexVariableRepeatRows)
+				addAsHeapVarRepeatArray = true;
+			if (arrayFormat == EntryArrayFormat.IsNDimensional && tdims == null)
+				throw new Exception("The tdims optional argument must be provided if the array format is n >= 3 dimensional.");
 
 			if (entryArray.Rank >= 3)
 				throw new Exception("Error: Cannot add an array of rank &gt;= 3 to a FITS binary table.");
@@ -3257,7 +3259,7 @@ namespace JPFITS
 
 			if (!addAsHeapVarRepeatArray && Type.GetTypeCode((entryArray.GetType()).GetElementType()) == TypeCode.String)
 				if (entryArray.Rank == 2)
-					throw new Exception("Error: Cannot pass a 2d String array '" + ttypeEntry + "' . Only a 1D array of Strings is allowed.");
+					throw new Exception("Error: Cannot pass a 2d String array '" + ttypeEntry + "' . Only a 1D array of Strings is allowed since a string is already an array.");
 				else
 				{
 					string[] strarr = (string[])entryArray;
@@ -3397,17 +3399,15 @@ namespace JPFITS
 		}
 
 		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES INCLUDING THE HEAP.
-		/// <br />Do not use for n &gt; 2 dimensional and/or complex entries.</summary>
+		/// <br />Do not use for n &gt;= 3 dimensional, or complex, or heap variable-repeat entries.</summary>
 		/// <param name="ttypeEntries">The names of the binary table extension entries, i.e. the TTYPE values.</param>
 		/// <param name="entryUnits">The physical units of the values of the arrays. Pass null if not needed, or with null elements or empty elements where not required, etc.</param>
-		/// <param name="entryArrays">An array of vectors or 2D arrays to enter into the table.</param>
+		/// <param name="entryArrays">An array of vectors or 2D arrays to enter into the table, all of which have the same height NAXIS2.</param>
 		public void SetTTYPEEntries(string[] ttypeEntries, string[]? entryUnits, Array[] entryArrays)
 		{
 			for (int i = 0; i < entryArrays.Length; i++)
 				if (entryArrays[i].Rank > 2)
-				{
 					throw new Exception("Error: Do not use this function to add an n &gt; 2 dimensional array. Use AddTTYPEEntry.");
-				}
 				else if (entryArrays[i].Rank == 1 && Type.GetTypeCode(entryArrays[i].GetType().GetElementType()) == TypeCode.String)
 				{
 					string[] strarr = (string[])entryArrays[i];
@@ -3415,7 +3415,7 @@ namespace JPFITS
 					for (int j = 1; j < strarr.Length; j++)
 						if (strarr[j].Length != nels)
 						{
-							throw new Exception("Error: String array entries '" + ttypeEntries[i] + "' are not all the same namber of characters (repeats) long.");
+							throw new Exception("Error: String array entries '" + ttypeEntries[i] + "' are not all the same namber of characters (repeats) long. Use AddTTYPEEntry.");
 						}
 				}
 
