@@ -417,8 +417,8 @@ namespace JPFITS
 					throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
 			}
 
-			long extensionstartposition, extensionendposition, tableendposition, pcount, theap;
-			if (!FITSFILEOPS.SEEKEXTENSION(fs, "IMAGE", extensionNumber, ref header, out extensionstartposition, out extensionendposition, out tableendposition, out pcount, out theap))
+			long extensionstartposition;
+			if (!FITSFILEOPS.SEEKEXTENSION(fs, "IMAGE", extensionNumber, ref header, out extensionstartposition, out _, out _, out _, out _))
 			{
 				fs.Close();
 				throw new Exception("Could not find IMAGE extension number '" + extensionNumber + "'");

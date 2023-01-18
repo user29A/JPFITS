@@ -3183,7 +3183,6 @@ namespace JPFITS
 		public bool GetTTYPEIsHeapEntry(string ttypeEntry)
 		{
 			int ttypeindex = GetTTYPEIndex(ttypeEntry);
-
             return GetTTYPEIsHeapEntry(ttypeindex);
 		}
 
@@ -3193,7 +3192,6 @@ namespace JPFITS
         public int GetTTYPEHeapEntryRowLength(string ttypeEntry, int row)
 		{
             int ttypeindex = GetTTYPEIndex(ttypeEntry);
-
             return TTYPEHEAPARRAYNELSPOS[ttypeindex][0, row];
 		}
 
