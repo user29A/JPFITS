@@ -30,8 +30,10 @@ namespace JPFITS
 		private string[]? EXTRAKEYS;
 		private string[]? EXTRAKEYVALS;
 		private string[]? EXTRAKEYCOMS;
+		//private FITSHeaderKey[]? EXTRAKEYS;
 		private byte[]? BINTABLE;//the table in raw byte format read from disk
 		private byte[]? HEAPDATA;//the table in raw byte format read from disk
+		
 
 		#region FITS bzero integer mapping
 
@@ -773,10 +775,10 @@ namespace JPFITS
 			int NKeys = hkeyslist.Count;
 			int NCards = (NKeys - 1) / 36;
 			int NBlankKeys = (NCards + 1) * 36 - NKeys;
-			string[] headerkeys = new string[((NCards + 1) * 36)];
-			string[] headerkeyvals = new string[((NCards + 1) * 36)];
-			string[] headerkeycoms = new string[((NCards + 1) * 36)];
-			string[] header = new string[((NCards + 1) * 36)];
+			string[] headerkeys = new string[(NCards + 1) * 36];
+			string[] headerkeyvals = new string[(NCards + 1) * 36];
+			string[] headerkeycoms = new string[(NCards + 1) * 36];
+			string[] header = new string[(NCards + 1) * 36];
 
 			for (int i = 0; i < NKeys; i++)
 			{
@@ -2751,7 +2753,7 @@ namespace JPFITS
 			}
 		}
 
-		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements. Operates on heap-stored data if required.</summary>
+		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements. Operates on heap-stored data where required.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		public void RemoveTTYPEEntry(string ttypeEntry)
 		{
@@ -2764,22 +2766,20 @@ namespace JPFITS
 				}
 
 			if (ttypeindex == -1)
-			{
 				throw new Exception("Extension Entry TTYPE wasn't found: '" + ttypeEntry + "'");
-			}
 
-			Array[] newEntryDataObjs = new Array[(TFIELDS - 1)];
-			string[] newTTYPES = new string[(TFIELDS - 1)];
-			string[] newTFORMS = new string[(TFIELDS - 1)];
-			string[] newTUNITS = new string[(TFIELDS - 1)];
-			int[] newTBYTES = new int[(TFIELDS - 1)];
-			int[] newTREPEATS = new int[(TFIELDS - 1)];
-			TypeCode[] newTCODES = new TypeCode[(TFIELDS - 1)];
-			int[][] newTDIMS = new int[(TFIELDS - 1)][];
-			bool[] newTTYPEISCOMPLEX = new bool[(TFIELDS - 1)];
-			bool[] newTTYPEISHEAPARRAYDESC = new bool[(TFIELDS - 1)];
-			TypeCode[] newHEAPTCODES = new TypeCode[(TFIELDS - 1)];
-			int[][,] newTTYPEHEAPARRAYNELSPOS = new int[(TFIELDS - 1)][,];
+			Array[] newEntryDataObjs = new Array[TFIELDS - 1];
+			string[] newTTYPES = new string[TFIELDS - 1];
+			string[] newTFORMS = new string[TFIELDS - 1];
+			string[] newTUNITS = new string[TFIELDS - 1];
+			int[] newTBYTES = new int[TFIELDS - 1];
+			int[] newTREPEATS = new int[TFIELDS - 1];
+			TypeCode[] newTCODES = new TypeCode[TFIELDS - 1];
+			int[][] newTDIMS = new int[TFIELDS - 1][];
+			bool[] newTTYPEISCOMPLEX = new bool[TFIELDS - 1];
+			bool[] newTTYPEISHEAPARRAYDESC = new bool[TFIELDS - 1];
+			TypeCode[] newHEAPTCODES = new TypeCode[TFIELDS - 1];
+			int[][,] newTTYPEHEAPARRAYNELSPOS = new int[TFIELDS - 1][,];
 
 			int c = 0;
 			for (int i = 0; i < TFIELDS; i++)
@@ -2821,6 +2821,9 @@ namespace JPFITS
 			MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
 		}
 
+		/// <summary>
+		/// Provides options for specifying the nature of the data added to a BINTABLE.
+		/// </summary>
 		public enum EntryArrayFormat
 		{
 			/// <summary>
@@ -2845,7 +2848,8 @@ namespace JPFITS
 
 			/// <summary>
 			/// The entryArray is a numeric vector but which is to be interpreted as an n-dimensional array of rank r &gt;= 3, for which the TDIM values will be provided giving the number of elements along each dimension of the array, which will be written into the header as the TDIMn keys.
-			/// <br />The optional argument for tdims *MUST* be provided with this option.
+			/// <br />The optional argument for tdims *MUST* be provided with this option. 
+			/// <br />NOTE that the array must be supplied as a vector or 2D array but which is to be understood as a rank r &gt;= 3 array via the TDIM keywords. Do not actually pass a rank r &gt;= 3 array.
 			/// </summary>
 			IsNDimensional
 		}
@@ -2861,8 +2865,8 @@ namespace JPFITS
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
 		/// <param name="entryUnits">The TUNITS physical units of the values of the array. Pass empty string if not required.</param>
 		/// <param name="entryArray">The array to enter into the table.</param>
-		///<param name="arrayFormat">Specify entryArray format for non-default (trivial) cases.</param>
-		///<param name="tdims">Specify the array dimensions for rank r &gt;= 3, to be written as the TDIMS keywords.</param>
+		/// <param name="arrayFormat">Specify entryArray format for non-default (trivial) cases.</param>
+		/// <param name="tdims">Specify the array dimensions for rank r &gt;= 3, to be written as the TDIM keywords.</param>
 		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray, EntryArrayFormat arrayFormat = EntryArrayFormat.Default, int[]? tdims = null)
 		{
 			bool isComplex = false;
@@ -3060,7 +3064,7 @@ namespace JPFITS
 			MAKEBINTABLEBYTEARRAY(newEntryDataObjs);
 		}
 
-		/// <summary>Set the bintable full of entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES INCLUDING THE HEAP.
+		/// <summary>Set the bintable full of basic entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES INCLUDING THE HEAP.
 		/// <br />Do not use for n &gt;= 3 dimensional, or complex, or heap variable-repeat entries.</summary>
 		/// <param name="ttypeEntries">The names of the binary table extension entries, i.e. the TTYPE values.</param>
 		/// <param name="entryUnits">The physical units of the values of the arrays. Pass null if not needed, or with null elements or empty elements where not required, etc.</param>
@@ -3147,7 +3151,7 @@ namespace JPFITS
 			HEAPDATA = null;
 		}
 
-		/// <summary>TableDataTypes reports the .NET typecodes for each entry in the table.</summary>
+		/// <summary>Returns the System.TypeCode for an entry in the table. Note that strings entries report as Char.</summary>
 		public TypeCode GetTTYPETypeCode(int ttypeindex)
 		{
 			if (TTYPEISHEAPARRAYDESC[ttypeindex])
@@ -3156,13 +3160,15 @@ namespace JPFITS
 				return TCODES[ttypeindex];
 		}
 
+		/// <summary>Returns the System.TypeCode for an entry in the table. Note that strings entries report as Char.</summary>
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		public TypeCode GetTTYPETypeCode(string ttypeEntry)
 		{
 			int ttypeindex = GetTTYPEIndex(ttypeEntry);
 			return GetTTYPETypeCode(ttypeindex);
 		}
 
-		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat heap area vector.</summary>
+		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat heap area vector of vectors.</summary>
 		public bool GetTTYPEIsHeapEntry(int ttypeindex)
 		{
 			return TTYPEISHEAPARRAYDESC[ttypeindex];
@@ -3188,7 +3194,7 @@ namespace JPFITS
 		}
 
         /// <summary>
-        /// Returns the column index of the TTYPE entry.
+        /// Returns the index of the TTYPE entry.
         /// </summary>
         /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
         public int GetTTYPEIndex(string ttypeEntry)
