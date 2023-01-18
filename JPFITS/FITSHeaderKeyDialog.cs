@@ -80,5 +80,10 @@ namespace JPFITS
 		{
 			label3.Text = String.Format("Key Comment ({0})", (48 - KeyCommentTxt.Text.Length).ToString());
 		}
+
+		private void CommentKeyLineTxt_TextChanged(object sender, EventArgs e)
+		{
+			label1.Text = string.Format("Comment Line ({0})", (80 - CommentKeyLineTxt.Text.Length).ToString());
+		}
 	}
 }

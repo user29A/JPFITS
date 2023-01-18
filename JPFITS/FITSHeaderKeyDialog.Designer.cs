@@ -130,6 +130,7 @@
 			this.CommentKeyLineTxt.Size = new System.Drawing.Size(562, 21);
 			this.CommentKeyLineTxt.TabIndex = 91;
 			this.CommentKeyLineTxt.Visible = false;
+			this.CommentKeyLineTxt.TextChanged += new System.EventHandler(this.CommentKeyLineTxt_TextChanged);
 			// 
 			// CommentKeyLineChck
 			// 
