@@ -1763,8 +1763,8 @@ namespace JPFITS
 			}
 
 			header = new ArrayList();
-			long extensionstartposition, extensionendposition, tableendposition, pcount, theap;
-			if (!FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", extensionName, ref header, out extensionstartposition, out extensionendposition, out tableendposition, out pcount, out theap))
+			long tableendposition, pcount, theap;
+			if (!FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", extensionName, ref header, out _, out _, out tableendposition, out pcount, out theap))
 			{
 				fs.Close();
 				throw new Exception("Could not find BINTABLE with name '" + extensionName + "'");
@@ -3156,38 +3156,43 @@ namespace JPFITS
 		}
 
 		/// <summary>TableDataTypes reports the .NET typecodes for each entry in the table.</summary>
-		public TypeCode GetTableDataTypeCodes(int n)
+		public TypeCode GetTTYPETypeCode(int ttypeindex)
 		{
-			if (TTYPEISHEAPARRAYDESC[n])
-				return HEAPTCODES[n];
+			if (TTYPEISHEAPARRAYDESC[ttypeindex])
+				return HEAPTCODES[ttypeindex];
 			else
-				return TCODES[n];
+				return TCODES[ttypeindex];
+		}
+
+		public TypeCode GetTTYPETypeCode(string ttypeEntry)
+		{
+			int ttypeindex = GetTTYPEIndex(ttypeEntry);
+			return GetTTYPETypeCode(ttypeindex);
 		}
 
 		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat heap area vector.</summary>
-		public bool TTYPEIsHeapEntry(int n)
+		public bool GetTTYPEIsHeapEntry(int ttypeindex)
 		{
-			return TTYPEISHEAPARRAYDESC[n];
+			return TTYPEISHEAPARRAYDESC[ttypeindex];
 		}
 
 		/// <summary>
 		/// Returns wheather the TTYPE entry is a variable repeat heap area vector.
 		/// </summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		/// <returns></returns>
-		public bool TTYPEIsHeapEntry(string ttypeEntry)
+		public bool GetTTYPEIsHeapEntry(string ttypeEntry)
 		{
-			int ttypeindex = TTYPEIndex(ttypeEntry);
+			int ttypeindex = GetTTYPEIndex(ttypeEntry);
 
-            return TTYPEIsHeapEntry(ttypeindex);
+            return GetTTYPEIsHeapEntry(ttypeindex);
 		}
 
         /// <summary>Returns the number of elements (repeats) for a given heap entry at a given row.</summary>
         /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
         /// <param name="row">The row of the entry.</param>
-        public int TTYPEHeapEntryRowLength(string ttypeEntry, int row)
+        public int GetTTYPEHeapEntryRowLength(string ttypeEntry, int row)
 		{
-            int ttypeindex = TTYPEIndex(ttypeEntry);
+            int ttypeindex = GetTTYPEIndex(ttypeEntry);
 
             return TTYPEHEAPARRAYNELSPOS[ttypeindex][0, row];
 		}
@@ -3196,7 +3201,7 @@ namespace JPFITS
         /// Returns the column index of the TTYPE entry.
         /// </summary>
         /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-        public int TTYPEIndex(string ttypeEntry)
+        public int GetTTYPEIndex(string ttypeEntry)
 		{
             int ttypeindex = -1;
             for (int i = 0; i < TTYPES.Length; i++)
@@ -3367,8 +3372,8 @@ namespace JPFITS
 				FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref headerret, out hasext);
 			}
 
-			long extensionstartposition, extensionendposition, tableendposition, pcount, theap;
-			bool extensionfound = FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", EXTENSIONNAME, ref headerret, out extensionstartposition, out extensionendposition, out tableendposition, out pcount, out theap);
+			long extensionstartposition, extensionendposition;
+			bool extensionfound = FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", EXTENSIONNAME, ref headerret, out extensionstartposition, out extensionendposition, out _, out _, out _);
 			if (extensionfound && !OverWriteExtensionIfExists)
 			{
 				fs.Close();
@@ -3456,8 +3461,8 @@ namespace JPFITS
 					throw new Exception("File '" + FileName + "'  not formatted as FITS file.");
 			}
 
-			long extensionstartposition, extensionendposition, tableendposition, pcount, theap;
-			bool exists = FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", ExtensionName, ref header, out extensionstartposition, out extensionendposition, out tableendposition, out pcount, out theap);
+			long extensionstartposition, extensionendposition;
+			bool exists = FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", ExtensionName, ref header, out extensionstartposition, out extensionendposition, out _, out _, out _);
 			if (!exists)
 			{
 				fs.Close();
@@ -3497,8 +3502,7 @@ namespace JPFITS
 					throw new Exception("File '" + FileName + "'  not formatted as FITS file.");
 			}
 
-			long extensionstartposition, extensionendposition, tableendposition, pcount, theap;
-			bool exists = FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", ExtensionName, ref header, out extensionstartposition, out extensionendposition, out tableendposition, out pcount, out theap);
+			bool exists = FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", ExtensionName, ref header, out _, out _, out _, out _, out _);
 			fs.Close();
 			return exists;
 		}

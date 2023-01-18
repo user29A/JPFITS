@@ -6,30 +6,33 @@ using System.Collections;
 
 namespace JPFITS
 {
-	/// <summary>Array formatting options for the data unit returned by the READDATAUNIT method.</summary>
-	public enum DataUnitFormatting
-	{
-		/// <summary>
-		/// The Array is returned as the rank indicated by the NAXIS keyword
-		/// </summary>
-		Default,
-		/// <summary>
-		/// If the default Array would be a vector, return it as a 2D horizontal array. Indexing will then be [i, 0].
-		/// </summary>
-		VectorAsHorizontalTable,
-		/// <summary>
-		/// If the default Array would be a vector, return it as a 2D vertical array. Indexing will then be [0, i].
-		/// </summary>
-		VectorAsVerticalTable,
-		/// <summary>
-		/// If the range dimensions indicate a vector when reading from a table or cube, or a table when reading from a cube, then return the Array formatted as the range rank.
-		/// </summary>
-		ArrayAsRangeRank
-	}
-
 	///<summary>FITSFILEOPS static class for facilitating interaction with FITS data on disk.</summary>
 	public class FITSFILEOPS
 	{
+		/// <summary>Array formatting options for the data unit returned by the READDATAUNIT method.</summary>
+		public enum ImageDataUnitFormatting
+		{
+			/// <summary>
+			/// The Array is returned as the rank indicated by the NAXIS keyword
+			/// </summary>
+			Default,
+
+			/// <summary>
+			/// If the default Array would be a vector, return it as a 2D horizontal array. Indexing will then be [i, 0].
+			/// </summary>
+			VectorAsHorizontalTable,
+
+			/// <summary>
+			/// If the default Array would be a vector, return it as a 2D vertical array. Indexing will then be [0, i].
+			/// </summary>
+			VectorAsVerticalTable,
+
+			/// <summary>
+			/// If the range dimensions indicate a vector when reading from a table or cube, or a table when reading from a cube, then return the Array formatted as the range rank.
+			/// </summary>
+			ArrayAsRangeRank
+		}
+
 		/// <summary>Scans the primary header unit and data of a FITS file. Returns false if the file is not a FITS file.</summary>
 		/// <param name="fs">The FileStream of the FITS file, positioned at the start of the stream.</param>
 		/// <param name="scanpastprimarydata">True to set the FileStream fs position to the end of the data block, otherwise the fs position will be at the end of the primary header block, i.e. at the beginning of the primary data.</param>
@@ -275,9 +278,7 @@ namespace JPFITS
 			if (scanpastdataunit)
 				if (naxis != 0)
 				{
-					long NBytes = (long)(Math.Abs(bitpix)) / 8;
-					for (int i = 0; i < naxisn.Length; i++)
-						NBytes *= naxisn[i];
+					long NBytes = (long)(Math.Abs(bitpix)) / 8 * JPMath.Product(naxisn);
 					fs.Seek((long)(Math.Ceiling(((double)(NBytes)) / 2880) * 2880), SeekOrigin.Current);//should now be at the 1st extension header
 				}
 
@@ -293,7 +294,7 @@ namespace JPFITS
 		/// <param name="bscale">The BSCALE keyword value of the data unit header.</param>
 		/// <param name="bzero">The BZERO keyword value of the data unit header.</param>
 		/// <param name="returnOptions">Options for formatting the return Array rank and dimensions.</param>
-		public static Array READDATAUNIT(FileStream fs, int[]? range, bool doParallel, int bitpix, ref int[] naxisn, double bscale, double bzero, DataUnitFormatting returnOptions = DataUnitFormatting.Default)
+		public static Array READIMAGEDATAUNIT(FileStream fs, int[]? range, bool doParallel, int bitpix, ref int[] naxisn, double bscale, double bzero, ImageDataUnitFormatting returnOptions = ImageDataUnitFormatting.Default)
 		{
 			if (range == null || range[0] == -1)//then it is a full frame read
 				if (naxisn.Length == 1)
@@ -340,7 +341,7 @@ namespace JPFITS
 				{
 					case 8:
 					{
-						if (returnOptions == DataUnitFormatting.Default)
+						if (returnOptions == ImageDataUnitFormatting.Default)
 						{
 							double[] dvector = new double[range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -349,7 +350,7 @@ namespace JPFITS
 							});
 							return dvector;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsHorizontalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
 						{
 							double[,] dtable = new double[range[1] - range[0] + 1, 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -359,7 +360,7 @@ namespace JPFITS
 							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 							return dtable;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsVerticalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
 						{
 							double[,] dtable = new double[1, range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -374,7 +375,7 @@ namespace JPFITS
 
 					case 16:
 					{
-						if (returnOptions == DataUnitFormatting.Default)
+						if (returnOptions == ImageDataUnitFormatting.Default)
 						{
 							double[] dvector = new double[range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -385,7 +386,7 @@ namespace JPFITS
 							});
 							return dvector;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsHorizontalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
 						{
 							double[,] dtable = new double[range[1] - range[0] + 1, 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -397,7 +398,7 @@ namespace JPFITS
 							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 							return dtable;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsVerticalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
 						{
 							double[,] dtable = new double[1, range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -414,7 +415,7 @@ namespace JPFITS
 
 					case 32:
 					{
-						if (returnOptions == DataUnitFormatting.Default)
+						if (returnOptions == ImageDataUnitFormatting.Default)
 						{
 							double[] dvector = new double[range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -425,7 +426,7 @@ namespace JPFITS
 							});
 							return dvector;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsHorizontalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
 						{
 							double[,] dtable = new double[range[1] - range[0] + 1, 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -437,7 +438,7 @@ namespace JPFITS
 							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 							return dtable;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsVerticalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
 						{
 							double[,] dtable = new double[1, range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -454,7 +455,7 @@ namespace JPFITS
 
 					case 64:
 					{
-						if (returnOptions == DataUnitFormatting.Default)
+						if (returnOptions == ImageDataUnitFormatting.Default)
 						{
 							double[] dvector = new double[range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -473,7 +474,7 @@ namespace JPFITS
 							});
 							return dvector;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsHorizontalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
 						{
 							double[,] dtable = new double[range[1] - range[0] + 1, 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -493,7 +494,7 @@ namespace JPFITS
 							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 							return dtable;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsVerticalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
 						{
 							double[,] dtable = new double[1, range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -518,7 +519,7 @@ namespace JPFITS
 
 					case -32:
 					{
-						if (returnOptions == DataUnitFormatting.Default)
+						if (returnOptions == ImageDataUnitFormatting.Default)
 						{
 							double[] dvector = new double[range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -533,7 +534,7 @@ namespace JPFITS
 							});
 							return dvector;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsHorizontalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
 						{
 							double[,] dtable = new double[range[1] - range[0] + 1, 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -549,7 +550,7 @@ namespace JPFITS
 							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 							return dtable;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsVerticalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
 						{
 							double[,] dtable = new double[1, range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -570,7 +571,7 @@ namespace JPFITS
 
 					case -64:
 					{
-						if (returnOptions == DataUnitFormatting.Default)
+						if (returnOptions == ImageDataUnitFormatting.Default)
 						{
 							double[] dvector = new double[range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -589,7 +590,7 @@ namespace JPFITS
 							});
 							return dvector;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsHorizontalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
 						{
 							double[,] dtable = new double[range[1] - range[0] + 1, 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -609,7 +610,7 @@ namespace JPFITS
 							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 							return dtable;
 						}
-						else if (returnOptions == DataUnitFormatting.VectorAsVerticalTable)
+						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
 						{
 							double[,] dtable = new double[1, range[1] - range[0] + 1];
 							Parallel.For(range[0], range[1] + 1, opts, i =>
@@ -750,11 +751,11 @@ namespace JPFITS
 					}
 				}
 
-				if (returnOptions == DataUnitFormatting.Default || returnOptions == DataUnitFormatting.VectorAsVerticalTable || returnOptions == DataUnitFormatting.VectorAsHorizontalTable)
+				if (returnOptions == ImageDataUnitFormatting.Default || returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable || returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
 					return dimage;
 				else if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0)
 					return dimage;
-				else if (returnOptions == DataUnitFormatting.ArrayAsRangeRank)
+				else if (returnOptions == ImageDataUnitFormatting.ArrayAsRangeRank)
 				{
 					double[] dvector = new double[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
 					int cc = 0;
@@ -895,11 +896,11 @@ namespace JPFITS
 					}
 				}
 
-				if (returnOptions == DataUnitFormatting.Default || returnOptions == DataUnitFormatting.VectorAsVerticalTable || returnOptions == DataUnitFormatting.VectorAsHorizontalTable)
+				if (returnOptions == ImageDataUnitFormatting.Default || returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable || returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
 					return dcube;
 				else if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0)
 					return dcube;
-				else if (returnOptions == DataUnitFormatting.ArrayAsRangeRank)
+				else if (returnOptions == ImageDataUnitFormatting.ArrayAsRangeRank)
 				{
 					//check if vector
 					if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))

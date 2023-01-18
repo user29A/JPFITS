@@ -291,7 +291,7 @@ namespace JPFITS
 			HEADER = new JPFITS.FITSHeader(header, HEADER_POP);
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.READDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, DataUnitFormatting.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.READIMAGEDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -345,8 +345,8 @@ namespace JPFITS
 					throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
 			}
 
-			long extensionstartposition, extensionendposition, tableendposition, pcount, theap;
-			if (!FITSFILEOPS.SEEKEXTENSION(fs, "IMAGE", extensionName, ref header, out extensionstartposition, out extensionendposition, out tableendposition, out pcount, out theap))
+			long extensionstartposition;
+			if (!FITSFILEOPS.SEEKEXTENSION(fs, "IMAGE", extensionName, ref header, out extensionstartposition, out _, out _, out _, out _))
 			{
 				fs.Close();
 				throw new Exception("Could not find IMAGE extension with name '" + extensionName + "'");
@@ -365,7 +365,7 @@ namespace JPFITS
 			HEADER.SetKey(0, "SIMPLE", "T", "file conforms to FITS standard");
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.READDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, DataUnitFormatting.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.READIMAGEDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -442,7 +442,7 @@ namespace JPFITS
 			this.FileName = this.FileName.Substring(0, this.FileName.LastIndexOf(".")) + "_" + EXTNAME + this.FileName.Substring(this.FileName.LastIndexOf("."));
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.READDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, DataUnitFormatting.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.READIMAGEDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -1164,7 +1164,7 @@ namespace JPFITS
 			ArrayList header = null;
 			FITSFILEOPS.SCANIMAGEHEADERUNIT(fs, false, ref header, out hasext, out BITPIX, out NAXISN, out BSCALE, out BZERO);
 
-			double[] result = (double[])FITSFILEOPS.READDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, DataUnitFormatting.ArrayAsRangeRank);
+			double[] result = (double[])FITSFILEOPS.READIMAGEDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.ArrayAsRangeRank);
 
 			fs.Close();
 
@@ -1659,8 +1659,8 @@ namespace JPFITS
 					throw new Exception("Primary data unit of file is not a FITS file.");
 				}
 
-				long extensionstartposition, extensionendposition, tableendposition, pcount, theap;
-				bool extexists = FITSFILEOPS.SEEKEXTENSION(fs, "IMAGE", EXTNAME, ref header_return, out extensionstartposition, out extensionendposition, out tableendposition, out pcount, out theap);
+				long extensionstartposition, extensionendposition;
+				bool extexists = FITSFILEOPS.SEEKEXTENSION(fs, "IMAGE", EXTNAME, ref header_return, out extensionstartposition, out extensionendposition, out _, out _, out _);
 				if (extexists && !EXTNAMEOVERWRITE)
 				{
 					fs.Close();

@@ -6076,6 +6076,10 @@ namespace JPFITS
 
 		#region ARRAY STATISTICS
 
+		/// <summary>
+		/// Multiples together all elements of an array.
+		/// </summary>
+		/// <param name="data"></param>
 		public static long Product(int[] data)
 		{
 			long product = 1;
