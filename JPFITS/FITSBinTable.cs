@@ -30,7 +30,6 @@ namespace JPFITS
 		private string[]? EXTRAKEYS;
 		private string[]? EXTRAKEYVALS;
 		private string[]? EXTRAKEYCOMS;
-		//private FITSHeaderKey[]? EXTRAKEYS;
 		private byte[]? BINTABLE;//the table in raw byte format read from disk
 		private byte[]? HEAPDATA;//the table in raw byte format read from disk
 		
@@ -1119,16 +1118,16 @@ namespace JPFITS
 					{
 						TFIELDS = Convert.ToInt32(strheaderline.Substring(10, 20));
 						TTYPES = new string[TFIELDS];
-						TFORMS = new string[(TFIELDS)];
-						TBYTES = new int[(TFIELDS)];
-						TREPEATS = new int[(TFIELDS)];
-						TCODES = new TypeCode[(TFIELDS)];
-						TUNITS = new string[(TFIELDS)];
-						TTYPEISCOMPLEX = new bool[(TFIELDS)];
-						TTYPEISHEAPARRAYDESC = new bool[(TFIELDS)];
-						HEAPTCODES = new TypeCode[(TFIELDS)];
-						TDIMS = new int[(TFIELDS)][];
-						TTYPEHEAPARRAYNELSPOS = new int[(TFIELDS)][,];
+						TFORMS = new string[TFIELDS];
+						TBYTES = new int[TFIELDS];
+						TREPEATS = new int[TFIELDS];
+						TCODES = new TypeCode[TFIELDS];
+						TUNITS = new string[TFIELDS];
+						TTYPEISCOMPLEX = new bool[TFIELDS];
+						TTYPEISHEAPARRAYDESC = new bool[TFIELDS];
+						HEAPTCODES = new TypeCode[TFIELDS];
+						TDIMS = new int[TFIELDS][];
+						TTYPEHEAPARRAYNELSPOS = new int[TFIELDS][,];
 						continue;
 					}
 
@@ -2959,18 +2958,18 @@ namespace JPFITS
 			}
 
 			TFIELDS++;
-			Array[] newEntryDataObjs = new Array[(TFIELDS)];
-			string[] newTTYPES = new string[(TFIELDS)];
-			string[] newTFORMS = new string[(TFIELDS)];
-			string[] newTUNITS = new string[(TFIELDS)];
-			int[] newTBYTES = new int[(TFIELDS)];
-			int[] newTREPEATS = new int[(TFIELDS)];
+			Array[] newEntryDataObjs = new Array[TFIELDS];
+			string[] newTTYPES = new string[TFIELDS];
+			string[] newTFORMS = new string[TFIELDS];
+			string[] newTUNITS = new string[TFIELDS];
+			int[] newTBYTES = new int[TFIELDS];
+			int[] newTREPEATS = new int[TFIELDS];
 			TypeCode[] newTCODES = new TypeCode[TFIELDS];
-			int[][] newTDIMS = new int[(TFIELDS)][];
-			bool[] newTTYPEISCOMPLEX = new bool[(TFIELDS)];
-			bool[] newTTYPEISHEAPARRAYDESC = new bool[(TFIELDS)];
+			int[][] newTDIMS = new int[TFIELDS][];
+			bool[] newTTYPEISCOMPLEX = new bool[TFIELDS];
+			bool[] newTTYPEISHEAPARRAYDESC = new bool[TFIELDS];
 			TypeCode[] newHEAPTCODES = new TypeCode[TFIELDS];
-			int[][,] newTTYPEHEAPARRAYNELSPOS = new int[(TFIELDS)][,];
+			int[][,] newTTYPEHEAPARRAYNELSPOS = new int[TFIELDS][,];
 
 			int c = 0;
 			for (int i = 0; i < TFIELDS; i++)
