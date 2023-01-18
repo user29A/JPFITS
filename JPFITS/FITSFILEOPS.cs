@@ -9,7 +9,7 @@ namespace JPFITS
 	///<summary>FITSFILEOPS static class for facilitating interaction with FITS data on disk.</summary>
 	public class FITSFILEOPS
 	{
-		/// <summary>Array formatting options for the data unit returned by the READDATAUNIT method.</summary>
+		/// <summary>Array formatting options for the data unit returned by the READIMAGEDATAUNIT method.</summary>
 		public enum ImageDataUnitFormatting
 		{
 			/// <summary>
@@ -33,12 +33,12 @@ namespace JPFITS
 			ArrayAsRangeRank
 		}
 
-		/// <summary>Scans the primary header unit and data of a FITS file. Returns false if the file is not a FITS file.</summary>
+		/// <summary>Scans the primary unit of a FITS file. Returns false if the file is not a FITS file.</summary>
 		/// <param name="fs">The FileStream of the FITS file, positioned at the start of the stream.</param>
 		/// <param name="scanpastprimarydata">True to set the FileStream fs position to the end of the data block, otherwise the fs position will be at the end of the primary header block, i.e. at the beginning of the primary data.</param>
-		/// <param name="header_return">Returns the header of the extension as an ArrayList with each 80-character header line being a String^ member of this list. Pass nullptr if not required.</param>
+		/// <param name="header_return">Returns the header of the unit as an ArrayList with each 80-character header line being a String member of this list. Pass null if not required.</param>
 		/// <param name="has_extensions">Returns whether or not the FITS file may contain extensions.</param>
-		public static bool SCANPRIMARYUNIT(FileStream fs, bool scanpastprimarydata, ref ArrayList? header_return, out bool has_extensions)
+		public static bool ScanPrimaryUnit(FileStream fs, bool scanpastprimarydata, ref ArrayList? header_return, out bool has_extensions)
 		{
 			byte[] c = new byte[2880];
 			int naxis = -1, bitpix = -1, Nnaxisn = 1;
@@ -143,16 +143,16 @@ namespace JPFITS
 			return true;
 		}
 
-		/// <summary>Scans the header unit and data of a FITS file. Returns false if the file is not a FITS file. Populates Primary Image Unit keywords.</summary>
-		/// <param name="fs">The FileStream of the FITS file, positioned at the start of the stream or at the start of any image extension unit.</param>
-		/// <param name="scanpastdataunit">True to set the FileStream fs position to the end of the data block, otherwise the fs position will be at the end of the primary header block, i.e. at the beginning of the primary data.</param>
-		/// <param name="header_return">Returns the header of the extension as an ArrayList with each 80-character header line being a String^ member of this list. Pass nullptr if not required.</param>
-		/// <param name="has_extensions">Returns whether or not the FITS file may contain extensions.</param>
+		/// <summary>Scans an IMAGE unit of a FITS file. Returns false if the file is not a FITS file. Returns essential IMAGE keyword values. Can be used to scan the primary image unit or IMAGE extensions.</summary>
+		/// <param name="fs">The FileStream of the FITS file, positioned at the start of the stream, or, at the start of any IMAGE extension unit.</param>
+		/// <param name="scanpastdataunit">True to set the FileStream fs position to the end of the data block, otherwise the fs position will be at the end of the header block, i.e. at the beginning of the data unit.</param>
+		/// <param name="header_return">Returns the header of the unit as an ArrayList with each 80-character header line being a String member of this list. Pass null if not required.</param>
+		/// <param name="has_extensions">Returns whether or not the FITS file may contain extensions. Returns true if the unit being scanned is itself an extension.</param>
 		/// <param name="bitpix">BITPIX keyword value. Bits per pixel keyword, following the meaning of the FITS convection.</param>
 		/// <param name="naxisn">An array of length NAXIS containing the dimension (length) of each axis. If there are no axes, is an emtpty array. NAXIS1 = naxisn[0]; NAXIS2 = naxisn[1]; etc.</param>
-		/// <param name="bscale">The BSCALE keyword value. Default is one (1) if not present.</param>
-		/// <param name="bzero">The BZERO keyword value. Default is zero (0) if not present.</param>
-		public static bool SCANIMAGEHEADERUNIT(FileStream fs, bool scanpastdataunit, ref ArrayList? header_return, out bool has_extensions, out int bitpix, out int[] naxisn, out double bscale, out double bzero)
+		/// <param name="bscale">The BSCALE keyword value. Default return is one (1) if not present.</param>
+		/// <param name="bzero">The BZERO keyword value. Default return is zero (0) if not present.</param>
+		public static bool ScanImageHeaderUnit(FileStream fs, bool scanpastdataunit, ref ArrayList? header_return, out bool has_extensions, out int bitpix, out int[] naxisn, out double bscale, out double bzero)
 		{
 			bitpix = -1;
 			int naxis = -1;
@@ -192,6 +192,9 @@ namespace JPFITS
 								break;
 							}
 						else if (line.Substring(0, 8).Trim() == "XTENSION")
+						{
+							has_extensions = true;
+
 							if (line.Substring(10, 20).Trim(new char[2] { ' ', '\'' }) == "IMAGE")
 							{
 								FITSformat = true;
@@ -202,6 +205,7 @@ namespace JPFITS
 								endheader = true;
 								break;
 							}
+						}
 						else
 						{
 							endheader = true;
@@ -285,16 +289,16 @@ namespace JPFITS
 			return true;
 		}
 
-		/// <summary>Reads the data unit from a FITS file and returns its Array. Supports data units with up to 3 axes. May return either a vector, table, or cube.</summary>
+		/// <summary>Reads the image data unit from a FITS file and returns its Array. Supports image data units with up to 3 axes. May return either a vector, table, or cube.</summary>
 		/// <param name="fs">The FileStream of the FITS file, positioned at the start of the primary or image extension data unit.</param>
 		/// <param name="range">Pass null or range[0] = -1 to default to full data unit size. Otherwise range is ZERO BASED 1-D int array [xmin xmax] or [xmin xmax ymin ymax]  or [xmin xmax ymin ymax zmin zmax] to return a sub-array.</param>
 		/// <param name="doParallel">Populate the Array object with parallelization after serial disk read.</param>
 		/// <param name="bitpix">The BITPIX keyword value of the data unit header.</param>
-		/// <param name="naxisn">An array containing the values of the NAXISn keywords from the data unit header. Specifies the rank of the return Array, i.e., if naxisn.Length == 1, then it is a vector, if 2 then a table, if 3 then a cube. The value may change from the input given the DataUnitReturn options.</param>
+		/// <param name="naxisn">An array containing the values of the NAXISn keywords from the data unit header. Specifies the rank of the return Array, i.e., if naxisn.Length == 1, then it is a vector, if 2 then a table, if 3 then a cube. The value may change from the input given the ImageDataUnitFormatting options.</param>
 		/// <param name="bscale">The BSCALE keyword value of the data unit header.</param>
 		/// <param name="bzero">The BZERO keyword value of the data unit header.</param>
 		/// <param name="returnOptions">Options for formatting the return Array rank and dimensions.</param>
-		public static Array READIMAGEDATAUNIT(FileStream fs, int[]? range, bool doParallel, int bitpix, ref int[] naxisn, double bscale, double bzero, ImageDataUnitFormatting returnOptions = ImageDataUnitFormatting.Default)
+		public static Array ReadImageDataUnit(FileStream fs, int[]? range, bool doParallel, int bitpix, ref int[] naxisn, double bscale, double bzero, ImageDataUnitFormatting returnOptions = ImageDataUnitFormatting.Default)
 		{
 			if (range == null || range[0] == -1)//then it is a full frame read
 				if (naxisn.Length == 1)
@@ -951,19 +955,19 @@ namespace JPFITS
 			throw new Exception("Error in FITSFILEOPS.READDATAUNIT - made it to end without returning data.");
 		}
 
-		/// <summary>Returns a data unit as a byte array formatted at a specified precision.</summary>
-		/// <param name="formatPrecision">The precision at which to format the byte array of the underlying double precision data unit. If double values of the data unit exceed the precision, the values are max scale.</param>
-		/// <param name="doParallel">Populate the byte array with parallelism over the data unit. Can speed things up the data unit is very large.</param>
+		/// <summary>Returns a data unit as a byte array formatted at a specified precision. Useful for writing.</summary>
+		/// <param name="formatPrecision">The precision at which to format the byte array of the underlying double precision data unit. If double values of the data unit exceed the precision, the values are clipped.</param>
+		/// <param name="doParallel">Populate the byte array with parallelism over the data unit. Can speed things up when the data unit is very large.</param>
 		/// <param name="doubleDataUnit">The data unit of up to rank three (data cube). Higher dimensional data than rank = 3 not supported.</param>
-		public static byte[] GETBYTEFORMATTEDDATAUNIT(TypeCode formatPrecision, bool doParallel, Array doubleDataUnit)
+		public static byte[] GetByteFormattedImageDataUnit(TypeCode formatPrecision, bool doParallel, Array doubleDataUnit)
 		{
 			if (doubleDataUnit.Rank > 3)
 				throw new Exception("Error: I can only handle up to 3-dimensional data units - SORRY!");
 
-			int bitpix;
-			int[] naxisn;
-			double bzero, bscale;
-			GETBITPIXNAXISnBSCALEBZERO(formatPrecision, doubleDataUnit, out bitpix, out naxisn, out bscale, out bzero);
+			if (Type.GetTypeCode((doubleDataUnit.GetType()).GetElementType()) != TypeCode.Double)
+				throw new Exception("Error: Only double-precision arrays can be passed.");
+
+			GetBitpixNaxisnBscaleBzero(formatPrecision, doubleDataUnit, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
 
 			long Ndatabytes = doubleDataUnit.Length * Math.Abs(bitpix) / 8;
 			int NBlocks = (int)(Math.Ceiling((double)(Ndatabytes) / 2880.0));
@@ -1331,7 +1335,7 @@ namespace JPFITS
 		/// <param name="naxisn">The length of this array provides the NAXIS keyword value. The elements of this array provide the NAXISn keyword values.</param>
 		/// <param name="bscale">BSCALE keyword value.</param>
 		/// <param name="bzero">BZERO keyword value.</param>
-		public static void GETBITPIXNAXISnBSCALEBZERO(TypeCode precision, Array? doubleDataUnit, out int bitpix, out int[] naxisn, out double bscale, out double bzero)
+		public static void GetBitpixNaxisnBscaleBzero(TypeCode precision, Array? doubleDataUnit, out int bitpix, out int[] naxisn, out double bscale, out double bzero)
 		{
 			if (doubleDataUnit == null || doubleDataUnit.Length == 0)
 			{
@@ -1446,7 +1450,7 @@ namespace JPFITS
 		/// <param name="tableEndPosition">Returns the end position within the FileStream of the main data table, NOT rounded to a data block boundary.</param>
 		/// <param name="pcount">Returns the number of bytes of any remaining fill plus supplemental heap data area after the main table endposition, IF any heap data exists. Does not represent fill bytes after the main table if no heap exists. Does not include fill bytes after the heap.</param>
 		/// <param name="theap">Returns the position within the filestream of the beginning of the heap relative to the beginning of the main table. Nominally equal to NAXIS1 * NAXIS2 unless THEAP keyword specifies a larger value.</param>
-		public static bool SEEKEXTENSION(FileStream fs, string extension_type, string extension_name, ref ArrayList? header_return, out long extensionStartPosition, out long extensionEndPosition, out long tableEndPosition, out long pcount, out long theap)
+		public static bool SeekExtension(FileStream fs, string extension_type, string extension_name, ref ArrayList? header_return, out long extensionStartPosition, out long extensionEndPosition, out long tableEndPosition, out long pcount, out long theap)
 		{
 			if (fs.Position == 0)
 			{
@@ -1606,20 +1610,19 @@ namespace JPFITS
 		/// <param name="tableEndPosition">Returns the end position within the FileStream of the main data table, NOT rounded to a data block boundary.</param>
 		/// <param name="pcount">Returns the number of bytes of any remaining fill plus supplemental heap data area after the main table endposition, IF any heap data exists. Does not represent fill bytes after the main table if no heap exists. Does not include fill bytes after the heap.</param>
 		/// <param name="theap">Returns the position within the filestream of the beginning of the heap relative to the beginning of the main table. Nominally equal to NAXIS1 * NAXIS2 unless THEAP keyword specifies a larger value.</param>
-		public static bool SEEKEXTENSION(FileStream fs, string extension_type, int extension_number, ref ArrayList? header_return, out long extensionStartPosition, out long extensionEndPosition, out long tableEndPosition, out long pcount, out long theap)
+		public static bool SeekExtension(FileStream fs, string extension_type, int extension_number, ref ArrayList? header_return, out long extensionStartPosition, out long extensionEndPosition, out long tableEndPosition, out long pcount, out long theap)
 		{
-			return SEEKEXTENSION(fs, extension_type, "_FINDEXTNUM_" + extension_number.ToString(), ref header_return, out extensionStartPosition, out extensionEndPosition, out tableEndPosition, out pcount, out theap);
+			return SeekExtension(fs, extension_type, "_FINDEXTNUM_" + extension_number.ToString(), ref header_return, out extensionStartPosition, out extensionEndPosition, out tableEndPosition, out pcount, out theap);
 		}
 
 		/// <summary>Gets all extension names of a specified extension type in the FITS file. If no extensions of the type exist, returns and empty array.</summary>
 		/// <param name="FileName">The full file name to read from disk.</param>
 		/// <param name="extension_type">The XTENSION extension type, either: &quot;BINTABLE&quot;, &quot;TABLE&quot;, or &quot;IMAGE&quot;.</param>
-		public static string[] GETALLEXTENSIONNAMES(string FileName, string extension_type)
+		public static string[] GetAllExtensionNames(string FileName, string extension_type)
 		{
 			FileStream fs = new FileStream(FileName, FileMode.Open);
 			ArrayList header_return = null;
-			bool hasext;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header_return, out hasext) || !hasext)
+			if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header_return, out bool hasext) || !hasext)
 			{
 				fs.Close();
 				if (!hasext)

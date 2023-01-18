@@ -540,9 +540,7 @@ namespace JPFITS
 			}
 			else
 			{
-				double[] x;
-				double[] y;
-				this.Get_Pixels(CVAL1, CVAL2, "TAN", out x, out y, returnZeroBasedPixels);
+				this.Get_Pixels(CVAL1, CVAL2, "TAN", out double[] x, out double[] y, returnZeroBasedPixels);
 
 				if (coordinate_Axis == 1)
 					return x;
@@ -741,10 +739,9 @@ namespace JPFITS
 
 			double[] dxpix = new double[CPIX1.Length];
 			double[] dypix = new double[CPIX1.Length];
-			double xpix, ypix;
 			for (int i = 0; i < CPIX1.Length; i++)
 			{
-				this.Get_Pixel(CVAL1[i], CVAL2[i], "TAN", out xpix, out ypix, false);
+				this.Get_Pixel(CVAL1[i], CVAL2[i], "TAN", out double xpix, out double ypix, false);
 				dxpix[i] = xpix - CPIX1[i];
 				dypix[i] = ypix - CPIX2[i];
 
@@ -771,12 +768,9 @@ namespace JPFITS
 			if (header == null)
 				return;
 
-			double ccvald1, ccvald2;
-			String ccvals1;
-			String ccvals2;
 			double width = Convert.ToDouble(header.GetKeyValue("NAXIS1"));
 			double height = Convert.ToDouble(header.GetKeyValue("NAXIS2"));
-			Get_Coordinate(width / 2, height / 2, false, "TAN", out ccvald1, out ccvald2, out ccvals1, out ccvals2);
+			Get_Coordinate(width / 2, height / 2, false, "TAN", out double ccvald1, out double ccvald2, out string ccvals1, out string ccvals2);
 			CCVALD1 = ccvald1;
 			CCVALD2 = ccvald2;
 			CCVALS1 = ccvals1;
@@ -820,10 +814,9 @@ namespace JPFITS
 			X_pix = new double[cval1.Length];
 			Y_pix = new double[cval1.Length];
 
-			double xpix, ypix;
 			for (int i = 0; i < cval1.Length; i++)
 			{
-				this.Get_Pixel(cval1[i], cval2[i], WCS_Type, out xpix, out ypix, return_zero_based_pixels);
+				this.Get_Pixel(cval1[i], cval2[i], WCS_Type, out double xpix, out double ypix, return_zero_based_pixels);
 				X_pix[i] = xpix;
 				Y_pix[i] = ypix;
 			}
@@ -838,18 +831,15 @@ namespace JPFITS
 		/// <param name="cval2">A coordinate value in degrees on coordinats axis 2 (i.e. declination).</param>
 		public void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, string WCS_Type, out double cval1, out double cval2)
 		{
-			String sx1;
-			String sx2;
 
-			Get_Coordinate(X_pix, Y_pix, zero_based_pixels, WCS_Type, out cval1, out cval2, out sx1, out sx2);
+			Get_Coordinate(X_pix, Y_pix, zero_based_pixels, WCS_Type, out cval1, out cval2, out string sx1, out string sx2);
 		}
 
 		/// <summary>Gets the cval1 and cval2 world coordinate in sexagesimal for a given image [x, y] pixel position.</summary>
 		public void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, string WCS_Type, out string cval1_sxgsml, out string cval2_sxgsml)
 		{
-			double cv1, cv2;
 
-			Get_Coordinate(X_pix, Y_pix, zero_based_pixels, WCS_Type, out cv1, out cv2, out cval1_sxgsml, out cval2_sxgsml);
+			Get_Coordinate(X_pix, Y_pix, zero_based_pixels, WCS_Type, out double cv1, out double cv2, out cval1_sxgsml, out cval2_sxgsml);
 		}
 
 		/// <summary>Gets the cval1 and cval2 world coordinate in degrees and sexagesimal for a given image [x, y] pixel position.</summary>
@@ -911,9 +901,6 @@ namespace JPFITS
 		/// <summary>Gets arrays of cval1 and cval2 world coordinates in degrees and sexagesimal for a list of given image [x, y] pixel positions.</summary>
 		public void Get_Coordinates(double[] X_pix, double[] Y_pix, bool zero_based_pixels, string WCS_Type, out double[] cval1, out double[] cval2, out string[] cval1_sxgsml, out string[] cval2_sxgsml)
 		{
-			double radeg, decdeg;
-			String rasx;
-			String decsx;
 			cval1 = new double[X_pix.Length];
 			cval2 = new double[X_pix.Length];
 			cval1_sxgsml = new string[X_pix.Length];
@@ -921,7 +908,7 @@ namespace JPFITS
 
 			for (int i = 0; i < cval1.Length; i++)
 			{
-				this.Get_Coordinate(X_pix[i], Y_pix[i], zero_based_pixels, WCS_Type, out radeg, out decdeg, out rasx, out decsx);
+				this.Get_Coordinate(X_pix[i], Y_pix[i], zero_based_pixels, WCS_Type, out double radeg, out double decdeg, out string rasx, out string decsx);
 				cval1[i] = radeg;
 				cval2[i] = decdeg;
 				cval1_sxgsml[i] = rasx;
@@ -1190,15 +1177,13 @@ namespace JPFITS
 			{
 				float xscale = (float)windowpixels_width / (float)imagepixels_width;
 				float yscale = (float)windowpixels_height / (float)imagepixels_height;
-				double x, y;
 				string sexx, sexy;
 
-				double fieldcenterRA, fieldcenterDEC;
-				Get_Coordinate((double)imagepixels_width / 2, (double)imagepixels_height / 2, false, "TAN", out fieldcenterRA, out fieldcenterDEC);
+				Get_Coordinate((double)imagepixels_width / 2, (double)imagepixels_height / 2, false, "TAN", out double fieldcenterRA, out double fieldcenterDEC);
 
 				bool poleinsidepos = false;
 				bool poleinsideneg = false;
-				Get_Pixel(0, 90, "TAN", out x, out y, true);
+				Get_Pixel(0, 90, "TAN", out double x, out double y, true);
 				if (x > 0 && y > 0 && x < imagepixels_width && y < imagepixels_height)
 					poleinsidepos = true;
 				if (!poleinsidepos)
@@ -1211,13 +1196,10 @@ namespace JPFITS
 				//top left, top middle, top right, middle left, middle right, bottom left, bottom middle, bottom right
 				double[] crosscornersX = new double[8] { 1, imagepixels_width / 2, imagepixels_width, 1, imagepixels_width, 1, imagepixels_width / 2, imagepixels_width };
 				double[] crosscornersY = new double[8] { 1, 1, 1, imagepixels_height / 2, imagepixels_height / 2, imagepixels_height, imagepixels_height, imagepixels_height };
-				double[] crosscornersRA;
-				double[] crosscornersDE;
-				Get_Coordinates(crosscornersX, crosscornersY, false, "TAN", out crosscornersRA, out crosscornersDE);
+				Get_Coordinates(crosscornersX, crosscornersY, false, "TAN", out double[] crosscornersRA, out double[] crosscornersDE);
 
 				double despan = 0;
-				double minDE, maxDE;
-				JPMath.MinMax(crosscornersDE, out minDE, out maxDE, false);
+				JPMath.MinMax(crosscornersDE, out double minDE, out double maxDE, false);
 				if (!poleinsidepos && !poleinsideneg)
 					despan = maxDE - minDE;
 				else if (poleinsidepos)
@@ -1744,7 +1726,6 @@ namespace JPFITS
 		/// <param name="decDeg">A declared array for the Declination coordinates in degrees. The array will be initialized internally to the appropriate size. The user may not require this array, but it still must be supplied.</param>
 		public static void SexagesimalFileToDegreeFile(string file, bool saveDegreeFile, out double[] raDeg, out double[] decDeg)
 		{
-			double ra, dec;
 			int Nlines = 0;
 
 			StreamReader sr = new StreamReader(file);
@@ -1761,7 +1742,7 @@ namespace JPFITS
 
 			for (int j = 0; j < Nlines; j++)
 			{
-				SexagesimalLineToDegreeElements(sr.ReadLine(), out ra, out dec);
+				SexagesimalLineToDegreeElements(sr.ReadLine(), out double ra, out double dec);
 				raDeg[j] = ra;
 				decDeg[j] = dec;
 			}
@@ -1890,8 +1871,6 @@ namespace JPFITS
 		/// <param name="decimals">The number of decimal places for the smallest scale element. Pass -1 for all decimals.</param>
 		public static void DegreeFileToSexagesimalFile(string file, bool saveSexigesimalFile, out string[] raSexagesimal, out string[] decSexagesimal, string delimitter, int decimals)
 		{
-			String ra;
-			String dec;
 			int Nlines = 0;
 
 			StreamReader sr = new StreamReader(file);
@@ -1908,7 +1887,7 @@ namespace JPFITS
 
 			for (int j = 0; j < Nlines; j++)
 			{
-				DegreeLineToSexagesimalElements(sr.ReadLine(), out ra, out dec, delimitter, decimals);
+				DegreeLineToSexagesimalElements(sr.ReadLine(), out string ra, out string dec, delimitter, decimals);
 				raSexagesimal[j] = ra;
 				decSexagesimal[j] = dec;
 			}

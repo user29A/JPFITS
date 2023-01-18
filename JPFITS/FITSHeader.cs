@@ -41,8 +41,7 @@ namespace JPFITS
 		{
 			FileStream fs = new FileStream(fileName, FileMode.Open);
 			ArrayList headerlines = new ArrayList();
-			bool ext;
-			FITSFILEOPS.SCANPRIMARYUNIT(fs, false, ref headerlines, out ext);
+			FITSFILEOPS.ScanPrimaryUnit(fs, false, ref headerlines, out bool ext);
 			fs.Close();
 
 			HEADERKEYS = new JPFITS.FITSHeaderKey[headerlines.Count];
@@ -608,10 +607,7 @@ namespace JPFITS
 		/// <param name="dataUnit">The data unit array. Pass null for NAXIS = 0.</param>
 		private void MAKE_DEFAULT_HEADER(bool mayContainExtensions, Array? dataUnit)
 		{
-			int BITPIX;
-			double BZERO, BSCALE;
-			int[] NAXISN;
-			FITSFILEOPS.GETBITPIXNAXISnBSCALEBZERO(TypeCode.Double, dataUnit, out BITPIX, out NAXISN, out BSCALE, out BZERO);
+			FITSFILEOPS.GetBitpixNaxisnBscaleBzero(TypeCode.Double, dataUnit, out int BITPIX, out int[] NAXISN, out double BSCALE, out double BZERO);
 
 			if (mayContainExtensions && dataUnit == null)
 				HEADERKEYS = new FITSHeaderKey[5];

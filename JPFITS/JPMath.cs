@@ -347,12 +347,9 @@ namespace JPFITS
 			alglib.ndimensional_pgrad pg = new alglib.ndimensional_pgrad(alglib_Gauss_1d_grad);
 			//alglib.ndimensional_rep rep;
 			object obj = null;
-			alglib.lsfitstate state;
-			alglib.lsfitreport report;
 			//double diffstep = 0.0001;
 			double epsx = 0.000001;
 			int maxits = 0;
-			int info;
 			double[] scale;
 
 			double min = Min(Gdata, false);
@@ -382,12 +379,12 @@ namespace JPFITS
 			if (p_ubnd == null)
 				p_ubnd = new double[4] { 2 * amp, xdata[xw - 1], (double)xw, max };
 
-			alglib.lsfitcreatefg(x, Gdata, p, false, out state);
+			alglib.lsfitcreatefg(x, Gdata, p, false, out alglib.lsfitstate state);
 			alglib.lsfitsetcond(state, epsx, maxits);
 			alglib.lsfitsetscale(state, scale);
 			alglib.lsfitsetbc(state, p_lbnd, p_ubnd);
 			alglib.lsfitfit(state, pf, pg, null, null);
-			alglib.lsfitresults(state, out info, out p, out report);
+			alglib.lsfitresults(state, out int info, out p, out alglib.lsfitreport report);
 
 			if (p_err != null)
 				for (int i = 0; i < p_err.Length; i++)
@@ -434,12 +431,9 @@ namespace JPFITS
 			alglib.ndimensional_pgrad pg = new alglib.ndimensional_pgrad(alglib_Moffat_1d_grad);
 			//alglib.ndimensional_rep rep;
 			object obj = null;
-			alglib.lsfitstate state;
-			alglib.lsfitreport report;
 			//double diffstep = 0.0001;
 			double epsx = 0.000001;
 			int maxits = 0;
-			int info;
 			double[] scale;
 
 			double min = Min(Mdata, false);
@@ -470,12 +464,12 @@ namespace JPFITS
 			if (p_ubnd == null)
 				p_ubnd = new double[5] { 2 * amp, xdata[xw - 1], (double)xw * 5, (double)xw * 5, max };
 
-			alglib.lsfitcreatefg(x, Mdata, p, false, out state);
+			alglib.lsfitcreatefg(x, Mdata, p, false, out alglib.lsfitstate state);
 			alglib.lsfitsetcond(state, epsx, maxits);
 			alglib.lsfitsetscale(state, scale);
 			alglib.lsfitsetbc(state, p_lbnd, p_ubnd);
 			alglib.lsfitfit(state, pf, pg, null, null);
-			alglib.lsfitresults(state, out info, out p, out report);
+			alglib.lsfitresults(state, out int info, out p, out alglib.lsfitreport report);
 
 			if (p_err != null)
 				for (int i = 0; i < p_err.Length; i++)
@@ -532,11 +526,8 @@ namespace JPFITS
 			alglib.ndimensional_pgrad pg = new alglib.ndimensional_pgrad(alglib_Gauss_2d_grad);
 			//alglib.ndimensional_rep rep;
 			object obj = null;
-			alglib.lsfitstate state;
-			alglib.lsfitreport report;
 			double epsx = 0.000000001;
 			int maxits = 5000;//automatic stopping conditions w epsx & maxits = 0
-			int info;
 			double[] scale = new double[0];
 
 			double min = Min(Gdata, false);
@@ -590,12 +581,12 @@ namespace JPFITS
 				}
 			}
 
-			alglib.lsfitcreatefg(x, y, p, false, out state);
+			alglib.lsfitcreatefg(x, y, p, false, out alglib.lsfitstate state);
 			alglib.lsfitsetcond(state, epsx, maxits);
 			alglib.lsfitsetscale(state, scale);
 			alglib.lsfitsetbc(state, p_LB, p_UB);
 			alglib.lsfitfit(state, pf, pg, null, null);
-			alglib.lsfitresults(state, out info, out p, out report);
+			alglib.lsfitresults(state, out int info, out p, out alglib.lsfitreport report);
 
 			if (p_err != null && p_err.Length != 0)
 				for (int j = 0; j < p_err.Length; j++)
@@ -654,11 +645,8 @@ namespace JPFITS
 			alglib.ndimensional_pgrad pg = new alglib.ndimensional_pgrad(alglib_Moffat_2d_grad);
 			//alglib.ndimensional_rep rep;
 			object obj = null;
-			alglib.lsfitstate state;
-			alglib.lsfitreport report;
 			double epsx = 0.00001;
 			int maxits = 5000;//automatic stopping conditions w epsx & maxits = 0
-			int info;
 			double[] scale = new double[0];
 
 			double min = Min(Mdata, false);
@@ -713,12 +701,12 @@ namespace JPFITS
 				}
 			}
 
-			alglib.lsfitcreatefg(x, y, p, false, out state);
+			alglib.lsfitcreatefg(x, y, p, false, out alglib.lsfitstate state);
 			alglib.lsfitsetcond(state, epsx, maxits);
 			alglib.lsfitsetscale(state, scale);
 			alglib.lsfitsetbc(state, p_LB, p_UB);
 			alglib.lsfitfit(state, pf, pg, null, null);
-			alglib.lsfitresults(state, out info, out p, out report);
+			alglib.lsfitresults(state, out int info, out p, out alglib.lsfitreport report);
 
 			if (p_err != null && p_err.Length != 0)
 				for (int xx = 0; xx < p_err.Length; xx++)
@@ -779,11 +767,8 @@ namespace JPFITS
 			alglib.ndimensional_pgrad pg = new alglib.ndimensional_pgrad(alglib_Gauss_2d_compound_grad);
 			//alglib.ndimensional_rep rep;
 			int[] fcobj = new int[(2)] { func, count };
-			alglib.lsfitstate state;
-			alglib.lsfitreport report;
 			double epsx = 0;// 0.00001;
 			int maxits = 0;// 5000;//automatic stopping conditions w epsx & maxits = 0
-			int info;
 			double[] P = new double[p.Length - count + 1];//remove repeated background, but keep one
 			double[] PLB = new double[p.Length - count + 1];//remove repeated background, but keep one
 			double[] PUB = new double[p.Length - count + 1];//remove repeated background, but keep one
@@ -808,12 +793,12 @@ namespace JPFITS
 			if (scale[P.Length - 1] == 0)
 				scale[P.Length - 1] = 1;
 
-			alglib.lsfitcreatefg(x, y, P, false, out state);
+			alglib.lsfitcreatefg(x, y, P, false, out alglib.lsfitstate state);
 			alglib.lsfitsetcond(state, epsx, maxits);
 			alglib.lsfitsetscale(state, scale);
 			alglib.lsfitsetbc(state, PLB, PUB);
 			alglib.lsfitfit(state, pf, pg, null, (object)fcobj);
-			alglib.lsfitresults(state, out info, out P, out report);
+			alglib.lsfitresults(state, out int info, out P, out alglib.lsfitreport report);
 
 			for (int i = 0; i < count; i++)
 				for (int j = 0; j < func - 1; j++)
@@ -885,11 +870,8 @@ namespace JPFITS
 			alglib.ndimensional_pgrad pg = new alglib.ndimensional_pgrad(alglib_Moffat_2d_compound_grad);
 			//alglib.ndimensional_rep rep;
 			int[] fcobj = new int[(2)] { func, count };
-			alglib.lsfitstate state;
-			alglib.lsfitreport report;
 			double epsx = 0;// 0.00001;
 			int maxits = 0;// 5000;//automatic stopping conditions w epsx & maxits = 0
-			int info;
 			double[] P = new double[p.Length - count + 1];//remove repeated background, but keep one
 			double[] PLB = new double[p.Length - count + 1];//remove repeated background, but keep one
 			double[] PUB = new double[p.Length - count + 1];//remove repeated background, but keep one
@@ -914,12 +896,12 @@ namespace JPFITS
 			if (scale[P.Length - 1] <= 0)
 				scale[P.Length - 1] = 1;
 
-			alglib.lsfitcreatefg(x, y, P, false, out state);
+			alglib.lsfitcreatefg(x, y, P, false, out alglib.lsfitstate state);
 			alglib.lsfitsetcond(state, epsx, maxits);
 			alglib.lsfitsetscale(state, scale);
 			alglib.lsfitsetbc(state, PLB, PUB);
 			alglib.lsfitfit(state, pf, pg, null, (object)fcobj);
-			alglib.lsfitresults(state, out info, out P, out report);
+			alglib.lsfitresults(state, out int info, out P, out alglib.lsfitreport report);
 
 			for (int i = 0; i < count; i++)
 				for (int j = 0; j < func - 1; j++)
@@ -964,8 +946,7 @@ namespace JPFITS
 			for (int i = 0; i < YDATA.Length; i++)
 				YDATA[i] = (double)(ydata[i]);
 
-			int maxx, maxy;
-			double max = JPMath.Max(source, out maxx, out maxy, false);
+			double max = JPMath.Max(source, out int maxx, out int maxy, false);
 			double min = JPMath.Min(source, false);
 			double amp = max - min;
 			if (amp == 0)
@@ -1104,14 +1085,12 @@ namespace JPFITS
 			arrays[1] = XDATA;
 			arrays[2] = YDATA;
 
-			alglib.minbcstate bcstate;
-			alglib.minbccreate(param, out bcstate);
+			alglib.minbccreate(param, out alglib.minbcstate bcstate);
 			alglib.minbcsetcond(bcstate, epsg, epsf, epsx, maxits);
 			alglib.minbcsetbc(bcstate, params_LB, params_UB);
 			alglib.minbcsetscale(bcstate, scale);
 			alglib.minbcoptimize(bcstate, grad, null, arrays, alglib.parallel);
-			alglib.minbcreport report;
-			alglib.minbcresults(bcstate, out param, out report);
+			alglib.minbcresults(bcstate, out param, out alglib.minbcreport report);
 
 			switch (report.terminationtype)
 			{
@@ -1205,8 +1184,7 @@ namespace JPFITS
 				for (int i = 0; i < YDATA.Length; i++)
 					YDATA[i] = (double)(ydata[i]);
 
-				double min, max;
-				JPMath.MinMax(source, out min, out max, false);
+				JPMath.MinMax(source, out double min, out double max, false);
 				double bias = min;
 				if (bias < 1)
 					bias = 1;
@@ -1438,14 +1416,12 @@ namespace JPFITS
 				arrays[2] = YDATA;
 				arrays[3] = fcobj;
 
-				alglib.minbcstate bcstate;
-				alglib.minbccreate(P0I, out bcstate);
+				alglib.minbccreate(P0I, out alglib.minbcstate bcstate);
 				alglib.minbcsetcond(bcstate, epsg, epsf, epsx, maxits);
 				alglib.minbcsetbc(bcstate, PLB, PUB);
 				alglib.minbcsetscale(bcstate, scale);
 				alglib.minbcoptimize(bcstate, grad, null, arrays, alglib.parallel);
-				alglib.minbcreport report;
-				alglib.minbcresults(bcstate, out P0I, out report);
+				alglib.minbcresults(bcstate, out P0I, out alglib.minbcreport report);
 
 				switch (report.terminationtype)
 				{
@@ -1541,8 +1517,6 @@ namespace JPFITS
 		{
 			double epsx = 0.000000001;
 			int maxits = 1000;
-			alglib.minlmstate state;
-			alglib.minlmreport report;
 			alglib.ndimensional_fvec fvec = new alglib.ndimensional_fvec(alglib_WCSTransform2d_fvec);
 			alglib.ndimensional_jac jac = new alglib.ndimensional_jac(alglib_WCSTransform2d_jac);
 			object[] objj = new object[4];
@@ -1552,12 +1526,12 @@ namespace JPFITS
 			objj[3] = (object)y_intrmdt;
 			object obj = (object)objj;
 
-			alglib.minlmcreatevj(y_pix.Length, p, out state);
+			alglib.minlmcreatevj(y_pix.Length, p, out alglib.minlmstate state);
 			alglib.minlmsetcond(state, epsx, maxits);
 			alglib.minlmsetscale(state, p_scale);
 			alglib.minlmsetbc(state, p_lbnd, p_ubnd);
 			alglib.minlmoptimize(state, fvec, jac, null, obj);
-			alglib.minlmresults(state, out p, out report);
+			alglib.minlmresults(state, out p, out alglib.minlmreport report);
 		}
 
 		/// <summary>Computes the 2-D transformation elements between two sets of coordinates.</summary>
@@ -1576,8 +1550,6 @@ namespace JPFITS
 		{
 			double epsx = 0.00000000001;
 			int maxits = 0;
-			alglib.minlmstate state;
-			alglib.minlmreport report;
 			alglib.ndimensional_fvec fvec = new alglib.ndimensional_fvec(alglib_GeneralTransform2d_fvec);
 			object[] objj = new object[4];
 			objj[0] = (object)x_tran;
@@ -1586,12 +1558,12 @@ namespace JPFITS
 			objj[3] = (object)y_ref;
 			object obj = (object)objj;
 
-			alglib.minlmcreatev(x_ref.Length, p, 0.000001, out state);
+			alglib.minlmcreatev(x_ref.Length, p, 0.000001, out alglib.minlmstate state);
 			alglib.minlmsetcond(state, epsx, maxits);
 			alglib.minlmsetscale(state, p_scale);
 			alglib.minlmsetbc(state, p_lbnd, p_ubnd);
 			alglib.minlmoptimize(state, fvec, null, obj);
-			alglib.minlmresults(state, out p, out report);
+			alglib.minlmresults(state, out p, out alglib.minlmreport report);
 		}
 
 		/// <summary>Fits a polynomial to x, y data.</summary>
@@ -1611,11 +1583,8 @@ namespace JPFITS
 			int[] dc = new int[(0)];
 
 			int m = poly_degree + 1;
-			int info;
-			alglib.barycentricinterpolant p;
-			alglib.polynomialfitreport rep;
 
-			alglib.polynomialfitwc(xdata, ydata, weights, xc, yc, dc, m, out info, out p, out rep);
+			alglib.polynomialfitwc(xdata, ydata, weights, xc, yc, dc, m, out int info, out alglib.barycentricinterpolant p, out alglib.polynomialfitreport rep);
 			alglib.polynomialbar2pow(p, out poly_coeffs);
 
 			if (!robust || xdata.Length <= 2)
@@ -1666,15 +1635,12 @@ namespace JPFITS
 				alglib.ndimensional_pfunc pf = new alglib.ndimensional_pfunc(alglib_Fourier_Polynomial);
 				//alglib.ndimensional_rep rep;
 				object obj = new double[1] { (double)order };
-				alglib.lsfitstate state;
-				alglib.lsfitreport report;
 				//double diffstep = 0;
 				double epsx = 0;
 				int maxits = 0;
-				int info;
 
-				double min, max, amp;
-				JPMath.MinMax(Fdata, out min, out max, false);
+				double amp;
+				JPMath.MinMax(Fdata, out double min, out double max, false);
 				amp = max - min;
 				for (int i = 0; i < p.Length - 2; i++)
 				{
@@ -1691,13 +1657,13 @@ namespace JPFITS
 				p[p.Length - 1] = nyq / 2;
 				scale[p.Length - 1] = p[p.Length - 1];// +1;
 
-				alglib.lsfitcreatef(x, Fdata, p, 0.00001, out state);
+				alglib.lsfitcreatef(x, Fdata, p, 0.00001, out alglib.lsfitstate state);
 				alglib.lsfitsetcond(state, epsx, maxits);
 				alglib.lsfitsetscale(state, scale);
 				alglib.lsfitsetbc(state, p_lbnd, p_ubnd);
 				alglib.lsfitfit(state, pf, null, obj);
 
-				alglib.lsfitresults(state, out info, out p, out report);
+				alglib.lsfitresults(state, out int info, out p, out alglib.lsfitreport report);
 				//MessageBox.Show(info.ToString());
 			}
 			catch (Exception e)
@@ -1885,9 +1851,7 @@ namespace JPFITS
 				hess[6, 5] = hess[5, 6];
 			}
 
-			int info;
-			alglib.matinvreport rep;
-			alglib.rmatrixinverse(ref hess, out info, out rep);
+			alglib.rmatrixinverse(ref hess, out int info, out alglib.matinvreport rep);
 			double[] errs = new double[p.Length];
 			for (int i = 0; i < p.Length; i++)
 				errs[i] = Math.Sqrt(hess[i, i]);
@@ -2109,9 +2073,7 @@ namespace JPFITS
 				hess[7, 6] = hess[6, 7];
 			}
 
-			int info;
-			alglib.matinvreport rep;
-			alglib.rmatrixinverse(ref hess, out info, out rep);
+			alglib.rmatrixinverse(ref hess, out int info, out alglib.matinvreport rep);
 			double[] errs = new double[p.Length];
 			for (int i = 0; i < p.Length; i++)
 				errs[i] = Math.Sqrt(hess[i, i]);
@@ -2139,8 +2101,7 @@ namespace JPFITS
 
 			int Rdata_HW = (Rdata.GetLength(0) - 1) / 2;
 
-			int xx, yy;
-			double center_val = JPMath.Max(Rdata, out xx, out yy, false);
+			double center_val = JPMath.Max(Rdata, out int xx, out int yy, false);
 
 			if (xx != Rdata_HW || yy != Rdata_HW)
 				throw new Exception("Error: Rdata maximum of array not at the center of the array. Cannot solve radial fit.");
@@ -2307,8 +2268,7 @@ namespace JPFITS
 				}
 				else// method == "centered"
 				{
-					int rem = 0;
-					Math.DivRem((int)kernelsize, 2, out rem);
+					Math.DivRem((int)kernelsize, 2, out int rem);
 					if (kernelsize == 1)
 						return data;
 					else if (rem == 0 || !IsInteger(kernelsize))
@@ -2442,8 +2402,7 @@ namespace JPFITS
 			if (do_parallel)
 				param = alglib.parallel;
 
-			alglib.spline2dinterpolant s;
-			alglib.spline2dbuildbicubicv(xdata, xw, ydata, yh, surfdata_vec, 1, out s, param);
+			alglib.spline2dbuildbicubicv(xdata, xw, ydata, yh, surfdata_vec, 1, out alglib.spline2dinterpolant s, param);
 
 			double[] xinter = new double[xw * xinterpdelta_inv];
 			for (int i = 0; i < xw * xinterpdelta_inv; i++)
@@ -5354,16 +5313,12 @@ namespace JPFITS
 			HCOM = VectorSubScalar(HCOM, meanCOM, do_parallel);
 			VCOM = VectorSubScalar(VCOM, meanCOM, do_parallel);
 
-			double[] Hcorr_Lag;
-            double[] Vcorr_Lag;
-			double[] Hcorr_Amp = XCorr(Href, HCOM, out Hcorr_Lag, do_parallel);
-			double[] Vcorr_Amp = XCorr(Vref, VCOM, out Vcorr_Lag, do_parallel);
+			double[] Hcorr_Amp = XCorr(Href, HCOM, out double[] Hcorr_Lag, do_parallel);
+			double[] Vcorr_Amp = XCorr(Vref, VCOM, out double[] Vcorr_Lag, do_parallel);
 
-			int maxHAmpindex;
-			double maxH = Max(Hcorr_Amp, out maxHAmpindex, do_parallel);
+			double maxH = Max(Hcorr_Amp, out int maxHAmpindex, do_parallel);
 			double xmax = Hcorr_Lag[maxHAmpindex];
-			int maxVAmpindex;
-			double maxV = Max(Vcorr_Amp, out maxVAmpindex, do_parallel);
+			double maxV = Max(Vcorr_Amp, out int maxVAmpindex, do_parallel);
 			double ymax = Vcorr_Lag[maxVAmpindex];
 
 			double[] Hx = new double[3] { (double)(xmax - 1), (double)(xmax), (double)(xmax + 1) };
@@ -5402,16 +5357,12 @@ namespace JPFITS
 			HCOM = VectorSubScalar(HCOM, meanCOM, false);
 			VCOM = VectorSubScalar(VCOM, meanCOM, false);
 
-			double[] Hcorr_Lag;
-			double[] Hcorr_Amp = XCorr(referenceX, HCOM, out Hcorr_Lag, do_parallel);
-			int maxHAmpindex = 0;
-			double maxH = Max(Hcorr_Amp, out maxHAmpindex, false);
+			double[] Hcorr_Amp = XCorr(referenceX, HCOM, out double[] Hcorr_Lag, do_parallel);
+			double maxH = Max(Hcorr_Amp, out int maxHAmpindex, false);
 			double xmax = Hcorr_Lag[maxHAmpindex];
 
-			double[] Vcorr_Lag;
-			double[] Vcorr_Amp = XCorr(referenceY, VCOM, out Vcorr_Lag, do_parallel);
-			int maxVAmpindex = 0;
-			double maxV = Max(Vcorr_Amp, out maxVAmpindex, false);
+			double[] Vcorr_Amp = XCorr(referenceY, VCOM, out double[] Vcorr_Lag, do_parallel);
+			double maxV = Max(Vcorr_Amp, out int maxVAmpindex, false);
 			double ymax = Vcorr_Lag[maxVAmpindex];
 
 			double[] Hx = new double[3] { (double)(xmax - 1), (double)(xmax), (double)(xmax + 1) };
@@ -7374,8 +7325,7 @@ namespace JPFITS
 			double m = Mean(clipper, true);
 			double s = Stdv(clipper, true);
 
-			int[] xinds, yinds;
-			Find(Abs(MatrixSubScalar(clipper, m, true), true), sigma * s, ">", true, out xinds, out yinds);
+			Find(Abs(MatrixSubScalar(clipper, m, true), true), sigma * s, ">", true, out int[] xinds, out int[] yinds);
 
 			while (xinds.Length > 0)
 			{
@@ -8076,8 +8026,7 @@ namespace JPFITS
 		/// <param name="utime">Universal time string = '04-15-16' or '04:15:16' for example</param>
 		public static double DateToJD(string date, string utime)
 		{
-			double outyear;
-			return DateToJD(date, utime, out outyear);
+			return DateToJD(date, utime, out double outyear);
 		}
 
 		/// <summary>

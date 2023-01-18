@@ -366,8 +366,7 @@ namespace JPFITS
 
 		private void MAKEHEAPBYTEARRAY(Array[] ExtensionEntryData)
 		{
-			long totalbytes;
-			MAKETTYPEHEAPARRAYNELSPOS(ExtensionEntryData, out totalbytes);
+			MAKETTYPEHEAPARRAYNELSPOS(ExtensionEntryData, out long totalbytes);
 			HEAPDATA = new byte[(int)totalbytes];
 
 			ParallelOptions opts = new ParallelOptions();
@@ -1147,8 +1146,7 @@ namespace JPFITS
 					int f = strheaderline.IndexOf("'");
 					int l = strheaderline.LastIndexOf("'");
 					TFORMS[ttypeindex] = strheaderline.Substring(f + 1, l - f - 1).Trim();
-					int instances;
-					TBYTES[ttypeindex] = TFORMTONBYTES(TFORMS[ttypeindex], out instances);
+					TBYTES[ttypeindex] = TFORMTONBYTES(TFORMS[ttypeindex], out int instances);
 					TREPEATS[ttypeindex] = instances;
 					if (TFORMS[ttypeindex].Contains("Q") || TFORMS[ttypeindex].Contains("P"))//heap form
 					{
@@ -1751,9 +1749,8 @@ namespace JPFITS
 		public FITSBinTable(string fileName, string extensionName)
 		{
 			FileStream fs = new FileStream(fileName, FileMode.Open);
-			bool hasext;
 			ArrayList header = null;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, out hasext) || !hasext)
+			if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header, out bool hasext) || !hasext)
 			{
 				fs.Close();
 				if (!hasext)
@@ -1763,8 +1760,7 @@ namespace JPFITS
 			}
 
 			header = new ArrayList();
-			long tableendposition, pcount, theap;
-			if (!FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", extensionName, ref header, out _, out _, out tableendposition, out pcount, out theap))
+			if (!FITSFILEOPS.SeekExtension(fs, "BINTABLE", extensionName, ref header, out _, out _, out long tableendposition, out long pcount, out long theap))
 			{
 				fs.Close();
 				throw new Exception("Could not find BINTABLE with name '" + extensionName + "'");
@@ -2794,9 +2790,7 @@ namespace JPFITS
 				}
 				else
 				{
-					TypeCode code;
-					int[] dimnelements;
-					newEntryDataObjs[c] = this.GetTTYPEEntry(TTYPES[i], out code, out dimnelements);
+					newEntryDataObjs[c] = this.GetTTYPEEntry(TTYPES[i], out TypeCode code, out int[] dimnelements);
 					newTTYPES[c] = TTYPES[i];
 					newTFORMS[c] = TFORMS[i];
 					newTUNITS[c] = TUNITS[i];
@@ -3029,9 +3023,7 @@ namespace JPFITS
 				}
 				else
 				{
-					TypeCode code;
-					int[] dimnelements;
-					newEntryDataObjs[i] = this.GetTTYPEEntry(TTYPES[c], out code, out dimnelements);
+					newEntryDataObjs[i] = this.GetTTYPEEntry(TTYPES[c], out TypeCode code, out int[] dimnelements);
 					newTTYPES[i] = TTYPES[c];
 					newTFORMS[i] = TFORMS[c];
 					newTUNITS[i] = TUNITS[c];
@@ -3321,9 +3313,8 @@ namespace JPFITS
 
 			FileStream fs = new FileStream(FILENAME, FileMode.Open);
 
-			bool hasext;
 			ArrayList headerret = null;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref headerret, out hasext))
+			if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref headerret, out bool hasext))
 			{
 				fs.Close();
 				throw new Exception("File '" + FileName + "' not formatted as FITS file. Use a new file.");
@@ -3331,7 +3322,7 @@ namespace JPFITS
 			if (!hasext)
 			{
 				fs.Position = 0;
-				FITSFILEOPS.SCANPRIMARYUNIT(fs, false, ref headerret, out hasext);
+				FITSFILEOPS.ScanPrimaryUnit(fs, false, ref headerret, out hasext);
 				byte[] primarydataarr = new byte[((int)(fs.Length - fs.Position))];
 				fs.Read(primarydataarr, 0, primarydataarr.Length);
 				fs.Close();
@@ -3367,11 +3358,10 @@ namespace JPFITS
 				fs.Close();
 
 				fs = new FileStream(FILENAME, FileMode.Open);
-				FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref headerret, out hasext);
+				FITSFILEOPS.ScanPrimaryUnit(fs, true, ref headerret, out hasext);
 			}
 
-			long extensionstartposition, extensionendposition;
-			bool extensionfound = FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", EXTENSIONNAME, ref headerret, out extensionstartposition, out extensionendposition, out _, out _, out _);
+			bool extensionfound = FITSFILEOPS.SeekExtension(fs, "BINTABLE", EXTENSIONNAME, ref headerret, out long extensionstartposition, out long extensionendposition, out _, out _, out _);
 			if (extensionfound && !OverWriteExtensionIfExists)
 			{
 				fs.Close();
@@ -3439,7 +3429,7 @@ namespace JPFITS
 		/// <param name="FileName">The full file name to read from disk.</param>
 		public static string[] GetAllExtensionNames(string FileName)
 		{
-			return FITSFILEOPS.GETALLEXTENSIONNAMES(FileName, "BINTABLE");
+			return FITSFILEOPS.GetAllExtensionNames(FileName, "BINTABLE");
 		}		
 
 		/// <summary>Remove a binary table extension from the given FITS file.</summary>
@@ -3448,9 +3438,8 @@ namespace JPFITS
 		public static void RemoveExtension(string FileName, string ExtensionName)
 		{
 			FileStream fs = new FileStream(FileName, FileMode.Open);
-			bool hasext;
 			ArrayList header = null;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, out hasext) || !hasext)
+			if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header, out bool hasext) || !hasext)
 			{
 				fs.Close();
 				if (!hasext)
@@ -3459,8 +3448,7 @@ namespace JPFITS
 					throw new Exception("File '" + FileName + "'  not formatted as FITS file.");
 			}
 
-			long extensionstartposition, extensionendposition;
-			bool exists = FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", ExtensionName, ref header, out extensionstartposition, out extensionendposition, out _, out _, out _);
+			bool exists = FITSFILEOPS.SeekExtension(fs, "BINTABLE", ExtensionName, ref header, out long extensionstartposition, out long extensionendposition, out _, out _, out _);
 			if (!exists)
 			{
 				fs.Close();
@@ -3489,9 +3477,8 @@ namespace JPFITS
 		public static bool ExtensionExists(string FileName, string ExtensionName)
 		{
 			FileStream fs = new FileStream(FileName, FileMode.Open);
-			bool hasext;
 			ArrayList header = null;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, out hasext) || !hasext)
+			if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header, out bool hasext) || !hasext)
 			{
 				fs.Close();
 				if (!hasext)
@@ -3500,7 +3487,7 @@ namespace JPFITS
 					throw new Exception("File '" + FileName + "'  not formatted as FITS file.");
 			}
 
-			bool exists = FITSFILEOPS.SEEKEXTENSION(fs, "BINTABLE", ExtensionName, ref header, out _, out _, out _, out _, out _);
+			bool exists = FITSFILEOPS.SeekExtension(fs, "BINTABLE", ExtensionName, ref header, out _, out _, out _, out _, out _);
 			fs.Close();
 			return exists;
 		}

@@ -297,7 +297,6 @@ namespace JPFITS
 							if (SOURCE_BOOLEAN_MAP[x, y])
 								continue;
 
-							double x_centroid, y_centroid;
 							int[] xdata = new int[(KERNEL_WIDTH)];
 							int[] ydata = new int[(KERNEL_WIDTH)];
 							for (int i = -KERNEL_RADIUS; i <= KERNEL_RADIUS; i++)
@@ -306,7 +305,7 @@ namespace JPFITS
 								ydata[i + KERNEL_RADIUS] = y + i;
 							}
 							double[,] kernel = JPMath.MatrixSubScalar(GetKernel(IMAGE, x, y, KERNEL_RADIUS), bg_est, false);
-							Centroid(xdata, ydata, kernel, out x_centroid, out y_centroid);
+							Centroid(xdata, ydata, kernel, out double x_centroid, out double y_centroid);
 
 							int r_x_cent = (int)Math.Round(x_centroid);
 							int r_y_cent = (int)Math.Round(y_centroid);						
@@ -1284,11 +1283,8 @@ namespace JPFITS
 		{
 			for (int i = 0; i < N_SRC; i++)
 			{
-				double a, d;
-				string RAhms;
-				string DECdamas;
 
-				wcs.Get_Coordinate(CENTROIDS_X[i], CENTROIDS_Y[i], true, "TAN", out a, out d, out RAhms, out DECdamas);
+				wcs.Get_Coordinate(CENTROIDS_X[i], CENTROIDS_Y[i], true, "TAN", out double a, out double d, out string RAhms, out string DECdamas);
 
 				CENTROIDS_RA_DEG[i] = a;
 				CENTROIDS_RA_HMS[i] = RAhms;
@@ -1464,7 +1460,6 @@ namespace JPFITS
 			int currgroupid = -1;
 			ArrayList groups = new ArrayList();
 			Color[] colors = new Color[11] { Color.OrangeRed, Color.Cyan, Color.LawnGreen, Color.BlueViolet, Color.DeepPink, Color.Aqua, Color.Crimson, Color.DarkGoldenrod, Color.Red, Color.Chartreuse, Color.HotPink };
-			int rem;
 
 			for (int i = 0; i < N_SRC - 1; i++)
 				for (int j = i + 1; j < N_SRC; j++)
@@ -1478,7 +1473,7 @@ namespace JPFITS
 
 							groups.Add(new Group(currgroupid));
 							((Group)groups[currgroupid]).REGION = new Region(path);
-							Math.DivRem(i, colors.Length, out rem);
+							Math.DivRem(i, colors.Length, out int rem);
 							((Group)groups[currgroupid]).GroupColor = colors[rem];
 
 							RECURSGROUP(i, j, groupRadius, currgroupid, groups);
@@ -1651,8 +1646,7 @@ namespace JPFITS
 				xdata[i - (cog.Length - N_last_fit_pts)] = N_points_COG[i];
 				ydata[i - (cog.Length - N_last_fit_pts)] = cog[i];
 			}
-			double[] param;
-			JPMath.Fit_Poly1d(xdata, ydata, 1, true, out param);
+			JPMath.Fit_Poly1d(xdata, ydata, 1, true, out double[] param);
 
 			source_signal = param[0];
 			background_signal_per_pix = param[1];

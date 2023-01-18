@@ -462,8 +462,7 @@ namespace JPFITS
 					if (c == RefImgIndex)
 						continue;//don't register to ones' self
 
-					double xshift, yshift;
-					JPMath.XCorrImageLagShifts(Href, Vref, ImageSet[c].Image, true, true, true, out xshift, out yshift, true);
+					JPMath.XCorrImageLagShifts(Href, Vref, ImageSet[c].Image, true, true, true, out double xshift, out double yshift, true);
 
 					ImageSet[c].SetImage(JPMath.RotateShiftArray(ImageSet[c].Image, 0, Double.MaxValue, Double.MaxValue, style, -xshift, -yshift, true), true, true);
                 }
@@ -584,8 +583,7 @@ namespace JPFITS
 
 					double std = JPMath.Stdv(stdvimg, true);
 					double mean = JPMath.Mean(stdvimg, true);
-					int[] xinds, yinds;
-					JPMath.Find(stdvimg, mean + sigma * std, ">", true, out xinds, out yinds);//find pts > clip range
+					JPMath.Find(stdvimg, mean + sigma * std, ">", true, out int[] xinds, out int[] yinds);//find pts > clip range
 
 					if (xinds.Length == 0)
 						break;
@@ -603,7 +601,6 @@ namespace JPFITS
 						int count = 0;//breakout counter if too high
 						double[] clipvec = new double[L];
 						double max;
-						int index;
 
 						for (int c = 0; c < xinds.Length; c++)
 						{
@@ -613,7 +610,7 @@ namespace JPFITS
 							while (true)
 							{
 								med = JPMath.Median(clipvec);
-								max = JPMath.Max(JPMath.Abs(JPMath.VectorSubScalar(clipvec, med, false), false), out index, false);
+								max = JPMath.Max(JPMath.Abs(JPMath.VectorSubScalar(clipvec, med, false), false), out int index, false);
 								if (max > sigma * std)
 								{
 									clipvec[index] = med;
@@ -1039,7 +1036,7 @@ namespace JPFITS
 						writedata[i * 80 + j] = (byte)head[i][j];
 				fs.Write(writedata, 0, writedata.Length);
 
-				writedata = FITSFILEOPS.GETBYTEFORMATTEDDATAUNIT(imagePrecisions[c], true, this[c].Image);
+				writedata = FITSFILEOPS.GetByteFormattedImageDataUnit(imagePrecisions[c], true, this[c].Image);
 				fs.Write(writedata, 0, writedata.Length);
 			}
 			fs.Close();
@@ -1757,8 +1754,7 @@ namespace JPFITS
 		/// <param name="sourceFullFileName"></param>
 		public static FITSImageSet ReadPrimaryImageLayerCubeAsSet(string sourceFullFileName)
 		{
-			int[] axesN;
-			double[] cube = FITSImage.ReadPrimaryNDimensionalData(sourceFullFileName, out axesN);
+			double[] cube = FITSImage.ReadPrimaryNDimensionalData(sourceFullFileName, out int[] axesN);
 
 			if (axesN.Length != 3)
 				throw new Exception("File does not contain a data cube: NAXIS = " + axesN.Length);

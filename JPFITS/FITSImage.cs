@@ -280,10 +280,7 @@ namespace JPFITS
 
 			FileStream fs = new FileStream(FULLFILENAME, FileMode.Open, FileAccess.Read, FileShare.Read);
 			ArrayList header = new ArrayList();
-			bool hasext;
-			int BITPIX;
-			double BZERO, BSCALE;
-			if (!FITSFILEOPS.SCANIMAGEHEADERUNIT(fs, false, ref header, out hasext, out BITPIX, out NAXISN, out BSCALE, out BZERO))
+			if (!FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out bool hasext, out int BITPIX, out NAXISN, out double BSCALE, out double BZERO))
 			{
 				fs.Close();
 				throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
@@ -291,7 +288,7 @@ namespace JPFITS
 			HEADER = new JPFITS.FITSHeader(header, HEADER_POP);
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.READIMAGEDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -334,9 +331,8 @@ namespace JPFITS
 			EXTNAME = extensionName;
 
 			FileStream fs = new FileStream(fullFileName, FileMode.Open, FileAccess.Read, FileShare.Read);
-			bool hasext;
 			ArrayList header = null;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, out hasext) || !hasext)
+			if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header, out bool hasext) || !hasext)
 			{
 				fs.Close();
 				if (!hasext)
@@ -345,8 +341,7 @@ namespace JPFITS
 					throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
 			}
 
-			long extensionstartposition;
-			if (!FITSFILEOPS.SEEKEXTENSION(fs, "IMAGE", extensionName, ref header, out extensionstartposition, out _, out _, out _, out _))
+			if (!FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName, ref header, out long extensionstartposition, out _, out _, out _, out _))
 			{
 				fs.Close();
 				throw new Exception("Could not find IMAGE extension with name '" + extensionName + "'");
@@ -354,9 +349,7 @@ namespace JPFITS
 
 			fs.Position = extensionstartposition;
 			header = new ArrayList();
-			int BITPIX;
-			double BZERO, BSCALE;
-			if (!FITSFILEOPS.SCANIMAGEHEADERUNIT(fs, false, ref header, out hasext, out BITPIX, out NAXISN, out BSCALE, out BZERO))
+			if (!FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out hasext, out int BITPIX, out NAXISN, out double BSCALE, out double BZERO))
 			{
 				fs.Close();
 				throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
@@ -365,7 +358,7 @@ namespace JPFITS
 			HEADER.SetKey(0, "SIMPLE", "T", "file conforms to FITS standard");
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.READIMAGEDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -406,9 +399,8 @@ namespace JPFITS
 			ISEXTENSION = false;//because changed to primary above
 
 			FileStream fs = new FileStream(fullFileName, FileMode.Open, FileAccess.Read, FileShare.Read);
-			bool hasext;
 			ArrayList header = null;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header, out hasext) || !hasext)
+			if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header, out bool hasext) || !hasext)
 			{
 				fs.Close();
 				if (!hasext)
@@ -417,8 +409,7 @@ namespace JPFITS
 					throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
 			}
 
-			long extensionstartposition;
-			if (!FITSFILEOPS.SEEKEXTENSION(fs, "IMAGE", extensionNumber, ref header, out extensionstartposition, out _, out _, out _, out _))
+			if (!FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionNumber, ref header, out long extensionstartposition, out _, out _, out _, out _))
 			{
 				fs.Close();
 				throw new Exception("Could not find IMAGE extension number '" + extensionNumber + "'");
@@ -426,9 +417,7 @@ namespace JPFITS
 
 			fs.Position = extensionstartposition;
 			header = new ArrayList();
-			int BITPIX;
-			double BZERO, BSCALE;
-			if (!FITSFILEOPS.SCANIMAGEHEADERUNIT(fs, false, ref header, out hasext, out BITPIX, out NAXISN, out BSCALE, out BZERO))
+			if (!FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out hasext, out int BITPIX, out NAXISN, out double BSCALE, out double BZERO))
 			{
 				fs.Close();
 				throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
@@ -442,7 +431,7 @@ namespace JPFITS
 			this.FileName = this.FileName.Substring(0, this.FileName.LastIndexOf(".")) + "_" + EXTNAME + this.FileName.Substring(this.FileName.LastIndexOf("."));
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.READIMAGEDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -1157,14 +1146,10 @@ namespace JPFITS
 		public static double[] ReadImageVectorOnly(string fullFileName, int[]? range, bool doParallel)
 		{
 			FileStream fs = new FileStream(fullFileName, FileMode.Open, FileAccess.Read, FileShare.Read);
-			bool hasext;
-			int BITPIX;
-			int[] NAXISN;
-			double BZERO, BSCALE;
 			ArrayList header = null;
-			FITSFILEOPS.SCANIMAGEHEADERUNIT(fs, false, ref header, out hasext, out BITPIX, out NAXISN, out BSCALE, out BZERO);
+			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out bool hasext, out int BITPIX, out int[] NAXISN, out double BSCALE, out double BZERO);
 
-			double[] result = (double[])FITSFILEOPS.READIMAGEDATAUNIT(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.ArrayAsRangeRank);
+			double[] result = (double[])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.ArrayAsRangeRank);
 
 			fs.Close();
 
@@ -1177,8 +1162,7 @@ namespace JPFITS
 		{
 			FileStream fs = new FileStream(fullFileName, FileMode.Open, FileAccess.Read, FileShare.Read);
 			ArrayList header = new ArrayList();
-			bool hasext;
-			if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, false, ref header, out hasext))
+			if (!FITSFILEOPS.ScanPrimaryUnit(fs, false, ref header, out bool hasext))
 			{
 				fs.Close();
 				throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
@@ -1307,8 +1291,7 @@ namespace JPFITS
 				if (layerExtensionNames[i] == "")
 					throw new Exception("layerExtensionNames cannot contain a nameless extension (empty string): " + (i + 1));
 
-			int[] axesN;
-			double[] cube = FITSImage.ReadPrimaryNDimensionalData(sourceFullFileName, out axesN);
+			double[] cube = FITSImage.ReadPrimaryNDimensionalData(sourceFullFileName, out int[] axesN);
 
 			if (layerExtensionNames.Length != axesN[2])
 				throw new Exception("layerExtensionNames array not equal in length (" + layerExtensionNames.Length + ") to the number of layers (" + axesN[2] + ")");
@@ -1344,7 +1327,7 @@ namespace JPFITS
 		/// <param name="FileName">The full file name to read from disk.</param>
 		public static string[] GetAllExtensionNames(string FileName)
 		{
-			return FITSFILEOPS.GETALLEXTENSIONNAMES(FileName, "IMAGE");
+			return FITSFILEOPS.GetAllExtensionNames(FileName, "IMAGE");
 		}
 
 		#endregion
@@ -1637,9 +1620,8 @@ namespace JPFITS
 			{
 				fs = new FileStream(FULLFILENAME, FileMode.Open);
 				//check for extensions
-				bool hasext;
 				ArrayList header_return = null;
-				FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header_return, out hasext);
+				FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header_return, out bool hasext);
 				if (hasext)
 				{
 					appenddata = new byte[(int)(fs.Length - fs.Position)];
@@ -1651,16 +1633,14 @@ namespace JPFITS
 			else if (filexists && ISEXTENSION)//then get the primary data unit and also check for other extensions, etc
 			{
 				fs = new FileStream(FULLFILENAME, FileMode.Open);
-				bool hasext;
 				ArrayList header_return = null;
-				if (!FITSFILEOPS.SCANPRIMARYUNIT(fs, true, ref header_return, out hasext))
+				if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header_return, out bool hasext))
 				{
 					fs.Close();
 					throw new Exception("Primary data unit of file is not a FITS file.");
 				}
 
-				long extensionstartposition, extensionendposition;
-				bool extexists = FITSFILEOPS.SEEKEXTENSION(fs, "IMAGE", EXTNAME, ref header_return, out extensionstartposition, out extensionendposition, out _, out _, out _);
+				bool extexists = FITSFILEOPS.SeekExtension(fs, "IMAGE", EXTNAME, ref header_return, out long extensionstartposition, out long extensionendposition, out _, out _, out _);
 				if (extexists && !EXTNAMEOVERWRITE)
 				{
 					fs.Close();
@@ -1713,7 +1693,7 @@ namespace JPFITS
 			fs.Write(data, 0, data.Length);
 
 			//get formatted data block
-			data = FITSFILEOPS.GETBYTEFORMATTEDDATAUNIT(prec, do_parallel, DIMAGE);
+			data = FITSFILEOPS.GetByteFormattedImageDataUnit(prec, do_parallel, DIMAGE);
 			fs.Write(data, 0, data.Length);
 			if (appenddata != null)
 				fs.Write(appenddata, 0, appenddata.Length);
@@ -1723,10 +1703,7 @@ namespace JPFITS
 		/// <summary>This sets the BITPIX, NAXIS, NAXISn, BSCALE and BZERO keywords of the header given the TypeCode and the image. If the image is null then NAXIS = 0 and any NAXISn keywords are removed as well as BSCALE and BZERO.</summary>
 		private static void SetBITPIXNAXISBSCZ(TypeCode precision, double[,]? image, FITSHeader HEADER)
 		{
-			int bitpix;
-			int[] naxnisn;
-			double bscale, bzero;
-			FITSFILEOPS.GETBITPIXNAXISnBSCALEBZERO(precision, image, out bitpix, out naxnisn, out bscale, out bzero);
+			FITSFILEOPS.GetBitpixNaxisnBscaleBzero(precision, image, out int bitpix, out int[] naxnisn, out double bscale, out double bzero);
 
 			HEADER.SetKey("BITPIX", bitpix.ToString(), true, 1);
 			HEADER.SetKey("NAXIS", naxnisn.Length.ToString(), true, 2);
