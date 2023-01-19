@@ -9,7 +9,7 @@ namespace JPFITS
 	public class FITSHeader
 	{
 		#region CONSTRUCTORS
-		/// <summary>Constructor. Creates an instance of a FITSImageHeader, with options to indicate whether extensions are present, and sets essential keywords for a given image it will be the header for.
+		/// <summary>Constructor. Creates an instance of a FITSHeader, with options to indicate whether extensions are present, and sets essential keywords for a given image it will be the header for.
 		/// <br />If the image is to be an extension, then use GetFormattedHeaderBlock to pull the header out with SIMPLE = T changed to XTENSION = IMAGE for writing.</summary>
 		/// <param name="mayContainExtensions">If true, heyword EXTEND = T is added, otherwise it is left out.</param>
 		/// <param name="image">If image is null, then NAXIS = 0 and there are no NAXISn keywords or BSCALE or BZERO. Otherwise NAXIS, NAXISn, BSCALE and BZERO are set as per the image dimensions.
@@ -31,6 +31,11 @@ namespace JPFITS
 
 			for (int i = 0; i < HEADERKEYS.Length; i++)
 				HEADERKEYS[i] = new FITSHeaderKey((string)headerlines[i]);
+		}
+
+		public FITSHeader(FITSHeaderKey[] headerKeys)
+		{
+			HEADERKEYS = headerKeys;
 		}
 
 		/// <summary>
@@ -187,8 +192,8 @@ namespace JPFITS
 			else
 			{
 				int NKeys = this.Length;
-				int NCards = (NKeys - 1) / 36;
-				FORMATTEDHEADER = new string[(NCards + 1) * 36];
+				int NCards = (NKeys - 1) / 36 + 1;
+				FORMATTEDHEADER = new string[NCards * 36];
 			}
 
 			for (int i = 0; i < this.Length; i++)
@@ -197,10 +202,8 @@ namespace JPFITS
 			if (keysOnly)
 				return FORMATTEDHEADER;
 
-			string empty = "";
-
 			for (int i = this.Length; i < FORMATTEDHEADER.Length; i++)
-				FORMATTEDHEADER[i] = empty.PadLeft(80);
+				FORMATTEDHEADER[i] = "".PadLeft(80);
 
 			return FORMATTEDHEADER;
 		}

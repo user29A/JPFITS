@@ -31,8 +31,7 @@ namespace JPFITS
 		private string[]? EXTRAKEYVALS;
 		private string[]? EXTRAKEYCOMS;
 		private byte[]? BINTABLE;//the table in raw byte format read from disk
-		private byte[]? HEAPDATA;//the table in raw byte format read from disk
-		
+		private byte[]? HEAPDATA;//the table in raw byte format read from disk		
 
 		#region FITS bzero integer mapping
 
@@ -772,12 +771,12 @@ namespace JPFITS
 			hcomslist.Add("");
 
 			int NKeys = hkeyslist.Count;
-			int NCards = (NKeys - 1) / 36;
-			int NBlankKeys = (NCards + 1) * 36 - NKeys;
-			string[] headerkeys = new string[(NCards + 1) * 36];
-			string[] headerkeyvals = new string[(NCards + 1) * 36];
-			string[] headerkeycoms = new string[(NCards + 1) * 36];
-			string[] header = new string[(NCards + 1) * 36];
+			int NCards = (NKeys - 1) / 36 + 1;
+			int NBlankKeys = NCards * 36 - NKeys;
+			string[] headerkeys = new string[NCards * 36];
+			string[] headerkeyvals = new string[NCards * 36];
+			string[] headerkeycoms = new string[NCards * 36];
+			string[] header = new string[NCards * 36];
 
 			for (int i = 0; i < NKeys; i++)
 			{
@@ -871,10 +870,10 @@ namespace JPFITS
 				header[i] = key + value + comment;
 			}
 
-			header[NKeys - 1] = ("END").PadRight(80);
+			header[NKeys - 1] = "END".PadRight(80);
 
 			for (int i = 0; i < NBlankKeys; i++)
-				header[NKeys + i] = ("").PadRight(80);
+				header[NKeys + i] = "".PadRight(80);
 
 			return header;
 		}
@@ -1080,7 +1079,7 @@ namespace JPFITS
 
 			ArrayList extras = new ArrayList();//for possible extras
 
-			HEADER = new string[(header.Count)];
+			HEADER = new string[header.Count];
 			string strheaderline;
 			int ttypeindex = -1;
 
@@ -1204,7 +1203,7 @@ namespace JPFITS
 						lastcommaindex = nextcommaindex + 1;
 					}
 					dimslist.Add(dimline.Substring(lastcommaindex));
-					TDIMS[ttypeindex] = new int[(dimslist.Count)];
+					TDIMS[ttypeindex] = new int[dimslist.Count];
 					for (int ii = 0; ii < dimslist.Count; ii++)
 						TDIMS[ttypeindex][ii] = Convert.ToInt32((string)dimslist[i]);
 					continue;
@@ -1297,9 +1296,9 @@ namespace JPFITS
 			if (extras.Count == 0)
 				return;
 
-			EXTRAKEYS = new string[(extras.Count)];
-			EXTRAKEYVALS = new string[(extras.Count)];
-			EXTRAKEYCOMS = new string[(extras.Count)];
+			EXTRAKEYS = new string[extras.Count];
+			EXTRAKEYVALS = new string[extras.Count];
+			EXTRAKEYCOMS = new string[extras.Count];
 
 			for (int i = 0; i < extras.Count; i++)
 			{
@@ -1355,7 +1354,7 @@ namespace JPFITS
 					{
 						double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] dbl = new byte[(8)];
+						byte[] dbl = new byte[8];
 
 						for (int j = 0; j < row.Length; j++)
 						{
@@ -1377,12 +1376,12 @@ namespace JPFITS
 
 				case TypeCode.Single:
 				{
-					float[][] arrya = new float[(NAXIS2)][];
+					float[][] arrya = new float[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						float[] row = new float[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] sng = new byte[(4)];
+						byte[] sng = new byte[4];
 
 						for (int j = 0; j < row.Length; j++)
 						{
@@ -1405,7 +1404,7 @@ namespace JPFITS
 					{
 						long[] row = new long[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] i64 = new byte[(8)];
+						byte[] i64 = new byte[8];
 
 						for (int j = 0; j < row.Length; j++)
 						{
@@ -1427,7 +1426,7 @@ namespace JPFITS
 
 				case (TypeCode.UInt64):
 				{
-					ulong[][] arrya = new ulong[(NAXIS2)][];
+					ulong[][] arrya = new ulong[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						ulong[] row = new ulong[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
@@ -1454,7 +1453,7 @@ namespace JPFITS
 
 				case TypeCode.Int32:
 				{
-					int[][] arrya = new int[(NAXIS2)][];
+					int[][] arrya = new int[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						int[] row = new int[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
@@ -1477,7 +1476,7 @@ namespace JPFITS
 
 				case TypeCode.UInt32:
 				{
-					uint[][] arrya = new uint[(NAXIS2)][];
+					uint[][] arrya = new uint[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						uint[] row = new uint[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
@@ -1500,12 +1499,12 @@ namespace JPFITS
 
 				case TypeCode.Int16:
 				{
-					short[][] arrya = new short[(NAXIS2)][];
+					short[][] arrya = new short[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						short[] row = new short[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
 						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] int16 = new byte[(2)];
+						byte[] int16 = new byte[2];
 
 						for (int j = 0; j < row.Length; j++)
 						{
@@ -1521,7 +1520,7 @@ namespace JPFITS
 
 				case TypeCode.UInt16:
 				{
-					ushort[][] arrya = new ushort[(NAXIS2)][];
+					ushort[][] arrya = new ushort[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						ushort[] row = new ushort[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
@@ -1542,7 +1541,7 @@ namespace JPFITS
 
 				case TypeCode.SByte:
 				{
-					sbyte[][] arrya = new sbyte[(NAXIS2)][];
+					sbyte[][] arrya = new sbyte[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						sbyte[] row = new sbyte[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
@@ -1557,7 +1556,7 @@ namespace JPFITS
 
 				case TypeCode.Byte:
 				{
-					byte[][] arrya = new byte[(NAXIS2)][];
+					byte[][] arrya = new byte[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						byte[] row = new byte[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
@@ -1572,7 +1571,7 @@ namespace JPFITS
 
 				case TypeCode.Boolean:
 				{
-					bool[][] arrya = new bool[(NAXIS2)][];
+					bool[][] arrya = new bool[NAXIS2][];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						bool[] row = new bool[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
@@ -1587,7 +1586,7 @@ namespace JPFITS
 
 				case TypeCode.Char:
 				{
-					string[] arrya = new string[(NAXIS2)];
+					string[] arrya = new string[NAXIS2];
 					Parallel.For(0, NAXIS2, opts, i =>
 					{
 						arrya[i] = System.Text.Encoding.ASCII.GetString(HEAPDATA, TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i], TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]);
@@ -1664,15 +1663,15 @@ namespace JPFITS
 			else
 				endpos += TTYPEHEAPARRAYNELSPOS[ttypeindex][0, NAXIS2 - 1] * TYPECODETONBYTES(HEAPTCODES[ttypeindex]);
 
-			byte[] prepend = new byte[(startpos)];
+			byte[] prepend = new byte[startpos];
 			for (int i = 0; i < prepend.Length; i++)
 				prepend[i] = HEAPDATA[i];
 
-			byte[] append = new byte[(HEAPDATA.Length - endpos)];
+			byte[] append = new byte[HEAPDATA.Length - endpos];
 			for (int i = 0; i < append.Length; i++)
 				append[i] = HEAPDATA[endpos + i];
 
-			HEAPDATA = new byte[(prepend.Length + append.Length)];
+			HEAPDATA = new byte[prepend.Length + append.Length];
 			for (int i = 0; i < prepend.Length; i++)
 				HEAPDATA[i] = prepend[i];
 			for (int i = prepend.Length; i < append.Length + prepend.Length; i++)
@@ -1843,10 +1842,10 @@ namespace JPFITS
 				{
 					if (TREPEATS[ttypeindex] == 1)
 					{
-						double[] vector = new double[(NAXIS2)];
+						double[] vector = new double[NAXIS2];
 						Parallel.For(0, NAXIS2, i =>
 						{
-							byte[] dbl = new byte[(8)];
+							byte[] dbl = new byte[8];
 							int currentbyte = byteoffset + i * NAXIS1;
 							dbl[7] = BINTABLE[currentbyte];
 							dbl[6] = BINTABLE[currentbyte + 1];
@@ -1889,10 +1888,10 @@ namespace JPFITS
 				{
 					if (TREPEATS[ttypeindex] == 1)
 					{
-						float[] vector = new float[(NAXIS2)];
+						float[] vector = new float[NAXIS2];
 						Parallel.For(0, NAXIS2, i =>
 						{
-							byte[] sng = new byte[(4)];
+							byte[] sng = new byte[4];
 							int currentbyte = byteoffset + i * NAXIS1;
 							sng[3] = BINTABLE[currentbyte];
 							sng[2] = BINTABLE[currentbyte + 1];
@@ -1908,7 +1907,7 @@ namespace JPFITS
 						Parallel.For(0, NAXIS2, i =>
 						{
 							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] sng = new byte[(4)];
+							byte[] sng = new byte[4];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{ 
 								sng[3] = BINTABLE[currentbyte];
@@ -1927,10 +1926,10 @@ namespace JPFITS
 				{
 					if (TREPEATS[ttypeindex] == 1)
 					{
-						long[] vector = new long[(NAXIS2)];
+						long[] vector = new long[NAXIS2];
 						Parallel.For(0, NAXIS2, i =>
 						{
-							byte[] i64 = new byte[(8)];
+							byte[] i64 = new byte[8];
 							int currentbyte = byteoffset + i * NAXIS1;
 							i64[7] = BINTABLE[currentbyte];
 							i64[6] = BINTABLE[currentbyte + 1];
@@ -1950,7 +1949,7 @@ namespace JPFITS
 						Parallel.For(0, NAXIS2, i =>
 						{
 							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] i64 = new byte[(8)];
+							byte[] i64 = new byte[8];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
 								i64[7] = BINTABLE[currentbyte];
@@ -1976,7 +1975,7 @@ namespace JPFITS
 						ulong[] vector = new ulong[NAXIS2];
 						Parallel.For(0, NAXIS2, i =>
 						{
-							byte[] ui64 = new byte[(8)];
+							byte[] ui64 = new byte[8];
 							int currentbyte = byteoffset + i * NAXIS1;
 							ui64[7] = BINTABLE[currentbyte];
 							ui64[6] = BINTABLE[currentbyte + 1];
@@ -2019,10 +2018,10 @@ namespace JPFITS
 				{
 					if (TREPEATS[ttypeindex] == 1)
 					{
-						uint[] vector = new uint[(NAXIS2)];
+						uint[] vector = new uint[NAXIS2];
 						Parallel.For(0, NAXIS2, i =>
 						{
-							byte[] uint32 = new byte[(4)];
+							byte[] uint32 = new byte[4];
 							int currentbyte = byteoffset + i * NAXIS1;
 							uint32[3] = BINTABLE[currentbyte];
 							uint32[2] = BINTABLE[currentbyte + 1];
@@ -2038,7 +2037,7 @@ namespace JPFITS
 						Parallel.For(0, NAXIS2, i =>
 						{
 							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] uint32 = new byte[(4)];
+							byte[] uint32 = new byte[4];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
 								uint32[3] = BINTABLE[currentbyte];
@@ -2057,10 +2056,10 @@ namespace JPFITS
 				{
 					if (TREPEATS[ttypeindex] == 1)
 					{
-						int[] vector = new int[(NAXIS2)];
+						int[] vector = new int[NAXIS2];
 						Parallel.For(0, NAXIS2, i =>
 						{
-							byte[] int32 = new byte[(4)];
+							byte[] int32 = new byte[4];
 							int currentbyte = byteoffset + i * NAXIS1;
 							int32[3] = BINTABLE[currentbyte];
 							int32[2] = BINTABLE[currentbyte + 1];
@@ -2095,10 +2094,10 @@ namespace JPFITS
 				{
 					if (TREPEATS[ttypeindex] == 1)
 					{
-						ushort[] vector = new ushort[(NAXIS2)];
+						ushort[] vector = new ushort[NAXIS2];
 						Parallel.For(0, NAXIS2, i =>
 						{
-							byte[] uint16 = new byte[(2)];
+							byte[] uint16 = new byte[2];
 							int currentbyte = byteoffset + i * NAXIS1;
 							uint16[1] = BINTABLE[currentbyte];
 							uint16[0] = BINTABLE[currentbyte + 1];
@@ -2112,7 +2111,7 @@ namespace JPFITS
 						Parallel.For(0, NAXIS2, i =>
 						{
 							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] uint16 = new byte[(2)];
+							byte[] uint16 = new byte[2];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
 								uint16[1] = BINTABLE[currentbyte];
@@ -2132,7 +2131,7 @@ namespace JPFITS
 						short[] vector = new short[NAXIS2];
 						Parallel.For(0, NAXIS2, i =>
 						{
-							byte[] int16 = new byte[(2)];
+							byte[] int16 = new byte[2];
 							int currentbyte = byteoffset + i * NAXIS1;
 							int16[1] = BINTABLE[currentbyte];
 							int16[0] = BINTABLE[currentbyte + 1];
@@ -2146,7 +2145,7 @@ namespace JPFITS
 						Parallel.For(0, NAXIS2, i =>
 						{
 							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] int16 = new byte[(2)];
+							byte[] int16 = new byte[2];
 							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 							{
 								int16[1] = BINTABLE[currentbyte];
@@ -2219,7 +2218,7 @@ namespace JPFITS
 				{
 					if (TREPEATS[ttypeindex] == 1)
 					{
-						bool[] vector = new bool[(NAXIS2)];
+						bool[] vector = new bool[NAXIS2];
 						Parallel.For(0, NAXIS2, i =>
 						{
 							int currentbyte = byteoffset + i * NAXIS1;
@@ -2245,11 +2244,11 @@ namespace JPFITS
 
 				case TypeCode.Char:
 				{
-					string[] vector = new string[(NAXIS2)];
+					string[] vector = new string[NAXIS2];
 					Parallel.For(0, NAXIS2, i =>
 					{
 						int currentbyte = byteoffset + i * NAXIS1;
-						byte[] charstr = new byte[(TREPEATS[ttypeindex])];
+						byte[] charstr = new byte[TREPEATS[ttypeindex]];
 						for (int j = 0; j < TREPEATS[ttypeindex]; j++)
 						{
 							charstr[j] = BINTABLE[currentbyte];
@@ -2299,7 +2298,7 @@ namespace JPFITS
 				{
 					case TypeCode.Double:
 					{
-						byte[] dbl = new byte[(8)];
+						byte[] dbl = new byte[8];
 						if (objectArrayRank == 1)
 						{
 							dbl[7] = BINTABLE[currentbyte];
@@ -2333,7 +2332,7 @@ namespace JPFITS
 
 					case TypeCode.Single:
 					{
-						byte[] sng = new byte[(4)];
+						byte[] sng = new byte[4];
 						if (objectArrayRank == 1)
 						{
 							sng[3] = BINTABLE[currentbyte];
@@ -2359,7 +2358,7 @@ namespace JPFITS
 
 					case (TypeCode.Int64):
 					{
-						byte[] i64 = new byte[(8)];
+						byte[] i64 = new byte[8];
 						if (objectArrayRank == 1)
 						{
 							i64[7] = BINTABLE[currentbyte];
@@ -2393,7 +2392,7 @@ namespace JPFITS
 
 					case (TypeCode.UInt64):
 					{
-						byte[] ui64 = new byte[(8)];
+						byte[] ui64 = new byte[8];
 						if (objectArrayRank == 1)
 						{
 							ui64[7] = BINTABLE[currentbyte];
@@ -2427,7 +2426,7 @@ namespace JPFITS
 
 					case TypeCode.UInt32:
 					{
-						byte[] uint32 = new byte[(4)];
+						byte[] uint32 = new byte[4];
 						if (objectArrayRank == 1)
 						{
 							uint32[3] = BINTABLE[currentbyte];
@@ -2453,7 +2452,7 @@ namespace JPFITS
 
 					case TypeCode.Int32:
 					{
-						byte[] int32 = new byte[(4)];
+						byte[] int32 = new byte[4];
 						if (objectArrayRank == 1)
 						{
 							int32[3] = BINTABLE[currentbyte];
@@ -2480,7 +2479,7 @@ namespace JPFITS
 
 					case TypeCode.UInt16:
 					{
-						byte[] uint16 = new byte[(2)];
+						byte[] uint16 = new byte[2];
 						if (objectArrayRank == 1)
 						{
 							uint16[1] = BINTABLE[currentbyte];
@@ -2502,7 +2501,7 @@ namespace JPFITS
 
 					case TypeCode.Int16:
 					{
-						byte[] int16 = new byte[(2)];
+						byte[] int16 = new byte[2];
 						if (objectArrayRank == 1)
 						{
 
@@ -2592,7 +2591,7 @@ namespace JPFITS
 				{
 					case TypeCode.Double:
 					{
-						byte[] dbl = new byte[(8)];
+						byte[] dbl = new byte[8];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
 							dbl[7] = HEAPDATA[currentbyte];
@@ -2611,7 +2610,7 @@ namespace JPFITS
 
 					case TypeCode.Single:
 					{
-						byte[] sng = new byte[(4)];
+						byte[] sng = new byte[4];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
 							sng[3] = HEAPDATA[currentbyte];
@@ -2626,7 +2625,7 @@ namespace JPFITS
 
 					case (TypeCode.Int64):
 					{
-						byte[] i64 = new byte[(8)];
+						byte[] i64 = new byte[8];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
 							i64[7] = HEAPDATA[currentbyte];
@@ -2645,7 +2644,7 @@ namespace JPFITS
 
 					case (TypeCode.UInt64):
 					{
-						byte[] ui64 = new byte[(8)];
+						byte[] ui64 = new byte[8];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
 							ui64[7] = HEAPDATA[currentbyte];
@@ -2664,7 +2663,7 @@ namespace JPFITS
 
 					case TypeCode.Int32:
 					{
-						byte[] int32 = new byte[(4)];
+						byte[] int32 = new byte[4];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
 							int32[3] = HEAPDATA[currentbyte];
@@ -2679,7 +2678,7 @@ namespace JPFITS
 
 					case TypeCode.UInt32:
 					{
-						byte[] uint32 = new byte[(4)];
+						byte[] uint32 = new byte[4];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
 							uint32[3] = HEAPDATA[currentbyte];
@@ -2694,7 +2693,7 @@ namespace JPFITS
 
 					case TypeCode.Int16:
 					{
-						byte[] int16 = new byte[(2)];
+						byte[] int16 = new byte[2];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
 							int16[1] = HEAPDATA[currentbyte];
@@ -2707,7 +2706,7 @@ namespace JPFITS
 
 					case TypeCode.UInt16:
 					{
-						byte[] uint16 = new byte[(2)];
+						byte[] uint16 = new byte[2];
 						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
 						{
 							uint16[1] = HEAPDATA[currentbyte];
@@ -3226,9 +3225,9 @@ namespace JPFITS
 			}
 			else
 			{
-				string[] newkeys = new string[(EXTRAKEYS.Length + 1)];
-				string[] newvals = new string[(EXTRAKEYS.Length + 1)];
-				string[] newcoms = new string[(EXTRAKEYS.Length + 1)];
+				string[] newkeys = new string[EXTRAKEYS.Length + 1];
+				string[] newvals = new string[EXTRAKEYS.Length + 1];
+				string[] newcoms = new string[EXTRAKEYS.Length + 1];
 
 				for (int i = 0; i < EXTRAKEYS.Length; i++)
 				{
@@ -3274,9 +3273,9 @@ namespace JPFITS
 			if (keyindex == -1)
 				return;
 
-			string[] newkeys = new string[(EXTRAKEYS.Length - 1)];
-			string[] newvals = new string[(EXTRAKEYS.Length - 1)];
-			string[] newcoms = new string[(EXTRAKEYS.Length - 1)];
+			string[] newkeys = new string[EXTRAKEYS.Length - 1];
+			string[] newvals = new string[EXTRAKEYS.Length - 1];
+			string[] newcoms = new string[EXTRAKEYS.Length - 1];
 			int c = 0;
 			for (int i = 0; i < EXTRAKEYS.Length; i++)
 				if (i == keyindex)
@@ -3352,7 +3351,7 @@ namespace JPFITS
 				ff.Header.SetKey("EXTEND", "T", "FITS file may contain extensions", true, n + 1);
 				string[] HEADER = ff.Header.GetFormattedHeaderBlock(true, false);
 
-				byte[] headarr = new byte[(HEADER.Length * 80)];
+				byte[] headarr = new byte[HEADER.Length * 80];
 				for (int i = 0; i < HEADER.Length; i++)
 					for (int j = 0; j < 80; j++)
 						headarr[i * 80 + j] = (byte)HEADER[i][j];
@@ -3403,7 +3402,7 @@ namespace JPFITS
 
 			//format the header for writing
 			string[] header = FORMATBINARYTABLEEXTENSIONHEADER();
-			byte[] headerdata = new byte[(header.Length * 80)];
+			byte[] headerdata = new byte[header.Length * 80];
 
 			for (int i = 0; i < header.Length; i++)
 				for (int j = 0; j < 80; j++)
