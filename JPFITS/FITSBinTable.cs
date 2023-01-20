@@ -1693,8 +1693,8 @@ namespace JPFITS
 			get { return TREPEATS; }
 		}
 
-		/// <summary>TableDataLabels reports the name of each table entry, i.e. the TTYPE values.</summary>
-		public string[] TableDataLabelsTTYPE
+		/// <summary>TableDataLabelTTYPEs reports the name of each table entry, i.e. the TTYPE values.</summary>
+		public string[] TableDataLabelTTYPEs
 		{
 			get { return TTYPES; }
 		}
@@ -1708,7 +1708,7 @@ namespace JPFITS
 		/// <summary>Return the binary table header as an array of Strings for each line of the header.</summary>
 		public string[] Header
 		{
-			get { return HEADER; }
+			get { return FORMATBINARYTABLEEXTENSIONHEADER(); }
 		}
 
 		/// <summary>Return the name of the extension.</summary>

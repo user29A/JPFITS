@@ -959,8 +959,11 @@ namespace JPFITS
 		/// <param name="formatPrecision">The precision at which to format the byte array of the underlying double precision data unit. If double values of the data unit exceed the precision, the values are clipped.</param>
 		/// <param name="doParallel">Populate the byte array with parallelism over the data unit. Can speed things up when the data unit is very large.</param>
 		/// <param name="doubleDataUnit">The data unit of up to rank three (data cube). Higher dimensional data than rank = 3 not supported.</param>
-		public static byte[] GetByteFormattedImageDataUnit(TypeCode formatPrecision, bool doParallel, Array doubleDataUnit)
+		public static byte[] GetByteFormattedImageDataUnit(TypeCode formatPrecision, bool doParallel, Array? doubleDataUnit)
 		{
+			if (doubleDataUnit == null)
+				return new byte[] { };
+
 			if (doubleDataUnit.Rank > 3)
 				throw new Exception("Error: I can only handle up to 3-dimensional data units - SORRY!");
 

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Collections;
+using System.Linq;
+
 #nullable enable
 
 namespace JPFITS
@@ -31,6 +33,14 @@ namespace JPFITS
 
 			for (int i = 0; i < HEADERKEYS.Length; i++)
 				HEADERKEYS[i] = new FITSHeaderKey((string)headerlines[i]);
+		}
+
+		public FITSHeader(string[] headerlines)
+		{
+			HEADERKEYS = new JPFITS.FITSHeaderKey[headerlines.Length];
+
+			for (int i = 0; i < HEADERKEYS.Length; i++)
+				HEADERKEYS[i] = new FITSHeaderKey(headerlines[i]);
 		}
 
 		public FITSHeader(FITSHeaderKey[] headerKeys)
@@ -597,6 +607,7 @@ namespace JPFITS
 		#endregion
 
 		#region PRIVATE MEMBERS
+
 		private JPFITS.FITSHeaderKey[]? HEADERKEYS;
 		private string[]? FORMATTEDHEADER;
 		private bool UPDATEDISPLAYHEADER = true;
