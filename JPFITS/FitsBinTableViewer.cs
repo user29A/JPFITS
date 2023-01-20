@@ -45,6 +45,7 @@ namespace JPFITS
 				MenuChooseTableEntries.DropDownItems.RemoveAt(2);
 
 			MenuChooseTable.DropDownItems.Clear();
+			ViewAllChck.Text = "View All";
 
 			OpenBINTABLE(ofd.FileName);
 		}
@@ -232,11 +233,6 @@ namespace JPFITS
 					MenuChooseTableEntries.DropDownItems[i].Tag = null;
 				}
 				ExtensionTableGrid.Columns.Clear();
-
-				ExtensionTableGrid.ColumnCount = MenuChooseTableEntries.DropDownItems.Count - 2;
-
-				for (int i = 0; i < ExtensionTableGrid.ColumnCount; i++)
-					ExtensionTableGrid.Columns[i].HeaderText = MenuChooseTableEntries.DropDownItems[i + 2].Text;
 			}
 			else
 			{
@@ -248,6 +244,9 @@ namespace JPFITS
 					MenuChooseTableEntries.DropDownItems[i].Tag = null;
 				}
 
+				ExtensionTableGrid.ColumnCount = MenuChooseTableEntries.DropDownItems.Count - 2;
+				for (int i = 0; i < ExtensionTableGrid.ColumnCount; i++)
+					ExtensionTableGrid.Columns[i].HeaderText = MenuChooseTableEntries.DropDownItems[i + 2].Text;
 				ExtensionTableGrid.RowCount = FITSBINTABLE.Naxis2 + 1;
 			}
 
@@ -267,7 +266,10 @@ namespace JPFITS
 				return;
 
 			if ((String)(((ToolStripMenuItem)sender).Tag) == "ViewAll")
-				return;	
+				return;
+
+			if (((ToolStripMenuItem)sender).Checked == false)
+				ViewAllChck.Text = "View All";
 
 			this.ExtensionTableGrid.SuspendLayout();
 
@@ -291,37 +293,73 @@ namespace JPFITS
 
 		private void PlotMenuItem_Click(object sender, EventArgs e)
 		{
-			//Plotter plot = new Plotter();
-			//double[] x = new double[(((double[])DATATABLE[YDrop.SelectedIndex]).Length)];
-			//double[] y = new double[(((double[])DATATABLE[YDrop.SelectedIndex]).Length)];
+			//first need to check that the items being plotted are vectors...can only plot y vs.x as vectors
+			if (XDrop.Enabled)
+				if (FITSBINTABLE.GetTTYPEIsHeapEntry(XDrop.SelectedItem.ToString()) || FITSBINTABLE.TableDataRepeats[XDrop.SelectedIndex] > 1)
+				{
+					MessageBox.Show("Error: X-Axis selection is either a heap entry or has multiple columns. Can only plot with X as a vector of values.");
+					return;
+				}
+				else if (FITSBINTABLE.GetTTYPETypeCode(XDrop.SelectedItem.ToString()) == TypeCode.Char || FITSBINTABLE.GetTTYPETypeCode(XDrop.SelectedItem.ToString()) == TypeCode.Boolean)
+				{
+					MessageBox.Show("Error: X-Axis selection is " + FITSBINTABLE.GetTTYPETypeCode(XDrop.SelectedItem.ToString()).ToString());
+					return;
+				}
 
-			//int xind = XDrop.SelectedIndex;
-			//int yind = YDrop.SelectedIndex;
-			//if (yind == -1)
-			//	return;
+			if (FITSBINTABLE.GetTTYPEIsHeapEntry(YDrop.SelectedItem.ToString()) || FITSBINTABLE.TableDataRepeats[YDrop.SelectedIndex] > 1)
+			{
+				MessageBox.Show("Error: Y-Axis selection is either a heap entry or has multiple columns. Can only plot with Y as a vector of values.");
+				return;
+			}
+			else if (FITSBINTABLE.GetTTYPETypeCode(YDrop.SelectedItem.ToString()) == TypeCode.Char || FITSBINTABLE.GetTTYPETypeCode(YDrop.SelectedItem.ToString()) == TypeCode.Boolean)
+			{
+				MessageBox.Show("Error: Y-Axis selection is " + FITSBINTABLE.GetTTYPETypeCode(XDrop.SelectedItem.ToString()).ToString());
+				return;
+			}
 
-			//for (int i = 0; i < x.Length; i++)
-			//{
-			//	if (xind == -1)
-			//		x[i] = i;
-			//	else
-			//		x[i] = ((double[])DATATABLE[xind])[i];
-			//	y[i] = ((double[])DATATABLE[yind])[i];
-			//}
+			double[] x = new double[FITSBINTABLE.Naxis2];
+			if (!XDrop.Enabled)
+				for (int i = 0; i < x.Length; i++)
+					x[i] = i;
+			else
+				for (int i = 0; i < x.Length; i++)
+					x[i] = Convert.ToDouble(FITSBINTABLE.GetTTypeEntryRow(XDrop.SelectedItem.ToString(), i));
 
-			//String xlabel;
-			//if (xind == -1)
-			//	xlabel = "index";
-			//else
-			//	xlabel = ExtensionTableGrid.Columns[xind].HeaderText;
-			//String ylabel = ExtensionTableGrid.Columns[yind].HeaderText;
-			//String title = ylabel;
-			//if (xind != -1)
-			//	title += " vs. " + xlabel;
+			double[] y = new double[FITSBINTABLE.Naxis2];
+			Array yy = FITSBINTABLE.GetTTYPEEntry(YDrop.SelectedItem.ToString(), out _, out _);
+			for (int i = 0; i < x.Length; i++)
+				y[i] = Convert.ToDouble(FITSBINTABLE.GetTTypeEntryRow(YDrop.SelectedItem.ToString(), i));
 
-			//plot.jpChart1.PlotXYData(x, y, title, xlabel, ylabel, System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastPoint, title.Replace(" ", ""), null);
-			//plot.Text = title;
-			//plot.Show();
+			Plotter plot = new Plotter();
+
+			String xlabel;
+			if (!XDrop.Enabled)
+				xlabel = "index";
+			else
+				xlabel = XDrop.SelectedItem.ToString();
+
+			String ylabel = YDrop.SelectedItem.ToString();
+			String title = ylabel;
+			if (XDrop.Enabled)
+				title += " vs. " + xlabel;
+
+			plot.jpChart1.PlotXYData(x, y, title, xlabel, ylabel, System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastPoint, title.Replace(" ", ""), null);
+			plot.Text = title;
+			plot.Show();
+		}
+
+		private void xToolStripMenuItem_CheckedChanged(object sender, EventArgs e)//THIS IS WHY THE CHECKBOX WAS THERE! - because you cannot unselect a drop down once any value is selected
+		{
+			if (xToolStripMenuItem.Checked)
+			{
+				XDrop.Enabled = true;
+				if (XDrop.SelectedIndex == -1)
+					XDrop.SelectedIndex = 0;
+			}
+			else
+				XDrop.Enabled = false;
+
+			PlotEntryMenu.ShowDropDown();
 		}
 
 		private void ViewHeaderMenu_Click(object sender, EventArgs e)
@@ -330,20 +368,10 @@ namespace JPFITS
 			fhv.Show();
 		}
 
-		private void XDrop_KeyDown(object sender, KeyEventArgs e)
+		private void YDrop_SelectedIndexChanged(object sender, EventArgs e)
 		{
-			//THIS IS WHY THE CHECKBOX WAS THERE!
-			//if (e.KeyCode == Keys.Escape)
-			//{
-			//	XDrop.Items.Clear();
-
-			//	string[] labels = FITSBINTABLE.TableDataLabelsTTYPE;
-
-			//	for (int i = 0; i < labels.Length; i++)
-			//		labels[i] = labels[i].Trim();
-
-			//	XDrop.Items.AddRange(labels);
-			//}
+			if (YDrop.SelectedIndex != -1)
+				PlotMenuItem.Enabled = true;
 		}
 	}
 }

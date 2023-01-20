@@ -29,7 +29,7 @@
 		private void InitializeComponent()
 		{
 			this.components = new System.ComponentModel.Container();
-			System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
+			System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle6 = new System.Windows.Forms.DataGridViewCellStyle();
 			this.ExtensionTableGrid = new System.Windows.Forms.DataGridView();
 			this.menuStrip1 = new System.Windows.Forms.MenuStrip();
 			this.MenuFile = new System.Windows.Forms.ToolStripMenuItem();
@@ -62,16 +62,16 @@
 			this.ExtensionTableGrid.Dock = System.Windows.Forms.DockStyle.Fill;
 			this.ExtensionTableGrid.Location = new System.Drawing.Point(0, 24);
 			this.ExtensionTableGrid.Name = "ExtensionTableGrid";
-			dataGridViewCellStyle1.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-			dataGridViewCellStyle1.BackColor = System.Drawing.SystemColors.Control;
-			dataGridViewCellStyle1.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-			dataGridViewCellStyle1.ForeColor = System.Drawing.SystemColors.WindowText;
-			dataGridViewCellStyle1.Format = "N0";
-			dataGridViewCellStyle1.NullValue = null;
-			dataGridViewCellStyle1.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-			dataGridViewCellStyle1.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-			dataGridViewCellStyle1.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
-			this.ExtensionTableGrid.RowHeadersDefaultCellStyle = dataGridViewCellStyle1;
+			dataGridViewCellStyle6.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+			dataGridViewCellStyle6.BackColor = System.Drawing.SystemColors.Control;
+			dataGridViewCellStyle6.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+			dataGridViewCellStyle6.ForeColor = System.Drawing.SystemColors.WindowText;
+			dataGridViewCellStyle6.Format = "N0";
+			dataGridViewCellStyle6.NullValue = null;
+			dataGridViewCellStyle6.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+			dataGridViewCellStyle6.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+			dataGridViewCellStyle6.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
+			this.ExtensionTableGrid.RowHeadersDefaultCellStyle = dataGridViewCellStyle6;
 			this.ExtensionTableGrid.RowHeadersWidth = 125;
 			this.ExtensionTableGrid.Size = new System.Drawing.Size(583, 329);
 			this.ExtensionTableGrid.TabIndex = 0;
@@ -130,7 +130,7 @@
 			// ViewAllChck
 			// 
 			this.ViewAllChck.Name = "ViewAllChck";
-			this.ViewAllChck.Size = new System.Drawing.Size(180, 22);
+			this.ViewAllChck.Size = new System.Drawing.Size(131, 22);
 			this.ViewAllChck.Text = "View None";
 			this.ViewAllChck.CheckedChanged += new System.EventHandler(this.ViewAllChck_CheckedChanged);
 			this.ViewAllChck.Click += new System.EventHandler(this.ViewAllChck_Click);
@@ -138,7 +138,7 @@
 			// toolStripSeparator1
 			// 
 			this.toolStripSeparator1.Name = "toolStripSeparator1";
-			this.toolStripSeparator1.Size = new System.Drawing.Size(177, 6);
+			this.toolStripSeparator1.Size = new System.Drawing.Size(128, 6);
 			// 
 			// PlotEntryMenu
 			// 
@@ -156,17 +156,19 @@
 			// 
 			// xToolStripMenuItem
 			// 
+			this.xToolStripMenuItem.CheckOnClick = true;
 			this.xToolStripMenuItem.Name = "xToolStripMenuItem";
 			this.xToolStripMenuItem.Size = new System.Drawing.Size(181, 22);
 			this.xToolStripMenuItem.Text = "X";
+			this.xToolStripMenuItem.CheckedChanged += new System.EventHandler(this.xToolStripMenuItem_CheckedChanged);
 			// 
 			// XDrop
 			// 
 			this.XDrop.BackColor = System.Drawing.Color.Gainsboro;
 			this.XDrop.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+			this.XDrop.Enabled = false;
 			this.XDrop.Name = "XDrop";
 			this.XDrop.Size = new System.Drawing.Size(121, 23);
-			this.XDrop.KeyDown += new System.Windows.Forms.KeyEventHandler(this.XDrop_KeyDown);
 			// 
 			// toolStripSeparator2
 			// 
@@ -185,6 +187,7 @@
 			this.YDrop.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
 			this.YDrop.Name = "YDrop";
 			this.YDrop.Size = new System.Drawing.Size(121, 23);
+			this.YDrop.SelectedIndexChanged += new System.EventHandler(this.YDrop_SelectedIndexChanged);
 			// 
 			// toolStripSeparator3
 			// 
@@ -193,6 +196,7 @@
 			// 
 			// PlotMenuItem
 			// 
+			this.PlotMenuItem.Enabled = false;
 			this.PlotMenuItem.Name = "PlotMenuItem";
 			this.PlotMenuItem.Size = new System.Drawing.Size(181, 22);
 			this.PlotMenuItem.Text = "Plot Selection";

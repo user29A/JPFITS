@@ -2264,7 +2264,7 @@ namespace JPFITS
 			}
 		}
 
-		/// <summary>Use this to access individual elements of the table with a string return of the values. Useful for looking at TTYPEs with multiple elements on a row.</summary>
+		/// <summary>Use this to access individual elements of the table with a string return of the value. Useful for looking at TTYPEs with multiple elements on a row, or, for extracting values to convert to numeric quantities.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="rowindex">The row index of the column.</param>
 		public string GetTTypeEntryRow(string ttypeEntry, int rowindex)
