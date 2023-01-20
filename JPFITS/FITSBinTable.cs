@@ -2837,12 +2837,12 @@ namespace JPFITS
 			/// <summary>
 			/// The entryArray is a vector containing variable-length vectors of numeric values, or it is an array of variable-length strings, either of which must therefore be stored in the heap area.
 			/// </summary>
-			IsHeapVariableRepeatRows,
+			IsHeapVariableLengthRows,
 
 			/// <summary>
 			/// The entryArray is a vector containing variable-length vectors of complex value pairings, of either single or double floating point precision, which therefore must be stored in the heap area. The length of each vector of the rows must be an even number given the pairings.
 			/// </summary>
-			IsHeapComplexVariableRepeatRows,
+			IsHeapComplexVariableLengthRows,
 
 			/// <summary>
 			/// The entryArray is a numeric vector but which is to be interpreted as an n-dimensional array of rank r &gt;= 3, for which the TDIM values will be provided giving the number of elements along each dimension of the array, which will be written into the header as the TDIMn keys.
@@ -2871,7 +2871,7 @@ namespace JPFITS
 			if (arrayFormat == EntryArrayFormat.IsComplex)
 				isComplex = true;
 			bool addAsHeapVarRepeatArray = false;
-			if (arrayFormat == EntryArrayFormat.IsHeapVariableRepeatRows || arrayFormat == EntryArrayFormat.IsHeapComplexVariableRepeatRows)
+			if (arrayFormat == EntryArrayFormat.IsHeapVariableLengthRows || arrayFormat == EntryArrayFormat.IsHeapComplexVariableLengthRows)
 				addAsHeapVarRepeatArray = true;
 			if (arrayFormat == EntryArrayFormat.IsNDimensional && tdims == null)
 				throw new Exception("The tdims optional argument must be provided if the array format is n >= 3 dimensional.");
