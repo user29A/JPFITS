@@ -948,7 +948,7 @@ namespace JPFITS
 			if (FROMDISKBUFFER != true)
 				throw new Exception("This FITS not created from 'JPFITS.FITSImage(string FullFileName, string DiskUCharBufferName, TypeCode Precision, int NAxis1, int NAxis2)' constructor.");
 
-			string[] HEADER = this.Header.GetFormattedHeaderBlock(false, false);
+			string[] HEADER = this.Header.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.Primary, false);
 			FileStream fits_fs = new FileStream(FULLFILENAME, FileMode.Create);
 
 			byte[] head = new byte[HEADER.Length * 80];
@@ -1027,7 +1027,7 @@ namespace JPFITS
 			double[,] dimage = new double[NAxis1, NAxis2];
 			FITSHeader header = new FITSHeader(true, dimage);
 			SetBITPIXNAXISBSCZ(precision, dimage, header);
-			string[] strHEADER = header.GetFormattedHeaderBlock(false, false);
+			string[] strHEADER = header.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.Primary, false);
 			byte[] byteHEADER = new byte[strHEADER.Length * 80];
 			for (int i = 0; i < strHEADER.Length; i++)
 				for (int j = 0; j < 80; j++)
@@ -1671,7 +1671,7 @@ namespace JPFITS
 			else if (!filexists && ISEXTENSION)//then write the extension to a new file with an empty primary unit
 			{
 				FITSHeader hed = new FITSHeader(true, null);
-				string[] pheader = hed.GetFormattedHeaderBlock(true, false);
+				string[] pheader = hed.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.ExtensionIMAGE, false);
 				prependdata = new byte[pheader.Length * 80];
 				for (int i = 0; i < pheader.Length; i++)
 					for (int j = 0; j < 80; j++)
@@ -1683,8 +1683,12 @@ namespace JPFITS
 			//set header BZERO and BCSALE key values depending on prec type.
 			SetBITPIXNAXISBSCZ(prec, DIMAGE, HEADER);
 
+			FITSHeader.HeaderUnitType type = FITSHeader.HeaderUnitType.Primary;
+			if (ISEXTENSION)
+				type = FITSHeader.HeaderUnitType.ExtensionIMAGE;
+
 			//get formatted header block
-			string[] header = this.Header.GetFormattedHeaderBlock(ISEXTENSION, false);
+			string[] header = this.Header.GetFormattedHeaderBlock(type, false);
 			byte[] data = new byte[header.Length * 80];
 			for (int i = 0; i < header.Length; i++)
 				for (int j = 0; j < 80; j++)

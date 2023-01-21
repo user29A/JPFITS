@@ -1013,7 +1013,7 @@ namespace JPFITS
 			{
 				primaryHeader.SetKey("EXTEND", "T", "File may contain extensions", true, 7);//do this in case where primary header was supplied, but might not have had EXTEND keyword
 
-				head = primaryHeader.GetFormattedHeaderBlock(false, false);
+				head = primaryHeader.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.Primary, false);
 				writedata = new byte[head.Length * 80];
 				for (int i = 0; i < head.Length; i++)
 					for (int j = 0; j < 80; j++)
@@ -1029,7 +1029,7 @@ namespace JPFITS
 
 				this[c].Header.SetKey("EXTNAME", extensionNames[c], "Name of this Extension", true, 7);
 
-				head = this[c].Header.GetFormattedHeaderBlock(true, false);
+				head = this[c].Header.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.ExtensionIMAGE, false);
 				writedata = new byte[head.Length * 80];
 				for (int i = 0; i < head.Length; i++)
 					for (int j = 0; j < 80; j++)

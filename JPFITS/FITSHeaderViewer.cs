@@ -23,7 +23,7 @@ namespace JPFITS
 
 			HeaderKeysListBox.SuspendLayout();
 			HeaderKeysListBox.Items.Clear();
-			HeaderKeysListBox.Items.AddRange(HEADER.GetFormattedHeaderBlock(false, true));
+			HeaderKeysListBox.Items.AddRange(HEADER.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.Primary, true));
 			HeaderKeysListBox.ResumeLayout();
 		}
 
@@ -38,7 +38,7 @@ namespace JPFITS
 
 			HeaderKeysListBox.SuspendLayout();
 			HeaderKeysListBox.Items.Clear();
-			HeaderKeysListBox.Items.AddRange(HEADER.GetFormattedHeaderBlock(false, true));
+			HeaderKeysListBox.Items.AddRange(HEADER.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.Primary, true));
 			HeaderKeysListBox.ResumeLayout();
 		}
 
@@ -54,7 +54,7 @@ namespace JPFITS
 
 				HeaderKeysListBox.SuspendLayout();
 				HeaderKeysListBox.Items.Clear();
-				HeaderKeysListBox.Items.AddRange(HEADER.GetFormattedHeaderBlock(false, true));
+				HeaderKeysListBox.Items.AddRange(HEADER.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.Primary, true));
 				HeaderKeysListBox.ResumeLayout();
 			}
 		}
@@ -342,7 +342,7 @@ namespace JPFITS
 
 			HeaderKeysListBox.SuspendLayout();
 			HeaderKeysListBox.Items.Clear();
-			HeaderKeysListBox.Items.AddRange(HEADER.GetFormattedHeaderBlock(false, true));
+			HeaderKeysListBox.Items.AddRange(HEADER.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.Primary, true));
 			HeaderKeysListBox.ResumeLayout();
 		}
 

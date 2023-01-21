@@ -3,6 +3,7 @@ using System.Collections;
 using System.Threading.Tasks;
 using System.IO;
 using System.Runtime.CompilerServices;
+using JPFITS;
 #nullable enable
 
 namespace JPFITS
@@ -27,9 +28,7 @@ namespace JPFITS
 		private string[]? HEADER;//header for the table
 		private string? FILENAME;
 		private string? EXTENSIONNAME;
-		private string[]? EXTRAKEYS;
-		private string[]? EXTRAKEYVALS;
-		private string[]? EXTRAKEYCOMS;
+		FITSHeaderKey[]? EXTRAKEYS;
 		private byte[]? BINTABLE;//the table in raw byte format read from disk
 		private byte[]? HEAPDATA;//the table in raw byte format read from disk		
 
@@ -624,258 +623,87 @@ namespace JPFITS
 			totalBytes = pos;
 		}
 
-		private string[] FORMATBINARYTABLEEXTENSIONHEADER()
+		private string[] FORMATBINARYTABLEEXTENSIONHEADER(bool keysOnly)
 		{
 			ArrayList hkeyslist = new ArrayList();
-			ArrayList hvalslist = new ArrayList();
-			ArrayList hcomslist = new ArrayList();
 
-			hkeyslist.Add("XTENSION");
-			hvalslist.Add("BINTABLE");
-			hcomslist.Add("binary table extension");
-			hkeyslist.Add("BITPIX");
-			hvalslist.Add("8");
-			hcomslist.Add("8-bit bytes");
-			hkeyslist.Add("NAXIS");
-			hvalslist.Add("2");
-			hcomslist.Add("2-dimensional binary table");
-			hkeyslist.Add("NAXIS1");
-			hvalslist.Add(NAXIS1.ToString());
-			hcomslist.Add("width of table in bytes");
-			hkeyslist.Add("NAXIS2");
-			hvalslist.Add(NAXIS2.ToString());
-			hcomslist.Add("number of rows in table");
-			hkeyslist.Add("PCOUNT");
+			hkeyslist.Add(new FITSHeaderKey("XTENSION", "BINTABLE", "binary table extension"));
+			hkeyslist.Add(new FITSHeaderKey("BITPIX", "8", "8-bit bytes"));
+			hkeyslist.Add(new FITSHeaderKey("NAXIS", "2", "2-dimensional binary table"));
+			hkeyslist.Add(new FITSHeaderKey("NAXIS1", NAXIS1.ToString(), "width of table in bytes"));
+			hkeyslist.Add(new FITSHeaderKey("NAXIS2", NAXIS2.ToString(), "number of rows in table"));
 			if (HEAPDATA == null)
-				hvalslist.Add("0");
+				hkeyslist.Add(new FITSHeaderKey("PCOUNT", "0", "size of heap data area (bytes)"));
 			else
-				hvalslist.Add(HEAPDATA.Length.ToString());//we do not write the heap with a gap, it comes right after the bintable, hence PCOUNT is simply the heap size, and the THEAP gap is zero
-			hcomslist.Add("size of heap data area (bytes)");
-			hkeyslist.Add("GCOUNT");
-			hvalslist.Add("1");
-			hcomslist.Add("one data group");
-			hkeyslist.Add("TFIELDS");
-			hvalslist.Add(TFIELDS.ToString());
-			hcomslist.Add("number of fields in each row");
+				hkeyslist.Add(new FITSHeaderKey("PCOUNT", HEAPDATA.Length.ToString(), "size of heap data area (bytes)"));
+			hkeyslist.Add(new FITSHeaderKey("GCOUNT", "1", "one data group"));
+			hkeyslist.Add(new FITSHeaderKey("TFIELDS", TFIELDS.ToString(), "number of data fields"));
 			if (EXTENSIONNAME != "")
-			{
-				hkeyslist.Add("EXTNAME");
-				hvalslist.Add(EXTENSIONNAME);
-				hcomslist.Add("name of this binary table extension");
-			}
+				hkeyslist.Add(new FITSHeaderKey("EXTNAME", EXTENSIONNAME, "name of this binary table extension"));
 
 			//KEY formats
 			for (int i = 0; i < TTYPES.Length; i++)
 			{
 				//TFORM
-				hkeyslist.Add("TFORM" + (i + 1).ToString());
-				if (!TTYPEISHEAPARRAYDESC[i])
-					hvalslist.Add(TFORMS[i]);
-				else
-				{
-					int max = 0;
-					for (int j = 0; j < NAXIS2; j++)
-						if (TTYPEHEAPARRAYNELSPOS[i][0, j] > max)
-							max = TTYPEHEAPARRAYNELSPOS[i][0, j];
-					hvalslist.Add(TFORMS[i] + "(" + max.ToString() + ")");
-				}
 				if (TTYPEISHEAPARRAYDESC[i])
 					if (!TTYPEISCOMPLEX[i])
-						hcomslist.Add((2 * TYPECODETONBYTES(TCODES[i])).ToString() + "-byte " + TYPECODESTRING(TCODES[i]) + " heap descriptor for " + TYPECODESTRING(HEAPTCODES[i]));
+						hkeyslist.Add(new FITSHeaderKey("TFORM" + (i + 1).ToString(), TFORMS[i], (2 * TYPECODETONBYTES(TCODES[i])).ToString() + "-byte " + TYPECODESTRING(TCODES[i]) + " heap descriptor for " + TYPECODESTRING(HEAPTCODES[i])));
 					else
-						hcomslist.Add((2 * TYPECODETONBYTES(TCODES[i])).ToString() + "-byte " + TYPECODESTRING(TCODES[i]) + " heap descriptor for " + TYPECODESTRING(HEAPTCODES[i]) + " complex pair");
+						hkeyslist.Add(new FITSHeaderKey("TFORM" + (i + 1).ToString(), TFORMS[i], (2 * TYPECODETONBYTES(TCODES[i])).ToString() + "-byte " + TYPECODESTRING(TCODES[i]) + " heap descriptor for " + TYPECODESTRING(HEAPTCODES[i]) + " complex pair"));
 				else if (TTYPEISCOMPLEX[i])
-					hcomslist.Add((2 * TYPECODETONBYTES(TCODES[i])).ToString() + "-byte " + TYPECODESTRING(TCODES[i]) + " complex pair");
+					hkeyslist.Add(new FITSHeaderKey("TFORM" + (i + 1).ToString(), TFORMS[i], (2 * TYPECODETONBYTES(TCODES[i])).ToString() + "-byte " + TYPECODESTRING(TCODES[i]) + " complex pair"));
 				else
-					hcomslist.Add(TYPECODETONBYTES(TCODES[i]).ToString() + "-byte " + TYPECODESTRING(TCODES[i]));
+					hkeyslist.Add(new FITSHeaderKey("TFORM" + (i + 1).ToString(), TFORMS[i], TYPECODETONBYTES(TCODES[i]).ToString() + "-byte " + TYPECODESTRING(TCODES[i])));
 
 				//TTYPE
-				hkeyslist.Add("TTYPE" + (i + 1).ToString());
-				hvalslist.Add(TTYPES[i]);
-				hcomslist.Add("label for field " + (i + 1).ToString());
+				hkeyslist.Add(new FITSHeaderKey("TTYPE" + (i + 1), TTYPES[i], "label for field " + (i + 1).ToString()));
 
 				//TZERO and TSCAL
 				if (!TTYPEISHEAPARRAYDESC[i] && TCODES[i] == TypeCode.SByte || HEAPTCODES[i] == TypeCode.SByte)
 				{
-					hkeyslist.Add("TZERO" + (i + 1).ToString());
-					hvalslist.Add("-128");
-					hcomslist.Add("offset for signed 8-bit integers");
-
-					hkeyslist.Add("TSCAL" + (i + 1).ToString());
-					hvalslist.Add("1");
-					hcomslist.Add("data are not scaled");
+					hkeyslist.Add(new FITSHeaderKey("TZERO" + (i + 1).ToString(), "-128", "offset for signed 8-bit integers"));
+					hkeyslist.Add(new FITSHeaderKey("TSCAL" + (i + 1).ToString(), "1", "data scaling"));
 				}
 				else if (!TTYPEISHEAPARRAYDESC[i] && TCODES[i] == TypeCode.UInt16 || HEAPTCODES[i] == TypeCode.UInt16)
 				{
-					hkeyslist.Add("TZERO" + (i + 1).ToString());
-					hvalslist.Add("32768");
-					hcomslist.Add("offset for unsigned 16-bit integers");
-
-					hkeyslist.Add("TSCAL" + (i + 1).ToString());
-					hvalslist.Add("1");
-					hcomslist.Add("data are not scaled");
+					hkeyslist.Add(new FITSHeaderKey("TZERO" + (i + 1).ToString(), "32768", "offset for unsigned 16-bit integers"));
+					hkeyslist.Add(new FITSHeaderKey("TSCAL" + (i + 1).ToString(), "1", "data scaling"));
 				}
 				else if (!TTYPEISHEAPARRAYDESC[i] && TCODES[i] == TypeCode.UInt32 || HEAPTCODES[i] == TypeCode.UInt32)
 				{
-					hkeyslist.Add("TZERO" + (i + 1).ToString());
-					hvalslist.Add("2147483648");
-					hcomslist.Add("offset for unsigned 32-bit integers");
-
-					hkeyslist.Add("TSCAL" + (i + 1).ToString());
-					hvalslist.Add("1");
-					hcomslist.Add("data are not scaled");
+					hkeyslist.Add(new FITSHeaderKey("TZERO" + (i + 1).ToString(), "2147483648", "offset for unsigned 32-bit integers"));
+					hkeyslist.Add(new FITSHeaderKey("TSCAL" + (i + 1).ToString(), "1", "data scaling"));
 				}
 				else if (!TTYPEISHEAPARRAYDESC[i] && TCODES[i] == TypeCode.UInt64 || HEAPTCODES[i] == TypeCode.UInt64)
 				{
-					hkeyslist.Add("TZERO" + (i + 1).ToString());
-					hvalslist.Add("9223372036854775808");
-					hcomslist.Add("offset for unsigned 64-bit integers");
-
-					hkeyslist.Add("TSCAL" + (i + 1).ToString());
-					hvalslist.Add("1");
-					hcomslist.Add("data are not scaled");
+					hkeyslist.Add(new FITSHeaderKey("TZERO" + (i + 1).ToString(), "9223372036854775808", "offset for unsigned 64-bit integers"));
+					hkeyslist.Add(new FITSHeaderKey("TSCAL" + (i + 1).ToString(), "1", "data scaling"));
 				}
 
 				//TUNIT
 				if (TUNITS != null && TUNITS[i] != null && TUNITS[i] != "")
-				{
-					hkeyslist.Add("TUNIT" + (i + 1).ToString());
-					hvalslist.Add(TUNITS[i]);
-					hcomslist.Add("physical unit of field");
-				}
+					hkeyslist.Add(new FITSHeaderKey("TUNIT" + (i + 1).ToString(), TUNITS[i], "physical unit of field"));
 
 				//TDIM
 				if (TDIMS[i] != null)//then it is a multi D array, and the dims should exist for this entry
 				{
-					hkeyslist.Add("TDIM" + (i + 1).ToString());
 					string dim = "(";
 					for (int j = 0; j < TDIMS[i].Length; j++)
-						dim += (TDIMS[i][j].ToString() + ",");
+						dim += TDIMS[i][j].ToString() + ",";
 					dim = dim.Remove(dim.Length - 1) + ")";
-					hvalslist.Add(dim);
-					hcomslist.Add("N-dim array dimensions");
+
+					hkeyslist.Add(new FITSHeaderKey("TDIM" + (i + 1).ToString(), dim, "N-dim array dimensions"));
 				}
 			}
 
 			//EXTRAKEYS
 			if (EXTRAKEYS != null)
 				for (int i = 0; i < EXTRAKEYS.Length; i++)
-				{
-					hkeyslist.Add(EXTRAKEYS[i].ToUpper());
-					hvalslist.Add(EXTRAKEYVALS[i]);
-					hcomslist.Add(EXTRAKEYCOMS[i]);
-				}
+					hkeyslist.Add(EXTRAKEYS[i]);
 
-			hkeyslist.Add("END     ");
-			hvalslist.Add("");
-			hcomslist.Add("");
+			hkeyslist.Add(new FITSHeaderKey("END", "", ""));
 
-			int NKeys = hkeyslist.Count;
-			int NCards = (NKeys - 1) / 36 + 1;
-			int NBlankKeys = NCards * 36 - NKeys;
-			string[] headerkeys = new string[NCards * 36];
-			string[] headerkeyvals = new string[NCards * 36];
-			string[] headerkeycoms = new string[NCards * 36];
-			string[] header = new string[NCards * 36];
-
-			for (int i = 0; i < NKeys; i++)
-			{
-				headerkeys[i] = (string)hkeyslist[i];
-				headerkeyvals[i] = (string)hvalslist[i];
-				headerkeycoms[i] = (string)hcomslist[i];
-			}
-
-			string key;
-			string value;
-			string comment;
-			for (int i = 0; i < NKeys - 1; i++)
-			{
-				key = headerkeys[i];
-				key = key.Trim();//in case some idiot put spaces in the front or back...if in the middle??
-				int L = key.Length;
-				if (key == "COMMENT")
-					key = "COMMENT ";//8 long, comment follows; key now = "COMMENT "..., no "=" needed
-				else if (L >= 8)
-				{
-					key = key.Substring(0, 8);
-					key += "= ";//key formatting done
-				}
-				else if (L < 8)
-				{
-					for (int ii = 0; ii < 8 - L; ii++)
-						key += " ";//pad right
-					key += "= ";//key formatting done
-				}
-
-				//do value formatting
-				if (JPMath.IsNumeric(headerkeyvals[i]))//then we have a numeric key value
-				{
-					double val = Convert.ToDouble(headerkeyvals[i]);
-					if (val == 9223372036854775808)
-						value = "9223372036854775808";
-					else
-						value = val.ToString();
-					L = value.Length;
-					if (L > 20)
-						value = value.Substring(0, 20);
-					if (L < 20)
-						for (int ii = 0; ii < 20 - L; ii++)
-							value = " " + value;//pad left
-				}
-				else//else it must be a string or comment.
-				{
-					value = headerkeyvals[i];
-					L = value.Length;
-					if (L >= 18)
-					{
-						value = value.Substring(0, 18);
-						value = "'" + value + "'";
-					}
-					if (L < 18)
-					{
-						value = "'" + value + "'";
-						for (int ii = 0; ii < 18 - L; ii++)
-							value += " ";//pad right
-					}
-					if (headerkeyvals[i].Trim() == "T")
-						value = "                   T";
-					if (headerkeyvals[i].Trim() == "F")
-						value = "                   F";
-				}
-				//value formatting done
-
-				//do comment formatting...always a string
-				comment = headerkeycoms[i];
-				L = comment.Length;
-				if (L > 48)
-					comment = comment.Substring(0, 48);
-				if (L < 48)
-					for (int ii = 0; ii < 48 - L; ii++)
-						comment += " ";//pad right
-				comment = " /" + comment;//comment formatting done
-
-				//check for COMMENT and reconfigure key line...it isn't the most efficient approach but I dont care.
-				if (key == "COMMENT ")
-				{
-					comment = headerkeyvals[i] + headerkeycoms[i];
-					value = "";
-					L = comment.Length;
-					if (L > 72)
-						comment = comment.Substring(0, 72);
-					if (L < 72)
-						for (int ii = 0; ii < 72 - L; ii++)
-							comment += " ";//pad right
-				}
-
-				header[i] = key + value + comment;
-			}
-
-			header[NKeys - 1] = "END".PadRight(80);
-
-			for (int i = 0; i < NBlankKeys; i++)
-				header[NKeys + i] = "".PadRight(80);
-
-			return header;
+			return (new FITSHeader(hkeyslist)).GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.ExtensionBINTABLE, keysOnly);
 		}
 
 		private int TFORMTONBYTES(string tform, out int instances)
@@ -1289,41 +1117,18 @@ namespace JPFITS
 				if (key.Length > 0 && key.Substring(0, 1) == "T" && JPMath.IsNumeric(key.Substring(key.Length - 1)))//then likely it is some other T____n field which isn't explicitly coded above...
 					continue;
 
-				//should now only be where extra keys might remain...so add them etc
-				extras.Add(header[i]);
+				//should now only be where extra keys might remain...so add them etc, but ignore END
+				if (strheaderline.Substring(0, 8).Trim() != "END" && strheaderline.Substring(0, 8).Trim() != "PCOUNT" && strheaderline.Substring(0, 8).Trim() != "GCOUNT" && strheaderline.Substring(0, 8).Trim() != "EXTNAME" && strheaderline.Substring(0, 8).Trim() != "XTENSION")
+					extras.Add(strheaderline);
 			}
 
 			if (extras.Count == 0)
 				return;
 
-			EXTRAKEYS = new string[extras.Count];
-			EXTRAKEYVALS = new string[extras.Count];
-			EXTRAKEYCOMS = new string[extras.Count];
+			EXTRAKEYS = new FITSHeaderKey[extras.Count];
 
 			for (int i = 0; i < extras.Count; i++)
-			{
-				string line = (string)extras[i];
-				EXTRAKEYS[i] = line.Substring(0, 8).Trim();
-
-				if (EXTRAKEYS[i] == "COMMENT")
-				{
-					EXTRAKEYVALS[i] = line.Substring(8, 18);
-					EXTRAKEYCOMS[i] = line.Substring(26);
-				}
-				else
-				{
-					if (JPMath.IsNumeric(line.Substring(10, 20)))//this has to work if it is supposed to be a numeric value here
-						EXTRAKEYVALS[i] = line.Substring(10, 20).Trim();//get rid of leading and trailing white space
-					else
-					{
-						string nock = "'";
-						EXTRAKEYVALS[i] = line.Substring(10, 20).Trim();
-						EXTRAKEYVALS[i] = EXTRAKEYVALS[i].Trim(nock.ToCharArray());
-						EXTRAKEYVALS[i] = EXTRAKEYVALS[i].Trim();
-					}
-					EXTRAKEYCOMS[i] = line.Substring(32).Trim();
-				}
-			}
+				EXTRAKEYS[i] = new FITSHeaderKey((string)extras[i]);
 		}
 
 		private Array GETHEAPTTYPE(int ttypeIndex, out TypeCode entryTypeCode, out int[] entryNElements)
@@ -1708,7 +1513,7 @@ namespace JPFITS
 		/// <summary>Return the binary table header as an array of Strings for each line of the header.</summary>
 		public string[] Header
 		{
-			get { return FORMATBINARYTABLEEXTENSIONHEADER(); }
+			get { return FORMATBINARYTABLEEXTENSIONHEADER(true); }
 		}
 
 		/// <summary>Return the name of the extension.</summary>
@@ -3218,30 +3023,16 @@ namespace JPFITS
 		public void AddExtraHeaderKey(string keyName, string keyValue, string keyComment)
 		{
 			if (EXTRAKEYS == null)
-			{
-				EXTRAKEYS = new string[] { keyName };
-				EXTRAKEYVALS = new string[] { keyValue };
-				EXTRAKEYCOMS = new string[] { keyComment };
-			}
+				EXTRAKEYS = new FITSHeaderKey[1] { new FITSHeaderKey(keyName, keyValue, keyComment) };
 			else
 			{
-				string[] newkeys = new string[EXTRAKEYS.Length + 1];
-				string[] newvals = new string[EXTRAKEYS.Length + 1];
-				string[] newcoms = new string[EXTRAKEYS.Length + 1];
+				FITSHeaderKey[] newkeys = new FITSHeaderKey[EXTRAKEYS.Length + 1];
 
 				for (int i = 0; i < EXTRAKEYS.Length; i++)
-				{
-					newkeys[i] = EXTRAKEYS[i];
-					newvals[i] = EXTRAKEYVALS[i];
-					newcoms[i] = EXTRAKEYCOMS[i];
-				}
-				newkeys[EXTRAKEYS.Length] = keyName;
-				newvals[EXTRAKEYS.Length] = keyValue;
-				newcoms[EXTRAKEYS.Length] = keyComment;
+					newkeys[i] = new FITSHeaderKey(keyName, keyValue, keyComment);
 
+				newkeys[EXTRAKEYS.Length] = new FITSHeaderKey(keyName, keyValue, keyComment);
 				EXTRAKEYS = newkeys;
-				EXTRAKEYVALS = newvals;
-				EXTRAKEYCOMS = newcoms;
 			}
 		}
 
@@ -3251,7 +3042,7 @@ namespace JPFITS
 		{
 			for (int i = 0; i < EXTRAKEYS.Length; i++)
 				if (keyName.Equals(EXTRAKEYS[i]))
-					return EXTRAKEYVALS[i];
+					return EXTRAKEYS[i].Value;
 			return "";
 		}
 
@@ -3264,7 +3055,7 @@ namespace JPFITS
 			int keyindex = -1;
 
 			for (int i = 0; i < EXTRAKEYS.Length; i++)
-				if (EXTRAKEYS[i] == keyName && EXTRAKEYVALS[i] == keyValue)
+				if (EXTRAKEYS[i].Name == keyName && EXTRAKEYS[i].Value == keyValue)
 				{
 					keyindex = i;
 					break;
@@ -3273,9 +3064,7 @@ namespace JPFITS
 			if (keyindex == -1)
 				return;
 
-			string[] newkeys = new string[EXTRAKEYS.Length - 1];
-			string[] newvals = new string[EXTRAKEYS.Length - 1];
-			string[] newcoms = new string[EXTRAKEYS.Length - 1];
+			FITSHeaderKey[] newkeys = new FITSHeaderKey[EXTRAKEYS.Length - 1];
 			int c = 0;
 			for (int i = 0; i < EXTRAKEYS.Length; i++)
 				if (i == keyindex)
@@ -3283,21 +3072,15 @@ namespace JPFITS
 				else
 				{
 					newkeys[c] = EXTRAKEYS[i];
-					newvals[c] = EXTRAKEYVALS[i];
-					newcoms[c] = EXTRAKEYCOMS[i];
 					c++;
 				}
 			EXTRAKEYS = newkeys;
-			EXTRAKEYVALS = newvals;
-			EXTRAKEYCOMS = newcoms;
 		}
 
 		/// <summary>Clear all extra header keys.</summary>
 		public void RemoveAllExtraHeaderKeys()
 		{
 			EXTRAKEYS = null;
-			EXTRAKEYVALS = null;
-			EXTRAKEYCOMS = null;
 		}
 
 		/// <summary>Write the binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be replaced.</summary>
@@ -3349,7 +3132,7 @@ namespace JPFITS
 				else
 					n = ff.Header.GetKeyIndex("NAXIS", false);
 				ff.Header.SetKey("EXTEND", "T", "FITS file may contain extensions", true, n + 1);
-				string[] HEADER = ff.Header.GetFormattedHeaderBlock(true, false);
+				string[] HEADER = ff.Header.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.Primary, false);
 
 				byte[] headarr = new byte[HEADER.Length * 80];
 				for (int i = 0; i < HEADER.Length; i++)
@@ -3401,7 +3184,7 @@ namespace JPFITS
 				fs.Write(arr_prepend, 0, arr_prepend.Length);
 
 			//format the header for writing
-			string[] header = FORMATBINARYTABLEEXTENSIONHEADER();
+			string[] header = FORMATBINARYTABLEEXTENSIONHEADER(false);
 			byte[] headerdata = new byte[header.Length * 80];
 
 			for (int i = 0; i < header.Length; i++)

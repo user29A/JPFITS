@@ -364,6 +364,7 @@ namespace JPFITS
 
 		private void ViewHeaderMenu_Click(object sender, EventArgs e)
 		{
+
 			FITSHeaderViewer fhv = new FITSHeaderViewer(new FITSHeader(FITSBINTABLE.Header));
 			fhv.Show();
 		}

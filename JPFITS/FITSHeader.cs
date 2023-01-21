@@ -48,6 +48,13 @@ namespace JPFITS
 			HEADERKEYS = headerKeys;
 		}
 
+		public FITSHeader(ArrayList FITSheaderKeys)
+		{
+			HEADERKEYS = new FITSHeaderKey[FITSheaderKeys.Count];
+			for (int i = 0; i < HEADERKEYS.Length; i++)
+				HEADERKEYS[i] = (FITSHeaderKey)FITSheaderKeys[i];
+		}
+
 		/// <summary>
 		/// Make a header object from an existing FITS file.
 		/// </summary>
@@ -127,21 +134,40 @@ namespace JPFITS
 			UPDATEDISPLAYHEADER = true;
 		}
 
-		/// <summary>Returns a formatted header block with the existing keys, and sets the first key to either SIMPLE = T or XTENSION = IMAGE. If a full 2880-multiple block is needed, set keysOnly to false.</summary>
-		/// <param name="isExtension">If true then the first keyword is set to XTENSION = IMAGE, otherwise it is SIMPLE = T.</param>
-		/// <param name="keysOnly">If true then only the existing keywords are returned formatted, otherwise if you need the entire 2880-multiple block pass false. True typically needed for display, false typically needed for writing.</param>
-		public string[] GetFormattedHeaderBlock(bool isExtension, bool keysOnly)
+		public enum HeaderUnitType
 		{
-			if (isExtension && !ISEXTENSION)
+			/// <summary>
+			/// The header is for the Primary Unit of the FITS file.
+			/// </summary>
+			Primary,
+
+			/// <summary>
+			/// The header is for an IMAGE extension.
+			/// </summary>
+			ExtensionIMAGE,
+
+			/// <summary>
+			/// The header is for a BINTABLE extension.
+			/// </summary>
+			ExtensionBINTABLE
+		}
+
+		/// <summary>Returns a formatted header block with the existing keys, and sets the first key to either SIMPLE = T or XTENSION = IMAGE or BINTABLE. If a full 2880-multiple block is needed, set keysOnly to false.</summary>
+		/// <param name="headerType">The type of header, either primary, image extension, or binary table extension.</param>
+		/// <param name="keysOnly">If true then only the existing keywords are returned formatted, otherwise if you need the entire 2880-multiple block pass false. True typically needed for display, false typically needed for writing.</param>
+		public string[] GetFormattedHeaderBlock(HeaderUnitType headerType, bool keysOnly)
+		{
+			if (headerType != HeaderUnitType.Primary && !ISEXTENSION)
 			{
 				UPDATEDISPLAYHEADER = true;
 				ISEXTENSION = true;
 
-				this.RemoveKey("EXTEND");
+				this.RemoveKey("EXTEND");//if the header was primary, then it may have contained this keyword, but it doesn't need to anymore now that it is an extension header
 
-				HEADERKEYS[0].Name = "XTENSION";
-				HEADERKEYS[0].Value = "IMAGE";
-				HEADERKEYS[0].Comment = "IMAGE extension";
+				if (headerType == HeaderUnitType.ExtensionIMAGE)
+					HEADERKEYS[0] = new FITSHeaderKey("XTENSION", "IMAGE", "image extension");
+				else//must be binary table
+					HEADERKEYS[0] = new FITSHeaderKey("XTENSION", "BINTABLE", "binary table extension");
 
 				bool pcountkey = false, gcountkey = false;
 				for (int i = 0; i < this.Length; i++)
@@ -183,13 +209,11 @@ namespace JPFITS
 					HEADERKEYS = keys;
 				}
 			}
-			else if (!isExtension && ISEXTENSION)
+			else if (headerType == HeaderUnitType.Primary && ISEXTENSION)
 			{
 				UPDATEDISPLAYHEADER = true;
 				ISEXTENSION = false;
-				HEADERKEYS[0].Name = "SIMPLE";
-				HEADERKEYS[0].Value = "T";
-				HEADERKEYS[0].Comment = "file conforms to FITS standard.";
+				HEADERKEYS[0] = new FITSHeaderKey("SIMPLE", "T", "file conforms to FITS standard");
 			}
 
 			if (!UPDATEDISPLAYHEADER && !keysOnly)
@@ -223,7 +247,7 @@ namespace JPFITS
 		public static bool ValidKeyEdit(string key, bool showMessageBox)
 		{
 			for (int i = 0; i < INVALIDEDITKEYS.Length; i++)
-				if (key == INVALIDEDITKEYS[i])
+				if (key.Contains(INVALIDEDITKEYS[i]))
 				{
 					if (showMessageBox)
 						System.Windows.Forms.MessageBox.Show("Selected key: '" + key + "' is restricted. Operation not allowed.", "Warning...");
@@ -612,7 +636,7 @@ namespace JPFITS
 		private string[]? FORMATTEDHEADER;
 		private bool UPDATEDISPLAYHEADER = true;
 		private bool ISEXTENSION = false;
-		private static string[] INVALIDEDITKEYS = { "SIMPLE", "EXTEND", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "NAXIS3", "NAXIS4", "BZERO", "BSCALE", "END", "PCOUNT", "GCOUNT", "THEAP", "GROUPS", "XTENSION", "TFIELDS" };
+		private static string[] INVALIDEDITKEYS = { "SIMPLE", "EXTEND", "BITPIX", "NAXIS", "BZERO", "BSCALE", "END", "PCOUNT", "GCOUNT", "THEAP", "GROUPS", "XTENSION", "TFIELDS", "TUNIT", "TFORM", "TTYPE", "TZERO", "TSCAL" };
 
 		/// <summary>
 		/// Make a header with essential keywords.
