@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Diagnostics.Eventing.Reader;
 using System.Windows.Forms;
 #nullable enable
 
@@ -44,9 +45,6 @@ namespace JPFITS
 			for (int i = 2; i < c; i++)
 				MenuChooseTableEntries.DropDownItems.RemoveAt(2);
 
-			MenuChooseTable.DropDownItems.Clear();
-			ViewAllChck.Text = "View All";
-
 			OpenBINTABLE(ofd.FileName);
 		}
 
@@ -54,6 +52,8 @@ namespace JPFITS
 		{
 			try
 			{
+				MenuChooseTable.DropDownItems.Clear();
+				ViewAllChck.Text = "View All";
 				FILENAME = FileName;
 				REG.SetReg("JPFITS", "BinTableOpenFilesPath", FileName.Substring(0, FileName.LastIndexOf("\\")));
 				string file = FILENAME.Substring(FILENAME.LastIndexOf("\\"));
@@ -71,15 +71,21 @@ namespace JPFITS
 					this.MenuChooseTable.DropDownItems[MenuChooseTable.DropDownItems.Count - 1].Click += new System.EventHandler(MenuChooseTable_Click);
 					((ToolStripMenuItem)this.MenuChooseTable.DropDownItems[MenuChooseTable.DropDownItems.Count - 1]).CheckedChanged += new System.EventHandler(MenuChooseTable_CheckedChanged);
 				}
-
-				if (extensions.Length > 1)
-					MenuChooseTable.ShowDropDown();
-				else
-					MenuChooseTable.DropDownItems[0].PerformClick();
 			}
 			catch (Exception e)
 			{
 				MessageBox.Show(e.Data + "	" + e.InnerException + "	" + e.Message + "	" + e.Source + "	" + e.StackTrace + "	" + e.TargetSite);
+			}
+		}
+
+		private void FitsBinTableViewer_Shown(object sender, EventArgs e)
+		{
+			if (MenuChooseTable.DropDownItems.Count > 1)
+				MenuChooseTable.ShowDropDown();
+			else
+			{
+				MenuChooseTable.DropDownItems[0].PerformClick();
+				MenuChooseTable.HideDropDown();
 			}
 		}
 
@@ -322,13 +328,9 @@ namespace JPFITS
 				for (int i = 0; i < x.Length; i++)
 					x[i] = i;
 			else
-				for (int i = 0; i < x.Length; i++)
-					x[i] = Convert.ToDouble(FITSBINTABLE.GetTTypeEntryRow(XDrop.SelectedItem.ToString(), i));
+				x = (double[])FITSBINTABLE.GetTTYPEEntry(XDrop.SelectedItem.ToString(), out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 
-			double[] y = new double[FITSBINTABLE.Naxis2];
-			Array yy = FITSBINTABLE.GetTTYPEEntry(YDrop.SelectedItem.ToString(), out _, out _);
-			for (int i = 0; i < x.Length; i++)
-				y[i] = Convert.ToDouble(FITSBINTABLE.GetTTypeEntryRow(YDrop.SelectedItem.ToString(), i));
+			double[] y = (double[])FITSBINTABLE.GetTTYPEEntry(YDrop.SelectedItem.ToString(), out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 
 			Plotter plot = new Plotter();
 
@@ -364,7 +366,6 @@ namespace JPFITS
 
 		private void ViewHeaderMenu_Click(object sender, EventArgs e)
 		{
-
 			FITSHeaderViewer fhv = new FITSHeaderViewer(new FITSHeader(FITSBINTABLE.Header));
 			fhv.Show();
 		}
@@ -373,6 +374,6 @@ namespace JPFITS
 		{
 			if (YDrop.SelectedIndex != -1)
 				PlotMenuItem.Enabled = true;
-		}
+		}		
 	}
 }

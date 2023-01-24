@@ -13,7 +13,7 @@ namespace JPFITS
 	{
 		#region PRIVATE CLASS MEMBERS
 
-		private int BITPIX = 0, NAXIS = 0, NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
+		private int NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
 		private string[]? TTYPES;//names of each table entry
 		private string[]? TFORMS;//FITS name for the table entry precisions
 		private bool[]? TTYPEISCOMPLEX;//for tracking complex singles and doubles
@@ -899,8 +899,6 @@ namespace JPFITS
 		private void EATRAWBINTABLEHEADER(ArrayList header)
 		{
 			//reset
-			BITPIX = 0;
-			NAXIS = 0;
 			NAXIS1 = 0;
 			NAXIS2 = 0;
 			TFIELDS = 0;
@@ -916,18 +914,6 @@ namespace JPFITS
 				strheaderline = (string)header[i];
 				HEADER[i] = strheaderline;
 
-				if (BITPIX == 0)
-					if (strheaderline.Substring(0, 8).Trim().Equals("BITPIX"))
-					{
-						BITPIX = Convert.ToInt32(strheaderline.Substring(10, 20));
-						continue;
-					}
-				if (NAXIS == 0)
-					if (strheaderline.Substring(0, 8).Trim().Equals("NAXIS"))
-					{
-						NAXIS = Convert.ToInt32(strheaderline.Substring(10, 20));
-						continue;
-					}
 				if (NAXIS1 == 0)
 					if (strheaderline.Substring(0, 8).Trim().Equals("NAXIS1"))
 					{
@@ -1131,7 +1117,7 @@ namespace JPFITS
 				EXTRAKEYS[i] = new FITSHeaderKey((string)extras[i]);
 		}
 
-		private Array GETHEAPTTYPE(int ttypeIndex, out TypeCode entryTypeCode, out int[] entryNElements)
+		private Array GETHEAPTTYPE(int ttypeIndex, out TypeCode entryTypeCode, out int[] entryNElements, TTYPEReturn returnType)
 		{
 			entryTypeCode = HEAPTCODES[ttypeIndex];
 
@@ -1148,259 +1134,759 @@ namespace JPFITS
 			if (NAXIS2 >= Environment.ProcessorCount)
 				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
 			else
-				opts.MaxDegreeOfParallelism = 1;
+				opts.MaxDegreeOfParallelism = 1;			
 
-			switch (entryTypeCode)
+			if (returnType == TTYPEReturn.AsDouble)
 			{
-				case TypeCode.Double:
+				switch (entryTypeCode)
 				{
-					double[][] arrya = new double[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+					case TypeCode.Double:
 					{
-						double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] dbl = new byte[8];
-
-						for (int j = 0; j < row.Length; j++)
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
 						{
-							dbl[7] = HEAPDATA[pos];
-							dbl[6] = HEAPDATA[pos + 1];
-							dbl[5] = HEAPDATA[pos + 2];
-							dbl[4] = HEAPDATA[pos + 3];
-							dbl[3] = HEAPDATA[pos + 4];
-							dbl[2] = HEAPDATA[pos + 5];
-							dbl[1] = HEAPDATA[pos + 6];
-							dbl[0] = HEAPDATA[pos + 7];
-							row[j] = BitConverter.ToDouble(dbl, 0);
-							pos += 8;
-						}
-						arrya[i] = row;
-					});
-					return arrya;
-				}
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] dbl = new byte[8];
 
-				case TypeCode.Single:
-				{
-					float[][] arrya = new float[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+							for (int j = 0; j < row.Length; j++)
+							{
+								dbl[7] = HEAPDATA[pos];
+								dbl[6] = HEAPDATA[pos + 1];
+								dbl[5] = HEAPDATA[pos + 2];
+								dbl[4] = HEAPDATA[pos + 3];
+								dbl[3] = HEAPDATA[pos + 4];
+								dbl[2] = HEAPDATA[pos + 5];
+								dbl[1] = HEAPDATA[pos + 6];
+								dbl[0] = HEAPDATA[pos + 7];
+								row[j] = BitConverter.ToDouble(dbl, 0);
+								pos += 8;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Single:
 					{
-						float[] row = new float[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] sng = new byte[4];
-
-						for (int j = 0; j < row.Length; j++)
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
 						{
-							sng[3] = HEAPDATA[pos];
-							sng[2] = HEAPDATA[pos + 1];
-							sng[1] = HEAPDATA[pos + 2];
-							sng[0] = HEAPDATA[pos + 3];
-							row[j] = BitConverter.ToSingle(sng, 0);
-							pos += 4;
-						}
-						arrya[i] = row;
-					});
-					return arrya;
-				}
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] sng = new byte[4];
 
-				case (TypeCode.Int64):
-				{
-					long[][] arrya = new long[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+							for (int j = 0; j < row.Length; j++)
+							{
+								sng[3] = HEAPDATA[pos];
+								sng[2] = HEAPDATA[pos + 1];
+								sng[1] = HEAPDATA[pos + 2];
+								sng[0] = HEAPDATA[pos + 3];
+								row[j] = (double)BitConverter.ToSingle(sng, 0);
+								pos += 4;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case (TypeCode.Int64):
 					{
-						long[] row = new long[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] i64 = new byte[8];
-
-						for (int j = 0; j < row.Length; j++)
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
 						{
-							i64[7] = HEAPDATA[pos];
-							i64[6] = HEAPDATA[pos + 1];
-							i64[5] = HEAPDATA[pos + 2];
-							i64[4] = HEAPDATA[pos + 3];
-							i64[3] = HEAPDATA[pos + 4];
-							i64[2] = HEAPDATA[pos + 5];
-							i64[1] = HEAPDATA[pos + 6];
-							i64[0] = HEAPDATA[pos + 7];
-							row[j] = BitConverter.ToInt64(i64, 0);
-							pos += 8;
-						}
-						arrya[i] = row;
-					});
-					return arrya;
-				}
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] i64 = new byte[8];
 
-				case (TypeCode.UInt64):
-				{
-					ulong[][] arrya = new ulong[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+							for (int j = 0; j < row.Length; j++)
+							{
+								i64[7] = HEAPDATA[pos];
+								i64[6] = HEAPDATA[pos + 1];
+								i64[5] = HEAPDATA[pos + 2];
+								i64[4] = HEAPDATA[pos + 3];
+								i64[3] = HEAPDATA[pos + 4];
+								i64[2] = HEAPDATA[pos + 5];
+								i64[1] = HEAPDATA[pos + 6];
+								i64[0] = HEAPDATA[pos + 7];
+								row[j] = (double)BitConverter.ToInt64(i64, 0);
+								pos += 8;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case (TypeCode.UInt64):
 					{
-						ulong[] row = new ulong[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] ui64 = new byte[8];
-
-						for (int j = 0; j < row.Length; j++)
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
 						{
-							ui64[7] = HEAPDATA[pos];
-							ui64[6] = HEAPDATA[pos + 1];
-							ui64[5] = HEAPDATA[pos + 2];
-							ui64[4] = HEAPDATA[pos + 3];
-							ui64[3] = HEAPDATA[pos + 4];
-							ui64[2] = HEAPDATA[pos + 5];
-							ui64[1] = HEAPDATA[pos + 6];
-							ui64[0] = HEAPDATA[pos + 7];
-							row[j] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
-							pos += 8;
-						}
-						arrya[i] = row;
-					});
-					return arrya;
-				}
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] ui64 = new byte[8];
 
-				case TypeCode.Int32:
-				{
-					int[][] arrya = new int[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+							for (int j = 0; j < row.Length; j++)
+							{
+								ui64[7] = HEAPDATA[pos];
+								ui64[6] = HEAPDATA[pos + 1];
+								ui64[5] = HEAPDATA[pos + 2];
+								ui64[4] = HEAPDATA[pos + 3];
+								ui64[3] = HEAPDATA[pos + 4];
+								ui64[2] = HEAPDATA[pos + 5];
+								ui64[1] = HEAPDATA[pos + 6];
+								ui64[0] = HEAPDATA[pos + 7];
+								row[j] = (double)MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+								pos += 8;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Int32:
 					{
-						int[] row = new int[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] int32 = new byte[4];
-
-						for (int j = 0; j < row.Length; j++)
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
 						{
-							int32[3] = HEAPDATA[pos];
-							int32[2] = HEAPDATA[pos + 1];
-							int32[1] = HEAPDATA[pos + 2];
-							int32[0] = HEAPDATA[pos + 3];
-							row[j] = BitConverter.ToInt32(int32, 0);
-							pos += 4;
-						}
-						arrya[i] = row;
-					});
-					return arrya;
-				}
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] int32 = new byte[4];
 
-				case TypeCode.UInt32:
-				{
-					uint[][] arrya = new uint[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+							for (int j = 0; j < row.Length; j++)
+							{
+								int32[3] = HEAPDATA[pos];
+								int32[2] = HEAPDATA[pos + 1];
+								int32[1] = HEAPDATA[pos + 2];
+								int32[0] = HEAPDATA[pos + 3];
+								row[j] = (double)BitConverter.ToInt32(int32, 0);
+								pos += 4;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.UInt32:
 					{
-						uint[] row = new uint[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] uint32 = new byte[4];
-
-						for (int j = 0; j < row.Length; j++)
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
 						{
-							uint32[3] = HEAPDATA[pos];
-							uint32[2] = HEAPDATA[pos + 1];
-							uint32[1] = HEAPDATA[pos + 2];
-							uint32[0] = HEAPDATA[pos + 3];
-							row[j] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
-							pos += 4;
-						}
-						arrya[i] = row;
-					});
-					return arrya;
-				}
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] uint32 = new byte[4];
 
-				case TypeCode.Int16:
-				{
-					short[][] arrya = new short[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+							for (int j = 0; j < row.Length; j++)
+							{
+								uint32[3] = HEAPDATA[pos];
+								uint32[2] = HEAPDATA[pos + 1];
+								uint32[1] = HEAPDATA[pos + 2];
+								uint32[0] = HEAPDATA[pos + 3];
+								row[j] = (double)MapIntToUint(BitConverter.ToInt32(uint32, 0));
+								pos += 4;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Int16:
 					{
-						short[] row = new short[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] int16 = new byte[2];
-
-						for (int j = 0; j < row.Length; j++)
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
 						{
-							int16[1] = HEAPDATA[pos];
-							int16[0] = HEAPDATA[pos + 1];
-							row[j] = BitConverter.ToInt16(int16, 0);
-							pos += 2;
-						}
-						arrya[i] = row;
-					});
-					return arrya;
-				}
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] int16 = new byte[2];
 
-				case TypeCode.UInt16:
-				{
-					ushort[][] arrya = new ushort[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+							for (int j = 0; j < row.Length; j++)
+							{
+								int16[1] = HEAPDATA[pos];
+								int16[0] = HEAPDATA[pos + 1];
+								row[j] = (double)BitConverter.ToInt16(int16, 0);
+								pos += 2;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.UInt16:
 					{
-						ushort[] row = new ushort[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
-						byte[] uint16 = new byte[2];
-
-						for (int j = 0; j < row.Length; j++)
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
 						{
-							uint16[1] = HEAPDATA[pos];
-							uint16[0] = HEAPDATA[pos + 1];
-							row[j] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
-							pos += 2;
-						}
-						arrya[i] = row;
-					});
-					return arrya;
-				}
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] uint16 = new byte[2];
 
-				case TypeCode.SByte:
-				{
-					sbyte[][] arrya = new sbyte[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+							for (int j = 0; j < row.Length; j++)
+							{
+								uint16[1] = HEAPDATA[pos];
+								uint16[0] = HEAPDATA[pos + 1];
+								row[j] = (double)MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+								pos += 2;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.SByte:
 					{
-						sbyte[] row = new sbyte[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 
-						for (int j = 0; j < row.Length; j++)
-							row[j] = (sbyte)HEAPDATA[pos + j];
-						arrya[i] = row;
-					});
-					return arrya;
-				}
+							for (int j = 0; j < row.Length; j++)
+								row[j] = (double)(sbyte)HEAPDATA[pos + j];
+							arrya[i] = row;
+						});
+						return arrya;
+					}
 
-				case TypeCode.Byte:
-				{
-					byte[][] arrya = new byte[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+					case TypeCode.Byte:
 					{
-						byte[] row = new byte[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
 
-						for (int j = 0; j < row.Length; j++)
-							row[j] = (byte)HEAPDATA[pos + j];
-						arrya[i] = row;
-					});
-					return arrya;
-				}
+							for (int j = 0; j < row.Length; j++)
+								row[j] = (double)(byte)HEAPDATA[pos + j];
+							arrya[i] = row;
+						});
+						return arrya;
+					}
 
-				case TypeCode.Boolean:
-				{
-					bool[][] arrya = new bool[NAXIS2][];
-					Parallel.For(0, NAXIS2, opts, i =>
+					case TypeCode.Boolean:
 					{
-						bool[] row = new bool[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
-						int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+						throw new Exception("Cannot return Boolean as a double.");
+					}
 
-						for (int j = 0; j < row.Length; j++)
-							row[j] = Convert.ToBoolean(HEAPDATA[pos + j]);
-						arrya[i] = row;
-					});
-					return arrya;
-				}
-
-				case TypeCode.Char:
-				{
-					string[] arrya = new string[NAXIS2];
-					Parallel.For(0, NAXIS2, opts, i =>
+					case TypeCode.Char:
 					{
-						arrya[i] = System.Text.Encoding.ASCII.GetString(HEAPDATA, TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i], TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]);
-					});
-					return arrya;
-				}
+						throw new Exception("Cannot return Char as a double.");
+					}
 
-				default:
-					throw new Exception("Unrecognized TypeCode: '" + entryTypeCode.ToString() + "'");
+					default:
+						throw new Exception("Unrecognized TypeCode: '" + entryTypeCode.ToString() + "'");
+				}
+			}
+
+			else if (returnType == TTYPEReturn.AsString)
+			{
+				switch (entryTypeCode)
+				{
+					case TypeCode.Double:
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] dbl = new byte[8];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								dbl[7] = HEAPDATA[pos];
+								dbl[6] = HEAPDATA[pos + 1];
+								dbl[5] = HEAPDATA[pos + 2];
+								dbl[4] = HEAPDATA[pos + 3];
+								dbl[3] = HEAPDATA[pos + 4];
+								dbl[2] = HEAPDATA[pos + 5];
+								dbl[1] = HEAPDATA[pos + 6];
+								dbl[0] = HEAPDATA[pos + 7];
+								row[j] = BitConverter.ToDouble(dbl, 0).ToString();
+								pos += 8;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Single:
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] sng = new byte[4];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								sng[3] = HEAPDATA[pos];
+								sng[2] = HEAPDATA[pos + 1];
+								sng[1] = HEAPDATA[pos + 2];
+								sng[0] = HEAPDATA[pos + 3];
+								row[j] = BitConverter.ToSingle(sng, 0).ToString();
+								pos += 4;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case (TypeCode.Int64):
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] i64 = new byte[8];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								i64[7] = HEAPDATA[pos];
+								i64[6] = HEAPDATA[pos + 1];
+								i64[5] = HEAPDATA[pos + 2];
+								i64[4] = HEAPDATA[pos + 3];
+								i64[3] = HEAPDATA[pos + 4];
+								i64[2] = HEAPDATA[pos + 5];
+								i64[1] = HEAPDATA[pos + 6];
+								i64[0] = HEAPDATA[pos + 7];
+								row[j] = BitConverter.ToInt64(i64, 0).ToString();
+								pos += 8;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case (TypeCode.UInt64):
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] ui64 = new byte[8];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								ui64[7] = HEAPDATA[pos];
+								ui64[6] = HEAPDATA[pos + 1];
+								ui64[5] = HEAPDATA[pos + 2];
+								ui64[4] = HEAPDATA[pos + 3];
+								ui64[3] = HEAPDATA[pos + 4];
+								ui64[2] = HEAPDATA[pos + 5];
+								ui64[1] = HEAPDATA[pos + 6];
+								ui64[0] = HEAPDATA[pos + 7];
+								row[j] = MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
+								pos += 8;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Int32:
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] int32 = new byte[4];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								int32[3] = HEAPDATA[pos];
+								int32[2] = HEAPDATA[pos + 1];
+								int32[1] = HEAPDATA[pos + 2];
+								int32[0] = HEAPDATA[pos + 3];
+								row[j] = BitConverter.ToInt32(int32, 0).ToString();
+								pos += 4;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.UInt32:
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] uint32 = new byte[4];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								uint32[3] = HEAPDATA[pos];
+								uint32[2] = HEAPDATA[pos + 1];
+								uint32[1] = HEAPDATA[pos + 2];
+								uint32[0] = HEAPDATA[pos + 3];
+								row[j] = MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString();
+								pos += 4;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Int16:
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] int16 = new byte[2];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								int16[1] = HEAPDATA[pos];
+								int16[0] = HEAPDATA[pos + 1];
+								row[j] = BitConverter.ToInt16(int16, 0).ToString();
+								pos += 2;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.UInt16:
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] uint16 = new byte[2];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								uint16[1] = HEAPDATA[pos];
+								uint16[0] = HEAPDATA[pos + 1];
+								row[j] = MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
+								pos += 2;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.SByte:
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+
+							for (int j = 0; j < row.Length; j++)
+								row[j] = ((sbyte)HEAPDATA[pos + j]).ToString();
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Byte:
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+
+							for (int j = 0; j < row.Length; j++)
+								row[j] = ((byte)HEAPDATA[pos + j]).ToString();
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Boolean:
+					{
+						string[][] arrya = new string[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							string[] row = new string[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+
+							for (int j = 0; j < row.Length; j++)
+								row[j] = Convert.ToBoolean(HEAPDATA[pos + j]).ToString();
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Char:
+					{
+						string[] arrya = new string[NAXIS2];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							arrya[i] = System.Text.Encoding.ASCII.GetString(HEAPDATA, TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i], TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]);
+						});
+						return arrya;
+					}
+
+					default:
+						throw new Exception("Unrecognized TypeCode: '" + entryTypeCode.ToString() + "'");
+				}
+			}
+
+			else// returnType == TTYPEReturn.Default
+			{
+				switch (entryTypeCode)
+				{
+					case TypeCode.Double:
+					{
+						double[][] arrya = new double[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							double[] row = new double[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] dbl = new byte[8];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								dbl[7] = HEAPDATA[pos];
+								dbl[6] = HEAPDATA[pos + 1];
+								dbl[5] = HEAPDATA[pos + 2];
+								dbl[4] = HEAPDATA[pos + 3];
+								dbl[3] = HEAPDATA[pos + 4];
+								dbl[2] = HEAPDATA[pos + 5];
+								dbl[1] = HEAPDATA[pos + 6];
+								dbl[0] = HEAPDATA[pos + 7];
+								row[j] = BitConverter.ToDouble(dbl, 0);
+								pos += 8;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Single:
+					{
+						float[][] arrya = new float[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							float[] row = new float[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] sng = new byte[4];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								sng[3] = HEAPDATA[pos];
+								sng[2] = HEAPDATA[pos + 1];
+								sng[1] = HEAPDATA[pos + 2];
+								sng[0] = HEAPDATA[pos + 3];
+								row[j] = BitConverter.ToSingle(sng, 0);
+								pos += 4;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case (TypeCode.Int64):
+					{
+						long[][] arrya = new long[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							long[] row = new long[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] i64 = new byte[8];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								i64[7] = HEAPDATA[pos];
+								i64[6] = HEAPDATA[pos + 1];
+								i64[5] = HEAPDATA[pos + 2];
+								i64[4] = HEAPDATA[pos + 3];
+								i64[3] = HEAPDATA[pos + 4];
+								i64[2] = HEAPDATA[pos + 5];
+								i64[1] = HEAPDATA[pos + 6];
+								i64[0] = HEAPDATA[pos + 7];
+								row[j] = BitConverter.ToInt64(i64, 0);
+								pos += 8;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case (TypeCode.UInt64):
+					{
+						ulong[][] arrya = new ulong[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							ulong[] row = new ulong[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] ui64 = new byte[8];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								ui64[7] = HEAPDATA[pos];
+								ui64[6] = HEAPDATA[pos + 1];
+								ui64[5] = HEAPDATA[pos + 2];
+								ui64[4] = HEAPDATA[pos + 3];
+								ui64[3] = HEAPDATA[pos + 4];
+								ui64[2] = HEAPDATA[pos + 5];
+								ui64[1] = HEAPDATA[pos + 6];
+								ui64[0] = HEAPDATA[pos + 7];
+								row[j] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+								pos += 8;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Int32:
+					{
+						int[][] arrya = new int[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							int[] row = new int[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] int32 = new byte[4];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								int32[3] = HEAPDATA[pos];
+								int32[2] = HEAPDATA[pos + 1];
+								int32[1] = HEAPDATA[pos + 2];
+								int32[0] = HEAPDATA[pos + 3];
+								row[j] = BitConverter.ToInt32(int32, 0);
+								pos += 4;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.UInt32:
+					{
+						uint[][] arrya = new uint[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							uint[] row = new uint[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] uint32 = new byte[4];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								uint32[3] = HEAPDATA[pos];
+								uint32[2] = HEAPDATA[pos + 1];
+								uint32[1] = HEAPDATA[pos + 2];
+								uint32[0] = HEAPDATA[pos + 3];
+								row[j] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
+								pos += 4;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Int16:
+					{
+						short[][] arrya = new short[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							short[] row = new short[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] int16 = new byte[2];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								int16[1] = HEAPDATA[pos];
+								int16[0] = HEAPDATA[pos + 1];
+								row[j] = BitConverter.ToInt16(int16, 0);
+								pos += 2;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.UInt16:
+					{
+						ushort[][] arrya = new ushort[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							ushort[] row = new ushort[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+							byte[] uint16 = new byte[2];
+
+							for (int j = 0; j < row.Length; j++)
+							{
+								uint16[1] = HEAPDATA[pos];
+								uint16[0] = HEAPDATA[pos + 1];
+								row[j] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+								pos += 2;
+							}
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.SByte:
+					{
+						sbyte[][] arrya = new sbyte[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							sbyte[] row = new sbyte[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+
+							for (int j = 0; j < row.Length; j++)
+								row[j] = (sbyte)HEAPDATA[pos + j];
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Byte:
+					{
+						byte[][] arrya = new byte[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							byte[] row = new byte[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+
+							for (int j = 0; j < row.Length; j++)
+								row[j] = (byte)HEAPDATA[pos + j];
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Boolean:
+					{
+						bool[][] arrya = new bool[NAXIS2][];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							bool[] row = new bool[TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]];
+							int pos = (int)TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i];
+
+							for (int j = 0; j < row.Length; j++)
+								row[j] = Convert.ToBoolean(HEAPDATA[pos + j]);
+							arrya[i] = row;
+						});
+						return arrya;
+					}
+
+					case TypeCode.Char:
+					{
+						string[] arrya = new string[NAXIS2];
+						Parallel.For(0, NAXIS2, opts, i =>
+						{
+							arrya[i] = System.Text.Encoding.ASCII.GetString(HEAPDATA, TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, i], TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, i]);
+						});
+						return arrya;
+					}
+
+					default:
+						throw new Exception("Unrecognized TypeCode: '" + entryTypeCode.ToString() + "'");
+				}
 			}
 		}
 
@@ -1492,7 +1978,7 @@ namespace JPFITS
 			get { return TFIELDS; }
 		}
 
-		/// <summary>TableDataTypes reports the number of columns or repeats in each table entry. Variable repeat (heap data) entries only report 1...use GetTTYPERowRepeatsHeapEntry to get the number of repeats for a given row.</summary>
+		/// <summary>TableDataRepeats reports the number of columns or repeats in each table entry. Variable repeat (heap data) entries only report 1...use GetTTYPERowRepeatsHeapEntry to get the number of repeats for a given row.</summary>
 		public int[] TableDataRepeats
 		{
 			get { return TREPEATS; }
@@ -1603,7 +2089,28 @@ namespace JPFITS
 			return false;
 		}
 
-		/// <summary>Return a binary table entry as an Array object. Its type and rank are given to the user. If you just need a double precision array to work on, use the overload for that.</summary>
+		/// <summary>
+		/// Provides options for specifying the nature of the return Array
+		/// </summary>
+		public enum TTYPEReturn
+		{
+			/// <summary>
+			/// Returns the array in its native Type.
+			/// </summary>
+			Native,
+
+			/// <summary>
+			/// Returns the array as double-precision values. Will throw an error if the TTYPE is a Boolean or Char (for string) TypeCode.
+			/// </summary>
+			AsDouble,
+
+			/// <summary>
+			/// Returns the array values as strings.
+			/// </summary>
+			AsString
+		}
+
+		/// <summary>Return a binary table entry as an Array object. Its type and rank are given to the user. Includes options for specifying the precision of the return.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="entryTypeCode">The TypeCode of the underlying data in the TTYPE. NOTE: strings are TypeCode.Char.</param>
 		/// <param name="entryNElements">A vector to return the properties of the return Array:
@@ -1611,68 +2118,41 @@ namespace JPFITS
 		/// <br />If the return is a numeric 2D array, it contains the width of the array as the first element, and the height of the array (NASIXS2) as the second element.
 		/// <br />If the return is from the heap, therefore as a vector of vectors (numeric or string), therefore containing a variable number of elements on each row, then it is a vector containing the number of elements of the vector on each row.
 		/// <br />If the ttypeEntry has TDIM keywords for an n &gt;= 3 dimensional array, then it contains the TDIM values for each TDIMn keyword. It therefore should have at least 3 elements.</param>
-		public Array GetTTYPEEntry(string ttypeEntry, out TypeCode entryTypeCode, out int[] entryNElements)
+		/// <param name="returnType">Use this option to force a non-native return for the Array precision. For example, a user may want single or int values returned as all doubles, or all values returned as strings.</param>
+		public Array GetTTYPEEntry(string ttypeEntry, out TypeCode entryTypeCode, out int[] entryNElements, TTYPEReturn returnType = TTYPEReturn.Native)
 		{
-			int ttypeindex = -1;
-			for (int i = 0; i < TTYPES.Length; i++)
-				if (TTYPES[i] == ttypeEntry)
-				{
-					ttypeindex = i;
-					break;
-				}
+			int ttypeindex = GetTTYPEIndex(ttypeEntry);
 
-			if (ttypeindex == -1)
-				throw new Exception("Extension entry TTYPE label wasn't found: '" + ttypeEntry + "'");
-
-			if (TTYPEISHEAPARRAYDESC[ttypeindex])//get from heap
-				return GETHEAPTTYPE(ttypeindex, out entryTypeCode, out entryNElements);
-
-			entryTypeCode = TCODES[ttypeindex];
-
-			if (TDIMS[ttypeindex] != null)
-				entryNElements = TDIMS[ttypeindex];
-			else
-				if (TREPEATS[ttypeindex] == 1 || TCODES[ttypeindex] == TypeCode.Char)
-				entryNElements = new int[] { NAXIS2 };
-			else
-				entryNElements = new int[] { TREPEATS[ttypeindex], NAXIS2 };
-
-			int byteoffset = 0;
-			for (int i = 0; i < ttypeindex; i++)
-				byteoffset += TBYTES[i];
-
-			switch (TCODES[ttypeindex])
+			if (returnType == TTYPEReturn.AsDouble)
 			{
-				case TypeCode.Double:
+				if (TTYPEISHEAPARRAYDESC[ttypeindex])//get from heap
+					return GETHEAPTTYPE(ttypeindex, out entryTypeCode, out entryNElements, returnType);
+
+				entryTypeCode = TCODES[ttypeindex];
+
+				if (TDIMS[ttypeindex] != null)
+					entryNElements = TDIMS[ttypeindex];
+				else
+					if (TREPEATS[ttypeindex] == 1 || TCODES[ttypeindex] == TypeCode.Char)
+					entryNElements = new int[] { NAXIS2 };
+				else
+					entryNElements = new int[] { TREPEATS[ttypeindex], NAXIS2 };
+
+				int byteoffset = 0;
+				for (int i = 0; i < ttypeindex; i++)
+					byteoffset += TBYTES[i];
+
+				switch (TCODES[ttypeindex])
 				{
-					if (TREPEATS[ttypeindex] == 1)
+					case TypeCode.Double:
 					{
-						double[] vector = new double[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
+						if (TREPEATS[ttypeindex] == 1)
 						{
-							byte[] dbl = new byte[8];
-							int currentbyte = byteoffset + i * NAXIS1;
-							dbl[7] = BINTABLE[currentbyte];
-							dbl[6] = BINTABLE[currentbyte + 1];
-							dbl[5] = BINTABLE[currentbyte + 2];
-							dbl[4] = BINTABLE[currentbyte + 3];
-							dbl[3] = BINTABLE[currentbyte + 4];
-							dbl[2] = BINTABLE[currentbyte + 5];
-							dbl[1] = BINTABLE[currentbyte + 6];
-							dbl[0] = BINTABLE[currentbyte + 7];
-							vector[i] = BitConverter.ToDouble(dbl, 0);
-						});
-						return vector;
-					}
-					else
-					{
-						double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] dbl = new byte[8];
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
 							{
+								byte[] dbl = new byte[8];
+								int currentbyte = byteoffset + i * NAXIS1;
 								dbl[7] = BINTABLE[currentbyte];
 								dbl[6] = BINTABLE[currentbyte + 1];
 								dbl[5] = BINTABLE[currentbyte + 2];
@@ -1681,82 +2161,82 @@ namespace JPFITS
 								dbl[2] = BINTABLE[currentbyte + 5];
 								dbl[1] = BINTABLE[currentbyte + 6];
 								dbl[0] = BINTABLE[currentbyte + 7];
-								arrya[j, i] = BitConverter.ToDouble(dbl, 0);
-								currentbyte += 8;
-							}
-						});
-						return arrya;
+								vector[i] = BitConverter.ToDouble(dbl, 0);
+							});
+							return vector;
+						}
+						else
+						{
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] dbl = new byte[8];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									dbl[7] = BINTABLE[currentbyte];
+									dbl[6] = BINTABLE[currentbyte + 1];
+									dbl[5] = BINTABLE[currentbyte + 2];
+									dbl[4] = BINTABLE[currentbyte + 3];
+									dbl[3] = BINTABLE[currentbyte + 4];
+									dbl[2] = BINTABLE[currentbyte + 5];
+									dbl[1] = BINTABLE[currentbyte + 6];
+									dbl[0] = BINTABLE[currentbyte + 7];
+									arrya[j, i] = BitConverter.ToDouble(dbl, 0);
+									currentbyte += 8;
+								}
+							});
+							return arrya;
+						}
 					}
-				}
 
-				case TypeCode.Single:
-				{
-					if (TREPEATS[ttypeindex] == 1)
+					case TypeCode.Single:
 					{
-						float[] vector = new float[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
+						if (TREPEATS[ttypeindex] == 1)
 						{
-							byte[] sng = new byte[4];
-							int currentbyte = byteoffset + i * NAXIS1;
-							sng[3] = BINTABLE[currentbyte];
-							sng[2] = BINTABLE[currentbyte + 1];
-							sng[1] = BINTABLE[currentbyte + 2];
-							sng[0] = BINTABLE[currentbyte + 3];
-							vector[i] = BitConverter.ToSingle(sng, 0);
-						});
-						return vector;
-					}
-					else
-					{
-						float[,] arrya = new float[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] sng = new byte[4];
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
-							{ 
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] sng = new byte[4];
+								int currentbyte = byteoffset + i * NAXIS1;
 								sng[3] = BINTABLE[currentbyte];
 								sng[2] = BINTABLE[currentbyte + 1];
 								sng[1] = BINTABLE[currentbyte + 2];
 								sng[0] = BINTABLE[currentbyte + 3];
-								arrya[j, i] = BitConverter.ToSingle(sng, 0);
-								currentbyte += 4;
-							}
-						});
-						return arrya;
-					}
-				}
-
-				case (TypeCode.Int64):
-				{
-					if (TREPEATS[ttypeindex] == 1)
-					{
-						long[] vector = new long[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
+								vector[i] = (double)BitConverter.ToSingle(sng, 0);
+							});
+							return vector;
+						}
+						else
 						{
-							byte[] i64 = new byte[8];
-							int currentbyte = byteoffset + i * NAXIS1;
-							i64[7] = BINTABLE[currentbyte];
-							i64[6] = BINTABLE[currentbyte + 1];
-							i64[5] = BINTABLE[currentbyte + 2];
-							i64[4] = BINTABLE[currentbyte + 3];
-							i64[3] = BINTABLE[currentbyte + 4];
-							i64[2] = BINTABLE[currentbyte + 5];
-							i64[1] = BINTABLE[currentbyte + 6];
-							i64[0] = BINTABLE[currentbyte + 7];
-							vector[i] = BitConverter.ToInt64(i64, 0);
-						});
-						return vector;
-					}
-					else
-					{
-						long[,] arrya = new long[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] i64 = new byte[8];
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
 							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] sng = new byte[4];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									sng[3] = BINTABLE[currentbyte];
+									sng[2] = BINTABLE[currentbyte + 1];
+									sng[1] = BINTABLE[currentbyte + 2];
+									sng[0] = BINTABLE[currentbyte + 3];
+									arrya[j, i] = (double)BitConverter.ToSingle(sng, 0);
+									currentbyte += 4;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case (TypeCode.Int64):
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] i64 = new byte[8];
+								int currentbyte = byteoffset + i * NAXIS1;
 								i64[7] = BINTABLE[currentbyte];
 								i64[6] = BINTABLE[currentbyte + 1];
 								i64[5] = BINTABLE[currentbyte + 2];
@@ -1765,44 +2245,44 @@ namespace JPFITS
 								i64[2] = BINTABLE[currentbyte + 5];
 								i64[1] = BINTABLE[currentbyte + 6];
 								i64[0] = BINTABLE[currentbyte + 7];
-								arrya[j, i] = BitConverter.ToInt64(i64, 0);
-								currentbyte += 8;
-							}
-						});
-						return arrya;
-					}
-				}
-
-				case (TypeCode.UInt64):
-				{
-					if (TREPEATS[ttypeindex] == 1)
-					{
-						ulong[] vector = new ulong[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
+								vector[i] = (double)BitConverter.ToInt64(i64, 0);
+							});
+							return vector;
+						}
+						else
 						{
-							byte[] ui64 = new byte[8];
-							int currentbyte = byteoffset + i * NAXIS1;
-							ui64[7] = BINTABLE[currentbyte];
-							ui64[6] = BINTABLE[currentbyte + 1];
-							ui64[5] = BINTABLE[currentbyte + 2];
-							ui64[4] = BINTABLE[currentbyte + 3];
-							ui64[3] = BINTABLE[currentbyte + 4];
-							ui64[2] = BINTABLE[currentbyte + 5];
-							ui64[1] = BINTABLE[currentbyte + 6];
-							ui64[0] = BINTABLE[currentbyte + 7];
-							vector[i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
-						});
-						return vector;
-					}
-					else
-					{
-						ulong[,] arrya = new ulong[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] ui64 = new byte[8];
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
 							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] i64 = new byte[8];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									i64[7] = BINTABLE[currentbyte];
+									i64[6] = BINTABLE[currentbyte + 1];
+									i64[5] = BINTABLE[currentbyte + 2];
+									i64[4] = BINTABLE[currentbyte + 3];
+									i64[3] = BINTABLE[currentbyte + 4];
+									i64[2] = BINTABLE[currentbyte + 5];
+									i64[1] = BINTABLE[currentbyte + 6];
+									i64[0] = BINTABLE[currentbyte + 7];
+									arrya[j, i] = (double)BitConverter.ToInt64(i64, 0);
+									currentbyte += 8;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case (TypeCode.UInt64):
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] ui64 = new byte[8];
+								int currentbyte = byteoffset + i * NAXIS1;
 								ui64[7] = BINTABLE[currentbyte];
 								ui64[6] = BINTABLE[currentbyte + 1];
 								ui64[5] = BINTABLE[currentbyte + 2];
@@ -1811,295 +2291,1165 @@ namespace JPFITS
 								ui64[2] = BINTABLE[currentbyte + 5];
 								ui64[1] = BINTABLE[currentbyte + 6];
 								ui64[0] = BINTABLE[currentbyte + 7];
-								arrya[j, i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
-								currentbyte += 8;
-							}
-						});
-						return arrya;
-					}
-				}
-
-				case TypeCode.UInt32:
-				{
-					if (TREPEATS[ttypeindex] == 1)
-					{
-						uint[] vector = new uint[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
+								vector[i] = (double)MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+							});
+							return vector;
+						}
+						else
 						{
-							byte[] uint32 = new byte[4];
-							int currentbyte = byteoffset + i * NAXIS1;
-							uint32[3] = BINTABLE[currentbyte];
-							uint32[2] = BINTABLE[currentbyte + 1];
-							uint32[1] = BINTABLE[currentbyte + 2];
-							uint32[0] = BINTABLE[currentbyte + 3];
-							vector[i] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
-						});
-						return vector;
-					}
-					else
-					{
-						uint[,] arrya = new uint[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] uint32 = new byte[4];
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
 							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] ui64 = new byte[8];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									ui64[7] = BINTABLE[currentbyte];
+									ui64[6] = BINTABLE[currentbyte + 1];
+									ui64[5] = BINTABLE[currentbyte + 2];
+									ui64[4] = BINTABLE[currentbyte + 3];
+									ui64[3] = BINTABLE[currentbyte + 4];
+									ui64[2] = BINTABLE[currentbyte + 5];
+									ui64[1] = BINTABLE[currentbyte + 6];
+									ui64[0] = BINTABLE[currentbyte + 7];
+									arrya[j, i] = (double)MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+									currentbyte += 8;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.UInt32:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] uint32 = new byte[4];
+								int currentbyte = byteoffset + i * NAXIS1;
 								uint32[3] = BINTABLE[currentbyte];
 								uint32[2] = BINTABLE[currentbyte + 1];
 								uint32[1] = BINTABLE[currentbyte + 2];
 								uint32[0] = BINTABLE[currentbyte + 3];
-								arrya[j, i] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
-								currentbyte += 4;
-							}
-						});
-						return arrya;
-					}
-				}
-
-				case TypeCode.Int32:
-				{
-					if (TREPEATS[ttypeindex] == 1)
-					{
-						int[] vector = new int[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
+								vector[i] = (double)MapIntToUint(BitConverter.ToInt32(uint32, 0));
+							});
+							return vector;
+						}
+						else
 						{
-							byte[] int32 = new byte[4];
-							int currentbyte = byteoffset + i * NAXIS1;
-							int32[3] = BINTABLE[currentbyte];
-							int32[2] = BINTABLE[currentbyte + 1];
-							int32[1] = BINTABLE[currentbyte + 2];
-							int32[0] = BINTABLE[currentbyte + 3];
-							vector[i] = BitConverter.ToInt32(int32, 0);
-						});
-						return vector;
-					}
-					else
-					{
-						int[,] arrya = new int[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] int32 = new byte[4];
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
 							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] uint32 = new byte[4];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									uint32[3] = BINTABLE[currentbyte];
+									uint32[2] = BINTABLE[currentbyte + 1];
+									uint32[1] = BINTABLE[currentbyte + 2];
+									uint32[0] = BINTABLE[currentbyte + 3];
+									arrya[j, i] = (double)MapIntToUint(BitConverter.ToInt32(uint32, 0));
+									currentbyte += 4;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Int32:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] int32 = new byte[4];
+								int currentbyte = byteoffset + i * NAXIS1;
 								int32[3] = BINTABLE[currentbyte];
 								int32[2] = BINTABLE[currentbyte + 1];
 								int32[1] = BINTABLE[currentbyte + 2];
 								int32[0] = BINTABLE[currentbyte + 3];
-								arrya[j, i] = BitConverter.ToInt32(int32, 0);
-								currentbyte += 4;
-							}
-						});
-						return arrya;
-					}
-				}
-
-				case TypeCode.UInt16:
-				{
-					if (TREPEATS[ttypeindex] == 1)
-					{
-						ushort[] vector = new ushort[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
+								vector[i] = (double)BitConverter.ToInt32(int32, 0);
+							});
+							return vector;
+						}
+						else
 						{
-							byte[] uint16 = new byte[2];
-							int currentbyte = byteoffset + i * NAXIS1;
-							uint16[1] = BINTABLE[currentbyte];
-							uint16[0] = BINTABLE[currentbyte + 1];
-							vector[i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
-						});
-						return vector;
-					}
-					else
-					{
-						ushort[,] arrya = new ushort[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] uint16 = new byte[2];
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
 							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] int32 = new byte[4];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									int32[3] = BINTABLE[currentbyte];
+									int32[2] = BINTABLE[currentbyte + 1];
+									int32[1] = BINTABLE[currentbyte + 2];
+									int32[0] = BINTABLE[currentbyte + 3];
+									arrya[j, i] = (double)BitConverter.ToInt32(int32, 0);
+									currentbyte += 4;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.UInt16:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] uint16 = new byte[2];
+								int currentbyte = byteoffset + i * NAXIS1;
 								uint16[1] = BINTABLE[currentbyte];
 								uint16[0] = BINTABLE[currentbyte + 1];
-								arrya[j, i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
-								currentbyte += 2;
-							}
-						});
-						return arrya;
-					}
-				}
-
-				case TypeCode.Int16:
-				{
-					if (TREPEATS[ttypeindex] == 1)
-					{
-						short[] vector = new short[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
+								vector[i] = (double)MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+							});
+							return vector;
+						}
+						else
 						{
-							byte[] int16 = new byte[2];
-							int currentbyte = byteoffset + i * NAXIS1;
-							int16[1] = BINTABLE[currentbyte];
-							int16[0] = BINTABLE[currentbyte + 1];
-							vector[i] = BitConverter.ToInt16(int16, 0);
-						});
-						return vector;
-					}
-					else
-					{
-						short[,] arrya = new short[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							byte[] int16 = new byte[2];
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
 							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] uint16 = new byte[2];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									uint16[1] = BINTABLE[currentbyte];
+									uint16[0] = BINTABLE[currentbyte + 1];
+									arrya[j, i] = (double)MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+									currentbyte += 2;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Int16:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] int16 = new byte[2];
+								int currentbyte = byteoffset + i * NAXIS1;
 								int16[1] = BINTABLE[currentbyte];
 								int16[0] = BINTABLE[currentbyte + 1];
-								arrya[j, i] = BitConverter.ToInt16(int16, 0);
-								currentbyte += 2;
-							}
-						});
-						return arrya;
-					}
-				}
-
-				case TypeCode.Byte:
-				{
-					if (TREPEATS[ttypeindex] == 1)
-					{
-						byte[] vector = new byte[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							vector[i] = (byte)BINTABLE[currentbyte];
-						});
-						return vector;
-					}
-					else
-					{
-						byte[,] arrya = new byte[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
-							{
-								arrya[j, i] = (byte)BINTABLE[currentbyte];
-								currentbyte += 1;
-							}
-						});
-						return arrya;
-					}
-				}
-
-				case TypeCode.SByte:
-				{
-					if (TREPEATS[ttypeindex] == 1)
-					{
-						sbyte[] vector = new sbyte[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							vector[i] = (sbyte)(BINTABLE[currentbyte]);
-						});
-						return vector;
-					}
-					else
-					{
-						sbyte[,] arrya = new sbyte[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
-							{
-								arrya[j, i] = (sbyte)(BINTABLE[currentbyte]);
-								currentbyte += 1;
-							}
-						});
-						return arrya;
-					}
-				}
-
-				case TypeCode.Boolean:
-				{
-					if (TREPEATS[ttypeindex] == 1)
-					{
-						bool[] vector = new bool[NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							vector[i] = Convert.ToBoolean(BINTABLE[currentbyte]);
-						});
-						return vector;
-					}
-					else
-					{
-						bool[,] arrya = new bool[TREPEATS[ttypeindex], NAXIS2];
-						Parallel.For(0, NAXIS2, i =>
-						{
-							int currentbyte = byteoffset + i * NAXIS1;
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
-							{
-								arrya[j, i] = Convert.ToBoolean(BINTABLE[currentbyte]);
-								currentbyte += 1;
-							}
-						});
-						return arrya;
-					}
-				}
-
-				case TypeCode.Char:
-				{
-					string[] vector = new string[NAXIS2];
-					Parallel.For(0, NAXIS2, i =>
-					{
-						int currentbyte = byteoffset + i * NAXIS1;
-						byte[] charstr = new byte[TREPEATS[ttypeindex]];
-						for (int j = 0; j < TREPEATS[ttypeindex]; j++)
-						{
-							charstr[j] = BINTABLE[currentbyte];
-							currentbyte += 1;
+								vector[i] = (double)BitConverter.ToInt16(int16, 0);
+							});
+							return vector;
 						}
-						vector[i] = System.Text.Encoding.ASCII.GetString(charstr);
-					});
-					return vector;
-				}
+						else
+						{
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] int16 = new byte[2];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									int16[1] = BINTABLE[currentbyte];
+									int16[0] = BINTABLE[currentbyte + 1];
+									arrya[j, i] = (double)BitConverter.ToInt16(int16, 0);
+									currentbyte += 2;
+								}
+							});
+							return arrya;
+						}
+					}
 
-				default:
-					throw new Exception("Unrecognized TypeCode: '" + TCODES[ttypeindex].ToString() + "'");
+					case TypeCode.Byte:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								vector[i] = (double)(byte)BINTABLE[currentbyte];
+							});
+							return vector;
+						}
+						else
+						{
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									arrya[j, i] = (double)(byte)BINTABLE[currentbyte];
+									currentbyte += 1;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.SByte:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								vector[i] = (double)(sbyte)(BINTABLE[currentbyte]);
+							});
+							return vector;
+						}
+						else
+						{
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									arrya[j, i] = (double)(sbyte)(BINTABLE[currentbyte]);
+									currentbyte += 1;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Boolean:
+					{
+						throw new Exception("Cannot convert Boolean to double.");
+					}
+
+					case TypeCode.Char:
+					{
+						throw new Exception("Cannot convert Char to double.");
+					}
+
+					default:
+						throw new Exception("Unrecognized TypeCode: '" + TCODES[ttypeindex].ToString() + "'");
+				}
+			}
+
+			else if (returnType == TTYPEReturn.AsString)
+			{
+				if (TTYPEISHEAPARRAYDESC[ttypeindex])//get from heap
+					return GETHEAPTTYPE(ttypeindex, out entryTypeCode, out entryNElements, returnType);
+
+				entryTypeCode = TCODES[ttypeindex];
+
+				if (TDIMS[ttypeindex] != null)
+					entryNElements = TDIMS[ttypeindex];
+				else
+					if (TREPEATS[ttypeindex] == 1 || TCODES[ttypeindex] == TypeCode.Char)
+					entryNElements = new int[] { NAXIS2 };
+				else
+					entryNElements = new int[] { TREPEATS[ttypeindex], NAXIS2 };
+
+				int byteoffset = 0;
+				for (int i = 0; i < ttypeindex; i++)
+					byteoffset += TBYTES[i];
+
+				switch (TCODES[ttypeindex])
+				{
+					case TypeCode.Double:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] dbl = new byte[8];
+								int currentbyte = byteoffset + i * NAXIS1;
+								dbl[7] = BINTABLE[currentbyte];
+								dbl[6] = BINTABLE[currentbyte + 1];
+								dbl[5] = BINTABLE[currentbyte + 2];
+								dbl[4] = BINTABLE[currentbyte + 3];
+								dbl[3] = BINTABLE[currentbyte + 4];
+								dbl[2] = BINTABLE[currentbyte + 5];
+								dbl[1] = BINTABLE[currentbyte + 6];
+								dbl[0] = BINTABLE[currentbyte + 7];
+								vector[i] = BitConverter.ToDouble(dbl, 0).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] dbl = new byte[8];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									dbl[7] = BINTABLE[currentbyte];
+									dbl[6] = BINTABLE[currentbyte + 1];
+									dbl[5] = BINTABLE[currentbyte + 2];
+									dbl[4] = BINTABLE[currentbyte + 3];
+									dbl[3] = BINTABLE[currentbyte + 4];
+									dbl[2] = BINTABLE[currentbyte + 5];
+									dbl[1] = BINTABLE[currentbyte + 6];
+									dbl[0] = BINTABLE[currentbyte + 7];
+									arrya[j, i] = BitConverter.ToDouble(dbl, 0).ToString();
+									currentbyte += 8;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Single:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] sng = new byte[4];
+								int currentbyte = byteoffset + i * NAXIS1;
+								sng[3] = BINTABLE[currentbyte];
+								sng[2] = BINTABLE[currentbyte + 1];
+								sng[1] = BINTABLE[currentbyte + 2];
+								sng[0] = BINTABLE[currentbyte + 3];
+								vector[i] = BitConverter.ToSingle(sng, 0).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] sng = new byte[4];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									sng[3] = BINTABLE[currentbyte];
+									sng[2] = BINTABLE[currentbyte + 1];
+									sng[1] = BINTABLE[currentbyte + 2];
+									sng[0] = BINTABLE[currentbyte + 3];
+									arrya[j, i] = BitConverter.ToSingle(sng, 0).ToString();
+									currentbyte += 4;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case (TypeCode.Int64):
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] i64 = new byte[8];
+								int currentbyte = byteoffset + i * NAXIS1;
+								i64[7] = BINTABLE[currentbyte];
+								i64[6] = BINTABLE[currentbyte + 1];
+								i64[5] = BINTABLE[currentbyte + 2];
+								i64[4] = BINTABLE[currentbyte + 3];
+								i64[3] = BINTABLE[currentbyte + 4];
+								i64[2] = BINTABLE[currentbyte + 5];
+								i64[1] = BINTABLE[currentbyte + 6];
+								i64[0] = BINTABLE[currentbyte + 7];
+								vector[i] = BitConverter.ToInt64(i64, 0).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] i64 = new byte[8];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									i64[7] = BINTABLE[currentbyte];
+									i64[6] = BINTABLE[currentbyte + 1];
+									i64[5] = BINTABLE[currentbyte + 2];
+									i64[4] = BINTABLE[currentbyte + 3];
+									i64[3] = BINTABLE[currentbyte + 4];
+									i64[2] = BINTABLE[currentbyte + 5];
+									i64[1] = BINTABLE[currentbyte + 6];
+									i64[0] = BINTABLE[currentbyte + 7];
+									arrya[j, i] = BitConverter.ToInt64(i64, 0).ToString();
+									currentbyte += 8;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case (TypeCode.UInt64):
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] ui64 = new byte[8];
+								int currentbyte = byteoffset + i * NAXIS1;
+								ui64[7] = BINTABLE[currentbyte];
+								ui64[6] = BINTABLE[currentbyte + 1];
+								ui64[5] = BINTABLE[currentbyte + 2];
+								ui64[4] = BINTABLE[currentbyte + 3];
+								ui64[3] = BINTABLE[currentbyte + 4];
+								ui64[2] = BINTABLE[currentbyte + 5];
+								ui64[1] = BINTABLE[currentbyte + 6];
+								ui64[0] = BINTABLE[currentbyte + 7];
+								vector[i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] ui64 = new byte[8];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									ui64[7] = BINTABLE[currentbyte];
+									ui64[6] = BINTABLE[currentbyte + 1];
+									ui64[5] = BINTABLE[currentbyte + 2];
+									ui64[4] = BINTABLE[currentbyte + 3];
+									ui64[3] = BINTABLE[currentbyte + 4];
+									ui64[2] = BINTABLE[currentbyte + 5];
+									ui64[1] = BINTABLE[currentbyte + 6];
+									ui64[0] = BINTABLE[currentbyte + 7];
+									arrya[j, i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
+									currentbyte += 8;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.UInt32:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] uint32 = new byte[4];
+								int currentbyte = byteoffset + i * NAXIS1;
+								uint32[3] = BINTABLE[currentbyte];
+								uint32[2] = BINTABLE[currentbyte + 1];
+								uint32[1] = BINTABLE[currentbyte + 2];
+								uint32[0] = BINTABLE[currentbyte + 3];
+								vector[i] = MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] uint32 = new byte[4];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									uint32[3] = BINTABLE[currentbyte];
+									uint32[2] = BINTABLE[currentbyte + 1];
+									uint32[1] = BINTABLE[currentbyte + 2];
+									uint32[0] = BINTABLE[currentbyte + 3];
+									arrya[j, i] = MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString();
+									currentbyte += 4;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Int32:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] int32 = new byte[4];
+								int currentbyte = byteoffset + i * NAXIS1;
+								int32[3] = BINTABLE[currentbyte];
+								int32[2] = BINTABLE[currentbyte + 1];
+								int32[1] = BINTABLE[currentbyte + 2];
+								int32[0] = BINTABLE[currentbyte + 3];
+								vector[i] = BitConverter.ToInt32(int32, 0).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] int32 = new byte[4];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									int32[3] = BINTABLE[currentbyte];
+									int32[2] = BINTABLE[currentbyte + 1];
+									int32[1] = BINTABLE[currentbyte + 2];
+									int32[0] = BINTABLE[currentbyte + 3];
+									arrya[j, i] = BitConverter.ToInt32(int32, 0).ToString();
+									currentbyte += 4;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.UInt16:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] uint16 = new byte[2];
+								int currentbyte = byteoffset + i * NAXIS1;
+								uint16[1] = BINTABLE[currentbyte];
+								uint16[0] = BINTABLE[currentbyte + 1];
+								vector[i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] uint16 = new byte[2];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									uint16[1] = BINTABLE[currentbyte];
+									uint16[0] = BINTABLE[currentbyte + 1];
+									arrya[j, i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
+									currentbyte += 2;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Int16:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] int16 = new byte[2];
+								int currentbyte = byteoffset + i * NAXIS1;
+								int16[1] = BINTABLE[currentbyte];
+								int16[0] = BINTABLE[currentbyte + 1];
+								vector[i] = BitConverter.ToInt16(int16, 0).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] int16 = new byte[2];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									int16[1] = BINTABLE[currentbyte];
+									int16[0] = BINTABLE[currentbyte + 1];
+									arrya[j, i] = BitConverter.ToInt16(int16, 0).ToString();
+									currentbyte += 2;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Byte:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								vector[i] = ((byte)BINTABLE[currentbyte]).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									arrya[j, i] = ((byte)BINTABLE[currentbyte]).ToString();
+									currentbyte += 1;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.SByte:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								vector[i] = ((sbyte)(BINTABLE[currentbyte])).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									arrya[j, i] = ((sbyte)(BINTABLE[currentbyte])).ToString();
+									currentbyte += 1;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Boolean:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							string[] vector = new string[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								vector[i] = Convert.ToBoolean(BINTABLE[currentbyte]).ToString();
+							});
+							return vector;
+						}
+						else
+						{
+							string[,] arrya = new string[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									arrya[j, i] = Convert.ToBoolean(BINTABLE[currentbyte]).ToString();
+									currentbyte += 1;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Char:
+					{
+						string[] vector = new string[NAXIS2];
+						Parallel.For(0, NAXIS2, i =>
+						{
+							int currentbyte = byteoffset + i * NAXIS1;
+							byte[] charstr = new byte[TREPEATS[ttypeindex]];
+							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							{
+								charstr[j] = BINTABLE[currentbyte];
+								currentbyte += 1;
+							}
+							vector[i] = System.Text.Encoding.ASCII.GetString(charstr);
+						});
+						return vector;
+					}
+
+					default:
+						throw new Exception("Unrecognized TypeCode: '" + TCODES[ttypeindex].ToString() + "'");
+				}
+			}
+
+			else //returnType == TTYPEReturn.Default
+			{
+				if (TTYPEISHEAPARRAYDESC[ttypeindex])//get from heap
+					return GETHEAPTTYPE(ttypeindex, out entryTypeCode, out entryNElements, returnType);
+
+				entryTypeCode = TCODES[ttypeindex];
+
+				if (TDIMS[ttypeindex] != null)
+					entryNElements = TDIMS[ttypeindex];
+				else
+					if (TREPEATS[ttypeindex] == 1 || TCODES[ttypeindex] == TypeCode.Char)
+					entryNElements = new int[] { NAXIS2 };
+				else
+					entryNElements = new int[] { TREPEATS[ttypeindex], NAXIS2 };
+
+				int byteoffset = 0;
+				for (int i = 0; i < ttypeindex; i++)
+					byteoffset += TBYTES[i];
+
+				switch (TCODES[ttypeindex])
+				{
+					case TypeCode.Double:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							double[] vector = new double[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] dbl = new byte[8];
+								int currentbyte = byteoffset + i * NAXIS1;
+								dbl[7] = BINTABLE[currentbyte];
+								dbl[6] = BINTABLE[currentbyte + 1];
+								dbl[5] = BINTABLE[currentbyte + 2];
+								dbl[4] = BINTABLE[currentbyte + 3];
+								dbl[3] = BINTABLE[currentbyte + 4];
+								dbl[2] = BINTABLE[currentbyte + 5];
+								dbl[1] = BINTABLE[currentbyte + 6];
+								dbl[0] = BINTABLE[currentbyte + 7];
+								vector[i] = BitConverter.ToDouble(dbl, 0);
+							});
+							return vector;
+						}
+						else
+						{
+							double[,] arrya = new double[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] dbl = new byte[8];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									dbl[7] = BINTABLE[currentbyte];
+									dbl[6] = BINTABLE[currentbyte + 1];
+									dbl[5] = BINTABLE[currentbyte + 2];
+									dbl[4] = BINTABLE[currentbyte + 3];
+									dbl[3] = BINTABLE[currentbyte + 4];
+									dbl[2] = BINTABLE[currentbyte + 5];
+									dbl[1] = BINTABLE[currentbyte + 6];
+									dbl[0] = BINTABLE[currentbyte + 7];
+									arrya[j, i] = BitConverter.ToDouble(dbl, 0);
+									currentbyte += 8;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Single:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							float[] vector = new float[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] sng = new byte[4];
+								int currentbyte = byteoffset + i * NAXIS1;
+								sng[3] = BINTABLE[currentbyte];
+								sng[2] = BINTABLE[currentbyte + 1];
+								sng[1] = BINTABLE[currentbyte + 2];
+								sng[0] = BINTABLE[currentbyte + 3];
+								vector[i] = BitConverter.ToSingle(sng, 0);
+							});
+							return vector;
+						}
+						else
+						{
+							float[,] arrya = new float[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] sng = new byte[4];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									sng[3] = BINTABLE[currentbyte];
+									sng[2] = BINTABLE[currentbyte + 1];
+									sng[1] = BINTABLE[currentbyte + 2];
+									sng[0] = BINTABLE[currentbyte + 3];
+									arrya[j, i] = BitConverter.ToSingle(sng, 0);
+									currentbyte += 4;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case (TypeCode.Int64):
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							long[] vector = new long[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] i64 = new byte[8];
+								int currentbyte = byteoffset + i * NAXIS1;
+								i64[7] = BINTABLE[currentbyte];
+								i64[6] = BINTABLE[currentbyte + 1];
+								i64[5] = BINTABLE[currentbyte + 2];
+								i64[4] = BINTABLE[currentbyte + 3];
+								i64[3] = BINTABLE[currentbyte + 4];
+								i64[2] = BINTABLE[currentbyte + 5];
+								i64[1] = BINTABLE[currentbyte + 6];
+								i64[0] = BINTABLE[currentbyte + 7];
+								vector[i] = BitConverter.ToInt64(i64, 0);
+							});
+							return vector;
+						}
+						else
+						{
+							long[,] arrya = new long[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] i64 = new byte[8];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									i64[7] = BINTABLE[currentbyte];
+									i64[6] = BINTABLE[currentbyte + 1];
+									i64[5] = BINTABLE[currentbyte + 2];
+									i64[4] = BINTABLE[currentbyte + 3];
+									i64[3] = BINTABLE[currentbyte + 4];
+									i64[2] = BINTABLE[currentbyte + 5];
+									i64[1] = BINTABLE[currentbyte + 6];
+									i64[0] = BINTABLE[currentbyte + 7];
+									arrya[j, i] = BitConverter.ToInt64(i64, 0);
+									currentbyte += 8;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case (TypeCode.UInt64):
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							ulong[] vector = new ulong[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] ui64 = new byte[8];
+								int currentbyte = byteoffset + i * NAXIS1;
+								ui64[7] = BINTABLE[currentbyte];
+								ui64[6] = BINTABLE[currentbyte + 1];
+								ui64[5] = BINTABLE[currentbyte + 2];
+								ui64[4] = BINTABLE[currentbyte + 3];
+								ui64[3] = BINTABLE[currentbyte + 4];
+								ui64[2] = BINTABLE[currentbyte + 5];
+								ui64[1] = BINTABLE[currentbyte + 6];
+								ui64[0] = BINTABLE[currentbyte + 7];
+								vector[i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+							});
+							return vector;
+						}
+						else
+						{
+							ulong[,] arrya = new ulong[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] ui64 = new byte[8];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									ui64[7] = BINTABLE[currentbyte];
+									ui64[6] = BINTABLE[currentbyte + 1];
+									ui64[5] = BINTABLE[currentbyte + 2];
+									ui64[4] = BINTABLE[currentbyte + 3];
+									ui64[3] = BINTABLE[currentbyte + 4];
+									ui64[2] = BINTABLE[currentbyte + 5];
+									ui64[1] = BINTABLE[currentbyte + 6];
+									ui64[0] = BINTABLE[currentbyte + 7];
+									arrya[j, i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+									currentbyte += 8;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.UInt32:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							uint[] vector = new uint[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] uint32 = new byte[4];
+								int currentbyte = byteoffset + i * NAXIS1;
+								uint32[3] = BINTABLE[currentbyte];
+								uint32[2] = BINTABLE[currentbyte + 1];
+								uint32[1] = BINTABLE[currentbyte + 2];
+								uint32[0] = BINTABLE[currentbyte + 3];
+								vector[i] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
+							});
+							return vector;
+						}
+						else
+						{
+							uint[,] arrya = new uint[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] uint32 = new byte[4];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									uint32[3] = BINTABLE[currentbyte];
+									uint32[2] = BINTABLE[currentbyte + 1];
+									uint32[1] = BINTABLE[currentbyte + 2];
+									uint32[0] = BINTABLE[currentbyte + 3];
+									arrya[j, i] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
+									currentbyte += 4;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Int32:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							int[] vector = new int[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] int32 = new byte[4];
+								int currentbyte = byteoffset + i * NAXIS1;
+								int32[3] = BINTABLE[currentbyte];
+								int32[2] = BINTABLE[currentbyte + 1];
+								int32[1] = BINTABLE[currentbyte + 2];
+								int32[0] = BINTABLE[currentbyte + 3];
+								vector[i] = BitConverter.ToInt32(int32, 0);
+							});
+							return vector;
+						}
+						else
+						{
+							int[,] arrya = new int[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] int32 = new byte[4];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									int32[3] = BINTABLE[currentbyte];
+									int32[2] = BINTABLE[currentbyte + 1];
+									int32[1] = BINTABLE[currentbyte + 2];
+									int32[0] = BINTABLE[currentbyte + 3];
+									arrya[j, i] = BitConverter.ToInt32(int32, 0);
+									currentbyte += 4;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.UInt16:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							ushort[] vector = new ushort[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] uint16 = new byte[2];
+								int currentbyte = byteoffset + i * NAXIS1;
+								uint16[1] = BINTABLE[currentbyte];
+								uint16[0] = BINTABLE[currentbyte + 1];
+								vector[i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+							});
+							return vector;
+						}
+						else
+						{
+							ushort[,] arrya = new ushort[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] uint16 = new byte[2];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									uint16[1] = BINTABLE[currentbyte];
+									uint16[0] = BINTABLE[currentbyte + 1];
+									arrya[j, i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+									currentbyte += 2;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Int16:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							short[] vector = new short[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								byte[] int16 = new byte[2];
+								int currentbyte = byteoffset + i * NAXIS1;
+								int16[1] = BINTABLE[currentbyte];
+								int16[0] = BINTABLE[currentbyte + 1];
+								vector[i] = BitConverter.ToInt16(int16, 0);
+							});
+							return vector;
+						}
+						else
+						{
+							short[,] arrya = new short[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								byte[] int16 = new byte[2];
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									int16[1] = BINTABLE[currentbyte];
+									int16[0] = BINTABLE[currentbyte + 1];
+									arrya[j, i] = BitConverter.ToInt16(int16, 0);
+									currentbyte += 2;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Byte:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							byte[] vector = new byte[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								vector[i] = (byte)BINTABLE[currentbyte];
+							});
+							return vector;
+						}
+						else
+						{
+							byte[,] arrya = new byte[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									arrya[j, i] = (byte)BINTABLE[currentbyte];
+									currentbyte += 1;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.SByte:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							sbyte[] vector = new sbyte[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								vector[i] = (sbyte)(BINTABLE[currentbyte]);
+							});
+							return vector;
+						}
+						else
+						{
+							sbyte[,] arrya = new sbyte[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									arrya[j, i] = (sbyte)(BINTABLE[currentbyte]);
+									currentbyte += 1;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Boolean:
+					{
+						if (TREPEATS[ttypeindex] == 1)
+						{
+							bool[] vector = new bool[NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								vector[i] = Convert.ToBoolean(BINTABLE[currentbyte]);
+							});
+							return vector;
+						}
+						else
+						{
+							bool[,] arrya = new bool[TREPEATS[ttypeindex], NAXIS2];
+							Parallel.For(0, NAXIS2, i =>
+							{
+								int currentbyte = byteoffset + i * NAXIS1;
+								for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+								{
+									arrya[j, i] = Convert.ToBoolean(BINTABLE[currentbyte]);
+									currentbyte += 1;
+								}
+							});
+							return arrya;
+						}
+					}
+
+					case TypeCode.Char:
+					{
+						string[] vector = new string[NAXIS2];
+						Parallel.For(0, NAXIS2, i =>
+						{
+							int currentbyte = byteoffset + i * NAXIS1;
+							byte[] charstr = new byte[TREPEATS[ttypeindex]];
+							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							{
+								charstr[j] = BINTABLE[currentbyte];
+								currentbyte += 1;
+							}
+							vector[i] = System.Text.Encoding.ASCII.GetString(charstr);
+						});
+						return vector;
+					}
+
+					default:
+						throw new Exception("Unrecognized TypeCode: '" + TCODES[ttypeindex].ToString() + "'");
+				}
 			}
 		}
 
 		/// <summary>Use this to access individual elements of the table with a string return of the value. Useful for looking at TTYPEs with multiple elements on a row, or, for extracting values to convert to numeric quantities.</summary>
-		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		/// <param name="ttypeIndex">The index of the TTYPE value.</param>
 		/// <param name="rowindex">The row index of the column.</param>
-		public string GetTTypeEntryRow(string ttypeEntry, int rowindex)
+		public string GetTTypeEntryRow(int ttypeIndex, int rowindex)
 		{
-			int ttypeindex = -1;
-			for (int i = 0; i < TTYPES.Length; i++)
-				if (TTYPES[i] == ttypeEntry)
-				{
-					ttypeindex = i;
-					break;
-				}
-
-			if (ttypeindex == -1)
-				throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
-
-			if (!TTYPEISHEAPARRAYDESC[ttypeindex])
+			if (!TTYPEISHEAPARRAYDESC[ttypeIndex])
 			{
 				int objectArrayRank;
-				if (TREPEATS[ttypeindex] == 1)
+				if (TREPEATS[ttypeIndex] == 1)
 					objectArrayRank = 1;
 				else
 					objectArrayRank = 2;
 
 				int byteoffset = 0;
-				for (int i = 0; i < ttypeindex; i++)
+				for (int i = 0; i < ttypeIndex; i++)
 					byteoffset += TBYTES[i];
 				int currentbyte = byteoffset + rowindex * NAXIS1;
 				string str = "";
 
-				switch (TCODES[ttypeindex])
+				switch (TCODES[ttypeIndex])
 				{
 					case TypeCode.Double:
 					{
@@ -2118,7 +3468,7 @@ namespace JPFITS
 						}
 						else
 						{
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 8;
 								dbl[7] = BINTABLE[currentbyte];
@@ -2148,7 +3498,7 @@ namespace JPFITS
 						}
 						else
 						{
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 4;
 								sng[3] = BINTABLE[currentbyte];
@@ -2178,7 +3528,7 @@ namespace JPFITS
 						}
 						else
 						{
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 8;
 								i64[7] = BINTABLE[currentbyte];
@@ -2212,7 +3562,7 @@ namespace JPFITS
 						}
 						else
 						{
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 8;
 								ui64[7] = BINTABLE[currentbyte];
@@ -2242,7 +3592,7 @@ namespace JPFITS
 						}
 						else
 						{
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 4;
 								uint32[3] = BINTABLE[currentbyte];
@@ -2269,7 +3619,7 @@ namespace JPFITS
 						else
 						{
 
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 4;
 								int32[3] = BINTABLE[currentbyte];
@@ -2293,7 +3643,7 @@ namespace JPFITS
 						}
 						else
 						{
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 2;
 								uint16[1] = BINTABLE[currentbyte];
@@ -2316,7 +3666,7 @@ namespace JPFITS
 						}
 						else
 						{
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 2;
 								int16[1] = BINTABLE[currentbyte];
@@ -2336,7 +3686,7 @@ namespace JPFITS
 						}
 						else
 						{
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j;
 								byte ret = (byte)BINTABLE[currentbyte];
@@ -2352,7 +3702,7 @@ namespace JPFITS
 							return ((sbyte)(BINTABLE[currentbyte])).ToString();
 						else
 						{
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j;
 								str += ((sbyte)(BINTABLE[currentbyte])).ToString() + ", ";
@@ -2367,7 +3717,7 @@ namespace JPFITS
 							return Convert.ToBoolean(BINTABLE[currentbyte]).ToString();
 						else
 						{
-							for (int j = 0; j < TREPEATS[ttypeindex]; j++)
+							for (int j = 0; j < TREPEATS[ttypeIndex]; j++)
 							{
 								currentbyte = byteoffset + rowindex * NAXIS1 + j;
 								str += Convert.ToBoolean(BINTABLE[currentbyte]).ToString() + ", ";
@@ -2378,26 +3728,26 @@ namespace JPFITS
 
 					case TypeCode.Char:
 					{
-						return System.Text.Encoding.ASCII.GetString(BINTABLE, currentbyte, TREPEATS[ttypeindex]);
+						return System.Text.Encoding.ASCII.GetString(BINTABLE, currentbyte, TREPEATS[ttypeIndex]);
 					}
 
 					default:
 					{
-						throw new Exception("Unrecognized TypeCode: '" + TCODES[ttypeindex].ToString() + "'");
+						throw new Exception("Unrecognized TypeCode: '" + TCODES[ttypeIndex].ToString() + "'");
 					}
 				}
 			}
 			else
 			{
-				int currentbyte = TTYPEHEAPARRAYNELSPOS[ttypeindex][1, rowindex];
+				int currentbyte = TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, rowindex];
 				string str = "";
 
-				switch (HEAPTCODES[ttypeindex])
+				switch (HEAPTCODES[ttypeIndex])
 				{
 					case TypeCode.Double:
 					{
 						byte[] dbl = new byte[8];
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 						{
 							dbl[7] = HEAPDATA[currentbyte];
 							dbl[6] = HEAPDATA[currentbyte + 1];
@@ -2416,7 +3766,7 @@ namespace JPFITS
 					case TypeCode.Single:
 					{
 						byte[] sng = new byte[4];
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 						{
 							sng[3] = HEAPDATA[currentbyte];
 							sng[2] = HEAPDATA[currentbyte + 1];
@@ -2431,7 +3781,7 @@ namespace JPFITS
 					case (TypeCode.Int64):
 					{
 						byte[] i64 = new byte[8];
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 						{
 							i64[7] = HEAPDATA[currentbyte];
 							i64[6] = HEAPDATA[currentbyte + 1];
@@ -2450,7 +3800,7 @@ namespace JPFITS
 					case (TypeCode.UInt64):
 					{
 						byte[] ui64 = new byte[8];
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 						{
 							ui64[7] = HEAPDATA[currentbyte];
 							ui64[6] = HEAPDATA[currentbyte + 1];
@@ -2469,7 +3819,7 @@ namespace JPFITS
 					case TypeCode.Int32:
 					{
 						byte[] int32 = new byte[4];
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 						{
 							int32[3] = HEAPDATA[currentbyte];
 							int32[2] = HEAPDATA[currentbyte + 1];
@@ -2484,7 +3834,7 @@ namespace JPFITS
 					case TypeCode.UInt32:
 					{
 						byte[] uint32 = new byte[4];
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 						{
 							uint32[3] = HEAPDATA[currentbyte];
 							uint32[2] = HEAPDATA[currentbyte + 1];
@@ -2499,7 +3849,7 @@ namespace JPFITS
 					case TypeCode.Int16:
 					{
 						byte[] int16 = new byte[2];
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 						{
 							int16[1] = HEAPDATA[currentbyte];
 							int16[0] = HEAPDATA[currentbyte + 1];
@@ -2512,7 +3862,7 @@ namespace JPFITS
 					case TypeCode.UInt16:
 					{
 						byte[] uint16 = new byte[2];
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 						{
 							uint16[1] = HEAPDATA[currentbyte];
 							uint16[0] = HEAPDATA[currentbyte + 1];
@@ -2524,36 +3874,55 @@ namespace JPFITS
 
 					case TypeCode.SByte:
 					{
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 							str += ((sbyte)(HEAPDATA[currentbyte + j])).ToString() + ", ";
 						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.Byte:
 					{
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 							str += ((byte)HEAPDATA[currentbyte + j]).ToString() + ", ";
 						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.Boolean:
 					{
-						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]; j++)
+						for (int j = 0; j < TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]; j++)
 							str += Convert.ToBoolean(HEAPDATA[currentbyte + j]).ToString() + ", ";
 						return str.Substring(0, str.Length - 2);
 					}
 
 					case TypeCode.Char:
 					{
-						return System.Text.Encoding.ASCII.GetString(HEAPDATA, TTYPEHEAPARRAYNELSPOS[ttypeindex][1, rowindex], TTYPEHEAPARRAYNELSPOS[ttypeindex][0, rowindex]);
+						return System.Text.Encoding.ASCII.GetString(HEAPDATA, TTYPEHEAPARRAYNELSPOS[ttypeIndex][1, rowindex], TTYPEHEAPARRAYNELSPOS[ttypeIndex][0, rowindex]);
 					}
 
 					default:
 					{
-						throw new Exception("Unrecognized TypeCode: '" + HEAPTCODES[ttypeindex].ToString() + "'");
+						throw new Exception("Unrecognized TypeCode: '" + HEAPTCODES[ttypeIndex].ToString() + "'");
 					}
 				}
 			}
+		}
+
+		/// <summary>Use this to access individual elements of the table with a string return of the value. Useful for looking at TTYPEs with multiple elements on a row, or, for extracting values to convert to numeric quantities.</summary>
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		/// <param name="rowindex">The row index of the column.</param>
+		public string GetTTypeEntryRow(string ttypeEntry, int rowindex)
+		{
+			int ttypeindex = -1;
+			for (int i = 0; i < TTYPES.Length; i++)
+				if (TTYPES[i] == ttypeEntry)
+				{
+					ttypeindex = i;
+					break;
+				}
+
+			if (ttypeindex == -1)
+				throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
+
+			return GetTTypeEntryRow(ttypeindex, rowindex);
 		}
 
 		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements. Operates on heap-stored data where required.</summary>
@@ -2593,7 +3962,7 @@ namespace JPFITS
 				}
 				else
 				{
-					newEntryDataObjs[c] = this.GetTTYPEEntry(TTYPES[i], out TypeCode code, out int[] dimnelements);
+					newEntryDataObjs[c] = this.GetTTYPEEntry(TTYPES[i], out TypeCode code, out int[] dimnelements, TTYPEReturn.Native);
 					newTTYPES[c] = TTYPES[i];
 					newTFORMS[c] = TFORMS[i];
 					newTUNITS[c] = TUNITS[i];
@@ -2830,7 +4199,7 @@ namespace JPFITS
 				}
 				else
 				{
-					newEntryDataObjs[i] = this.GetTTYPEEntry(TTYPES[c], out TypeCode code, out int[] dimnelements);
+					newEntryDataObjs[i] = this.GetTTYPEEntry(TTYPES[c], out TypeCode code, out int[] dimnelements, TTYPEReturn.Native);
 					newTTYPES[i] = TTYPES[c];
 					newTFORMS[i] = TFORMS[c];
 					newTUNITS[i] = TUNITS[c];
@@ -2858,8 +4227,6 @@ namespace JPFITS
 			TTYPEHEAPARRAYNELSPOS = newTTYPEHEAPARRAYNELSPOS;
 
 			//either it was an add to a blank table, or a replacement, or an additional, so these either need set for the first time, or updated
-			BITPIX = 8;
-			NAXIS = 2;
 			NAXIS1 = 0;
 			for (int i = 0; i < TBYTES.Length; i++)
 				NAXIS1 += TBYTES[i];
@@ -2940,8 +4307,6 @@ namespace JPFITS
 			}
 
 			//new table, so these either need set for the first time, or updated
-			BITPIX = 8;
-			NAXIS = 2;
 			NAXIS1 = 0;
 			for (int i = 0; i < entryArrays.Length; i++)
 				NAXIS1 += TBYTES[i];

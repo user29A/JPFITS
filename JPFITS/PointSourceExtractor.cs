@@ -1718,24 +1718,24 @@ namespace JPFITS
 				//SOURCE_INDEX_MAP = new int[,](IMAGEWIDTH, IMAGEHEIGHT);
 			}
 			N_SRC = BinTablePSE.Naxis2;
-			CENTROIDS_X = (double[])BinTablePSE.GetTTYPEEntry("PSE X-Centroid", out _, out _);
-			CENTROIDS_Y = (double[])BinTablePSE.GetTTYPEEntry("PSE Y-Centroid", out _, out _);
-			CENTROIDS_AMPLITUDE = (double[])BinTablePSE.GetTTYPEEntry("PSE Amplitude", out _, out _);
-			CENTROIDS_VOLUME = (double[])BinTablePSE.GetTTYPEEntry("PSE Volume", out _, out _);
-			CENTROIDS_BGESTIMATE = (double[])BinTablePSE.GetTTYPEEntry("PSE Background", out _, out _);
+			CENTROIDS_X = (double[])BinTablePSE.GetTTYPEEntry("PSE X-Centroid", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			CENTROIDS_Y = (double[])BinTablePSE.GetTTYPEEntry("PSE Y-Centroid", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			CENTROIDS_AMPLITUDE = (double[])BinTablePSE.GetTTYPEEntry("PSE Amplitude", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			CENTROIDS_VOLUME = (double[])BinTablePSE.GetTTYPEEntry("PSE Volume", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			CENTROIDS_BGESTIMATE = (double[])BinTablePSE.GetTTYPEEntry("PSE Background", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 
 			CENTROID_POINTS = new JPMath.PointD[N_SRC];
 			for (int i = 0; i < N_SRC; i++)
 				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 
 			if (BinTablePSE.TTYPEEntryExists("PSE RA (deg)"))
-				CENTROIDS_RA_DEG = (double[])BinTablePSE.GetTTYPEEntry("PSE RA (deg)", out _, out _);
+				CENTROIDS_RA_DEG = (double[])BinTablePSE.GetTTYPEEntry("PSE RA (deg)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 			if (BinTablePSE.TTYPEEntryExists("PSE Dec (deg)"))
-				CENTROIDS_DEC_DEG = (double[])BinTablePSE.GetTTYPEEntry("PSE Dec (deg)", out _, out _);
+				CENTROIDS_DEC_DEG = (double[])BinTablePSE.GetTTYPEEntry("PSE Dec (deg)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 			if (BinTablePSE.TTYPEEntryExists("PSE RA (sxgsml)"))
-				CENTROIDS_RA_HMS = (string[])BinTablePSE.GetTTYPEEntry("PSE RA (sxgsml)", out _, out _);
+				CENTROIDS_RA_HMS = (string[])BinTablePSE.GetTTYPEEntry("PSE RA (sxgsml)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 			if (BinTablePSE.TTYPEEntryExists("PSE Dec (sxgsml)"))
-				CENTROIDS_DEC_DMS = (string[])BinTablePSE.GetTTYPEEntry("PSE Dec (sxgsml)", out _, out _);
+				CENTROIDS_DEC_DMS = (string[])BinTablePSE.GetTTYPEEntry("PSE Dec (sxgsml)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 		}
 
 		#endregion

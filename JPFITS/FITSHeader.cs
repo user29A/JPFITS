@@ -1,8 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Collections;
-using System.Linq;
-
 #nullable enable
 
 namespace JPFITS
@@ -240,22 +238,7 @@ namespace JPFITS
 				FORMATTEDHEADER[i] = "".PadLeft(80);
 
 			return FORMATTEDHEADER;
-		}
-
-		/// <summary>ValidKeyEdit returns whether the given key is an essential key and shouldn't be user-modified.</summary>
-		/// <param name="key">The name of the header key.</param>
-		public static bool ValidKeyEdit(string key, bool showMessageBox)
-		{
-			for (int i = 0; i < INVALIDEDITKEYS.Length; i++)
-				if (key.Contains(INVALIDEDITKEYS[i]))
-				{
-					if (showMessageBox)
-						System.Windows.Forms.MessageBox.Show("Selected key: '" + key + "' is restricted. Operation not allowed.", "Warning...");
-					return false;
-				}
-
-			return true;
-		}
+		}		
 
 		/// <summary>Returns all of the key names from the header.</summary>
 		public string[] GetAllKeyNames()
@@ -628,15 +611,31 @@ namespace JPFITS
 			}
 		}
 
+		private static string[] INVALIDEDITKEYS = { "SIMPLE", "EXTEND", "BITPIX", "NAXIS", "BZERO", "BSCALE", "END", "PCOUNT", "GCOUNT", "THEAP", "GROUPS", "XTENSION", "TFIELDS", "TUNIT", "TFORM", "TTYPE", "TZERO", "TSCAL" };
+
+		/// <summary>ValidKeyEdit returns whether the given key is an essential key and shouldn't be user-modified.</summary>
+		/// <param name="key">The name of the header key.</param>
+		public static bool ValidKeyEdit(string key, bool showMessageBox)
+		{
+			for (int i = 0; i < INVALIDEDITKEYS.Length; i++)
+				if (key.Contains(INVALIDEDITKEYS[i]))
+				{
+					if (showMessageBox)
+						System.Windows.Forms.MessageBox.Show("Selected key: '" + key + "' is restricted. Operation not allowed.", "Warning...");
+					return false;
+				}
+
+			return true;
+		}
+
 		#endregion
 
 		#region PRIVATE MEMBERS
 
-		private JPFITS.FITSHeaderKey[]? HEADERKEYS;
+		private FITSHeaderKey[]? HEADERKEYS;
 		private string[]? FORMATTEDHEADER;
 		private bool UPDATEDISPLAYHEADER = true;
-		private bool ISEXTENSION = false;
-		private static string[] INVALIDEDITKEYS = { "SIMPLE", "EXTEND", "BITPIX", "NAXIS", "BZERO", "BSCALE", "END", "PCOUNT", "GCOUNT", "THEAP", "GROUPS", "XTENSION", "TFIELDS", "TUNIT", "TFORM", "TTYPE", "TZERO", "TSCAL" };
+		private bool ISEXTENSION = false;		
 
 		/// <summary>
 		/// Make a header with essential keywords.

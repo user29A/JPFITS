@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using System.Threading;
 using System.ComponentModel;
-using System.Collections;
-using System.IO;
 using System.Windows.Forms;
 using System.Collections.Concurrent;
 #nullable enable
@@ -55,9 +52,9 @@ namespace JPFITS
 				BGWRKR.ReportProgress(0, "Reading the Catalogue FITS binary tables...");
 
 				FITSBinTable bt = new JPFITS.FITSBinTable(CAT_FILENAME, CAT_EXTNAME);
-				CAT_CVAL1s = (double[])(double[])bt.GetTTYPEEntry(CAT_CVAL1NAME, out _, out _);
-				CAT_CVAL2s = (double[])(double[])bt.GetTTYPEEntry(CAT_CVAL2NAME, out _, out _);
-				CAT_MAGs = (double[])(double[])bt.GetTTYPEEntry(CAT_MAGNAME, out _, out _);
+				CAT_CVAL1s = (double[])(double[])bt.GetTTYPEEntry(CAT_CVAL1NAME, out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+				CAT_CVAL2s = (double[])(double[])bt.GetTTYPEEntry(CAT_CVAL2NAME, out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+				CAT_MAGs = (double[])(double[])bt.GetTTYPEEntry(CAT_MAGNAME, out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 
 				//need to check mag for NaN's and re-form ra dec mag
 				BGWRKR.ReportProgress(0, "Formatting the Catalogue FITS binary tables...");

@@ -62,11 +62,12 @@
 			this.HeaderKeysListBox.Dock = System.Windows.Forms.DockStyle.Fill;
 			this.HeaderKeysListBox.Font = new System.Drawing.Font("Courier New", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
 			this.HeaderKeysListBox.FormattingEnabled = true;
-			this.HeaderKeysListBox.ItemHeight = 15;
-			this.HeaderKeysListBox.Location = new System.Drawing.Point(0, 24);
+			this.HeaderKeysListBox.ItemHeight = 20;
+			this.HeaderKeysListBox.Location = new System.Drawing.Point(0, 36);
+			this.HeaderKeysListBox.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
 			this.HeaderKeysListBox.Name = "HeaderKeysListBox";
 			this.HeaderKeysListBox.SelectionMode = System.Windows.Forms.SelectionMode.MultiExtended;
-			this.HeaderKeysListBox.Size = new System.Drawing.Size(613, 582);
+			this.HeaderKeysListBox.Size = new System.Drawing.Size(920, 896);
 			this.HeaderKeysListBox.TabIndex = 0;
 			this.HeaderKeysListBox.KeyDown += new System.Windows.Forms.KeyEventHandler(this.HeaderKeysListBox_KeyDown);
 			this.HeaderKeysListBox.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.HeaderKeysListBox_MouseDoubleClick);
@@ -84,47 +85,47 @@
             this.HeaderContextCopyValuesList,
             this.HeaderContextInsertKeys});
 			this.HeaderContextMenu.Name = "HeaderContextMenu";
-			this.HeaderContextMenu.Size = new System.Drawing.Size(279, 170);
+			this.HeaderContextMenu.Size = new System.Drawing.Size(393, 208);
 			this.HeaderContextMenu.Opening += new System.ComponentModel.CancelEventHandler(this.HeaderContextMenu_Opening);
 			// 
 			// toolStripSeparator2
 			// 
 			this.toolStripSeparator2.Name = "toolStripSeparator2";
-			this.toolStripSeparator2.Size = new System.Drawing.Size(275, 6);
+			this.toolStripSeparator2.Size = new System.Drawing.Size(389, 6);
 			// 
 			// HeaderContextApplyAll
 			// 
 			this.HeaderContextApplyAll.CheckOnClick = true;
 			this.HeaderContextApplyAll.Name = "HeaderContextApplyAll";
-			this.HeaderContextApplyAll.Size = new System.Drawing.Size(278, 22);
+			this.HeaderContextApplyAll.Size = new System.Drawing.Size(392, 32);
 			this.HeaderContextApplyAll.Text = "Apply to All Headers";
 			this.HeaderContextApplyAll.Click += new System.EventHandler(this.HeaderContextApplyAll_Click);
 			// 
 			// HeaderContextAddKey
 			// 
 			this.HeaderContextAddKey.Name = "HeaderContextAddKey";
-			this.HeaderContextAddKey.Size = new System.Drawing.Size(278, 22);
+			this.HeaderContextAddKey.Size = new System.Drawing.Size(392, 32);
 			this.HeaderContextAddKey.Text = "Add New Key";
 			this.HeaderContextAddKey.Click += new System.EventHandler(this.HeaderContextAddKey_Click);
 			// 
 			// HeaderContextEditKey
 			// 
 			this.HeaderContextEditKey.Name = "HeaderContextEditKey";
-			this.HeaderContextEditKey.Size = new System.Drawing.Size(278, 22);
+			this.HeaderContextEditKey.Size = new System.Drawing.Size(392, 32);
 			this.HeaderContextEditKey.Text = "Edit Selected Key";
 			this.HeaderContextEditKey.Click += new System.EventHandler(this.HeaderContextEditKey_Click);
 			// 
 			// HeaderContextRemoveKeys
 			// 
 			this.HeaderContextRemoveKeys.Name = "HeaderContextRemoveKeys";
-			this.HeaderContextRemoveKeys.Size = new System.Drawing.Size(278, 22);
+			this.HeaderContextRemoveKeys.Size = new System.Drawing.Size(392, 32);
 			this.HeaderContextRemoveKeys.Text = "Remove Selected Key(s)";
 			this.HeaderContextRemoveKeys.Click += new System.EventHandler(this.HeaderContextRemoveKeys_Click);
 			// 
 			// toolStripSeparator1
 			// 
 			this.toolStripSeparator1.Name = "toolStripSeparator1";
-			this.toolStripSeparator1.Size = new System.Drawing.Size(275, 6);
+			this.toolStripSeparator1.Size = new System.Drawing.Size(389, 6);
 			// 
 			// HeaderContextCopyValuesList
 			// 
@@ -132,7 +133,7 @@
 			this.HeaderContextCopyValuesList.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.CopyIncludeKeyNameHeaderChck});
 			this.HeaderContextCopyValuesList.Name = "HeaderContextCopyValuesList";
-			this.HeaderContextCopyValuesList.Size = new System.Drawing.Size(278, 22);
+			this.HeaderContextCopyValuesList.Size = new System.Drawing.Size(392, 32);
 			this.HeaderContextCopyValuesList.Text = "Copy Selected Key Value(s) to List";
 			this.HeaderContextCopyValuesList.DoubleClick += new System.EventHandler(this.HeaderContextCopyValuesList_DoubleClick);
 			// 
@@ -140,7 +141,7 @@
 			// 
 			this.CopyIncludeKeyNameHeaderChck.CheckOnClick = true;
 			this.CopyIncludeKeyNameHeaderChck.Name = "CopyIncludeKeyNameHeaderChck";
-			this.CopyIncludeKeyNameHeaderChck.Size = new System.Drawing.Size(224, 22);
+			this.CopyIncludeKeyNameHeaderChck.Size = new System.Drawing.Size(336, 34);
 			this.CopyIncludeKeyNameHeaderChck.Text = "Include Key Name Header(s)";
 			this.CopyIncludeKeyNameHeaderChck.Click += new System.EventHandler(this.CopyIncludeKeyNameHeaderChck_Click);
 			// 
@@ -150,27 +151,28 @@
 			this.HeaderContextInsertKeys.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.InsertOverwriteChck});
 			this.HeaderContextInsertKeys.Name = "HeaderContextInsertKeys";
-			this.HeaderContextInsertKeys.Size = new System.Drawing.Size(278, 22);
+			this.HeaderContextInsertKeys.Size = new System.Drawing.Size(392, 32);
 			this.HeaderContextInsertKeys.Text = "Insert Selected Key(s) to Other Headers";
 			this.HeaderContextInsertKeys.DoubleClick += new System.EventHandler(this.HeaderContextInsertKeys_DoubleClick);
 			// 
 			// InsertOverwriteChck
 			// 
 			this.InsertOverwriteChck.Name = "InsertOverwriteChck";
-			this.InsertOverwriteChck.Size = new System.Drawing.Size(227, 22);
+			this.InsertOverwriteChck.Size = new System.Drawing.Size(343, 34);
 			this.InsertOverwriteChck.Text = "Overwrite Existing Key Values";
 			this.InsertOverwriteChck.Click += new System.EventHandler(this.InsertOverwriteChck_Click);
 			// 
 			// MenuStrip
 			// 
+			this.MenuStrip.GripMargin = new System.Windows.Forms.Padding(2, 2, 0, 2);
 			this.MenuStrip.ImageScalingSize = new System.Drawing.Size(24, 24);
 			this.MenuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.FileMenuItem,
             this.EditMenuItem});
 			this.MenuStrip.Location = new System.Drawing.Point(0, 0);
 			this.MenuStrip.Name = "MenuStrip";
-			this.MenuStrip.Padding = new System.Windows.Forms.Padding(4, 1, 0, 1);
-			this.MenuStrip.Size = new System.Drawing.Size(613, 24);
+			this.MenuStrip.Padding = new System.Windows.Forms.Padding(6, 2, 0, 2);
+			this.MenuStrip.Size = new System.Drawing.Size(920, 36);
 			this.MenuStrip.TabIndex = 1;
 			this.MenuStrip.Text = "menuStrip1";
 			// 
@@ -180,14 +182,14 @@
             this.FileSaveCloseMenuItem,
             this.discardCloseToolStripMenuItem});
 			this.FileMenuItem.Name = "FileMenuItem";
-			this.FileMenuItem.Size = new System.Drawing.Size(38, 22);
+			this.FileMenuItem.Size = new System.Drawing.Size(55, 29);
 			this.FileMenuItem.Text = "Exit";
 			// 
 			// FileSaveCloseMenuItem
 			// 
 			this.FileSaveCloseMenuItem.Name = "FileSaveCloseMenuItem";
 			this.FileSaveCloseMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.S)));
-			this.FileSaveCloseMenuItem.Size = new System.Drawing.Size(199, 22);
+			this.FileSaveCloseMenuItem.Size = new System.Drawing.Size(302, 34);
 			this.FileSaveCloseMenuItem.Text = "Save && Close";
 			this.FileSaveCloseMenuItem.Click += new System.EventHandler(this.FileSaveCloseMenuItem_Click);
 			// 
@@ -195,7 +197,7 @@
 			// 
 			this.discardCloseToolStripMenuItem.Name = "discardCloseToolStripMenuItem";
 			this.discardCloseToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.X)));
-			this.discardCloseToolStripMenuItem.Size = new System.Drawing.Size(199, 22);
+			this.discardCloseToolStripMenuItem.Size = new System.Drawing.Size(302, 34);
 			this.discardCloseToolStripMenuItem.Text = "Discard && Close";
 			this.discardCloseToolStripMenuItem.Click += new System.EventHandler(this.discardCloseToolStripMenuItem_Click);
 			// 
@@ -205,13 +207,13 @@
             this.EditCopyfromFileBtn,
             this.EditClearMenu});
 			this.EditMenuItem.Name = "EditMenuItem";
-			this.EditMenuItem.Size = new System.Drawing.Size(39, 22);
+			this.EditMenuItem.Size = new System.Drawing.Size(58, 29);
 			this.EditMenuItem.Text = "Edit";
 			// 
 			// EditCopyfromFileBtn
 			// 
 			this.EditCopyfromFileBtn.Name = "EditCopyfromFileBtn";
-			this.EditCopyfromFileBtn.Size = new System.Drawing.Size(152, 22);
+			this.EditCopyfromFileBtn.Size = new System.Drawing.Size(231, 34);
 			this.EditCopyfromFileBtn.Text = "Copy from File";
 			this.EditCopyfromFileBtn.Click += new System.EventHandler(this.EditCopyfromFileBtn_Click);
 			// 
@@ -220,58 +222,59 @@
 			this.EditClearMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.EditClearBtn});
 			this.EditClearMenu.Name = "EditClearMenu";
-			this.EditClearMenu.Size = new System.Drawing.Size(152, 22);
+			this.EditClearMenu.Size = new System.Drawing.Size(231, 34);
 			this.EditClearMenu.Text = "Clear";
 			// 
 			// EditClearBtn
 			// 
 			this.EditClearBtn.Name = "EditClearBtn";
-			this.EditClearBtn.Size = new System.Drawing.Size(101, 22);
+			this.EditClearBtn.Size = new System.Drawing.Size(153, 34);
 			this.EditClearBtn.Text = "Clear";
 			this.EditClearBtn.Click += new System.EventHandler(this.EditClearBtn_Click);
 			// 
 			// CancelBtn
 			// 
 			this.CancelBtn.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-			this.CancelBtn.Location = new System.Drawing.Point(219, 246);
-			this.CancelBtn.Margin = new System.Windows.Forms.Padding(2);
+			this.CancelBtn.Location = new System.Drawing.Point(328, 378);
 			this.CancelBtn.Name = "CancelBtn";
-			this.CancelBtn.Size = new System.Drawing.Size(61, 31);
+			this.CancelBtn.Size = new System.Drawing.Size(92, 48);
 			this.CancelBtn.TabIndex = 2;
 			this.CancelBtn.Text = "cancel button";
 			this.CancelBtn.UseVisualStyleBackColor = true;
+			this.CancelBtn.Click += new System.EventHandler(this.CancelBtn_Click);
 			// 
 			// OKbtn
 			// 
 			this.OKbtn.DialogResult = System.Windows.Forms.DialogResult.OK;
-			this.OKbtn.Location = new System.Drawing.Point(219, 303);
-			this.OKbtn.Margin = new System.Windows.Forms.Padding(2);
+			this.OKbtn.Location = new System.Drawing.Point(328, 466);
 			this.OKbtn.Name = "OKbtn";
-			this.OKbtn.Size = new System.Drawing.Size(61, 31);
+			this.OKbtn.Size = new System.Drawing.Size(92, 48);
 			this.OKbtn.TabIndex = 3;
 			this.OKbtn.Text = "OK save button";
 			this.OKbtn.UseVisualStyleBackColor = true;
 			// 
 			// FITSHeaderViewer
 			// 
-			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+			this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.CancelButton = this.CancelBtn;
-			this.ClientSize = new System.Drawing.Size(613, 606);
+			this.ClientSize = new System.Drawing.Size(920, 932);
 			this.Controls.Add(this.HeaderKeysListBox);
 			this.Controls.Add(this.MenuStrip);
 			this.Controls.Add(this.OKbtn);
 			this.Controls.Add(this.CancelBtn);
 			this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.SizableToolWindow;
 			this.MainMenuStrip = this.MenuStrip;
+			this.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
 			this.MaximizeBox = false;
 			this.MinimizeBox = false;
-			this.MinimumSize = new System.Drawing.Size(627, 639);
+			this.MinimumSize = new System.Drawing.Size(930, 953);
 			this.Name = "FITSHeaderViewer";
 			this.ShowIcon = false;
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			this.Text = "Header";
 			this.TopMost = true;
+			this.Shown += new System.EventHandler(this.FITSHeaderViewer_Shown);
 			this.HeaderContextMenu.ResumeLayout(false);
 			this.MenuStrip.ResumeLayout(false);
 			this.MenuStrip.PerformLayout();

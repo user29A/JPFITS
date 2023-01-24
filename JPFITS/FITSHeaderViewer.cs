@@ -199,9 +199,9 @@ namespace JPFITS
 			}
 			else
 				if (hkd.HeaderLine.IsCommentKey)
-				IMAGESET[IMAGESETHEADERINDEX].Header.AddCommentKeyLine(hkd.HeaderLine.Comment, -1);
-			else
-				IMAGESET[IMAGESETHEADERINDEX].Header.AddKey(hkd.HeaderLine.Name, hkd.HeaderLine.Value, hkd.HeaderLine.Comment, -1);
+					IMAGESET[IMAGESETHEADERINDEX].Header.AddCommentKeyLine(hkd.HeaderLine.Comment, -1);
+				else
+					IMAGESET[IMAGESETHEADERINDEX].Header.AddKey(hkd.HeaderLine.Name, hkd.HeaderLine.Value, hkd.HeaderLine.Comment, -1);
 
 			this.Header = IMAGESET[IMAGESETHEADERINDEX].Header;
 		}
@@ -275,40 +275,43 @@ namespace JPFITS
 
 		private void HeaderKeysListBox_KeyDown(System.Object sender, System.Windows.Forms.KeyEventArgs e)
 		{
-			//if (e.KeyCode == Keys.Delete)
-			//{
-			//	if (HeaderKeysListBox.SelectedIndices.Count == 0)
-			//		return;
+			if (e.KeyCode == Keys.Delete)
+			{
+				if (HeaderKeysListBox.SelectedIndices.Count == 0)
+					return;
 
-			//	DialogResult res = DialogResult.No;
-			//	if (IMAGESET.Count > 1)
-			//		res = MessageBox.Show("Delete selected key(s) from all headers (YES), or only current header (NO)?", "Warning...", MessageBoxButtons.YesNoCancel);
-				
-			//	if (res == DialogResult.Cancel)
-			//		return;
-			//	else if (res == DialogResult.Yes)
-			//		HeaderContextApplyAll.Checked = true;
-			//	else
-			//		HeaderContextApplyAll.Checked = false;
+				if (MessageBox.Show("Are you sure you wish to delete these keys?", "Warning...", MessageBoxButtons.OKCancel) == DialogResult.Cancel) 
+					return;
 
-			//	HeaderContextRemoveKeys.PerformClick();
-			//	return;
-			//}
+				DialogResult res = DialogResult.No;
+				if (IMAGESET.Count > 1)
+					res = MessageBox.Show("Delete selected key(s) from all headers (YES), or only current header (NO)?", "Warning...", MessageBoxButtons.YesNoCancel);
 
-			//if (e.Control && e.KeyCode == Keys.C)//copy
-			//{
-			//	if (HeaderKeysListBox.SelectedIndices.Count == 0)
-			//		return;
+				if (res == DialogResult.Cancel)
+					return;
+				else if (res == DialogResult.Yes)
+					HeaderContextApplyAll.Checked = true;
+				else
+					HeaderContextApplyAll.Checked = false;
 
-			//	String copy = "";
-			//	for (int i = 0; i < HeaderKeysListBox.SelectedIndices.Count; i++)
-			//		copy += HEADER[(int)HeaderKeysListBox.SelectedIndices[i]].GetFullyFomattedFITSLine() + Environment.NewLine;
+				HeaderContextRemoveKeys.PerformClick();
+				return;
+			}
 
-			//	if (copy.Length > 0)
-			//		Clipboard.SetText(copy);
+			if (e.Control && e.KeyCode == Keys.C)//copy
+			{
+				if (HeaderKeysListBox.SelectedIndices.Count == 0)
+					return;
 
-			//	return;
-			//}
+				String copy = "";
+				for (int i = 0; i < HeaderKeysListBox.SelectedIndices.Count; i++)
+					copy += HEADER[(int)HeaderKeysListBox.SelectedIndices[i]].GetFullyFomattedFITSLine() + Environment.NewLine;
+
+				if (copy.Length > 0)
+					Clipboard.SetText(copy);
+
+				return;
+			}
 
 			//if (e.Control && e.KeyCode == Keys.V)//paste
 			//{
@@ -319,14 +322,17 @@ namespace JPFITS
 			//	if (!JPMath.IsInteger((double)(paste.Length) / 80))
 			//		return;
 
-			//	int index = HeaderKeysListBox.SelectedIndices[HeaderKeysListBox.SelectedIndices.Count - 1];
-			//	FITSHeaderKey key;
 			//	int nlines = paste.Length / 80;
 			//	for (int i = 0; i < nlines; i++)
 			//	{
-			//		key = new FITSHeaderKey(paste.Substring(i * 80, 80));
-			//		HEADER.AddKey(key, index + 1 + i);
+			//		FITSHeaderKey key = new FITSHeaderKey(paste.Substring(i * 80, 80));
+			//		HEADER.AddKey(key, -1);
 			//	}
+
+			//	HeaderKeysListBox.SuspendLayout();
+			//	HeaderKeysListBox.Items.Clear();
+			//	HeaderKeysListBox.Items.AddRange(HEADER.GetFormattedHeaderBlock(FITSHeader.HeaderUnitType.Primary, true));
+			//	HeaderKeysListBox.ResumeLayout();
 			//}
 		}
 
@@ -351,7 +357,17 @@ namespace JPFITS
 			if (MessageBox.Show("Are you really sure that you want to clear this header of all values?", "WARNING!", MessageBoxButtons.OKCancel) == DialogResult.Cancel)
 				return;
 
-			this.Header = new FITSHeader(true, null);
+			this.Header = new FITSHeader(true, IMAGESET[IMAGESETHEADERINDEX].Image);
+		}
+
+		private void FITSHeaderViewer_Shown(object sender, EventArgs e)
+		{
+
+		}
+
+		private void CancelBtn_Click(object sender, EventArgs e)
+		{
+			this.Close();
 		}
 	}
 }
