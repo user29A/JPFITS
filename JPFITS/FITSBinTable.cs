@@ -11,6 +11,60 @@ namespace JPFITS
 	/// <summary> FITSBinTable class to create, read, interact with, modify components of, and write FITS BINTABLE binary table data extensions.</summary>
 	public class FITSBinTable
 	{
+		#region CONSTRUCTORS
+		/// <summary>Create an empty FITSBinTable object. TTYPE entries may be added later via SetTTYPEEntries or AddTTYPEEntry.</summary>
+		/// <param name="extensionName">The EXTNAME keyword extension name of the table. Always name your BINTABLE's.</param>
+		public FITSBinTable(string extensionName)
+		{
+			if (extensionName == null || extensionName == "")
+				throw new Exception("The EXTNAME extension name of the binary table must have a value.");
+
+			EXTNAME = extensionName;
+		}
+
+		/// <summary>Create a FITSBinTable object from an existing extension.</summary>
+		/// <param name="fileName">The full path filename.</param>
+		/// <param name="extensionName">The BINTABLE EXTNAME name of the extension. If an empty string is passed the first nameless extension will be found, if one exists.</param>
+		public FITSBinTable(string fileName, string extensionName)
+		{
+			FileStream fs = new FileStream(fileName, FileMode.Open);
+			ArrayList header = null;
+			if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header, out bool hasext) || !hasext)
+			{
+				fs.Close();
+				if (!hasext)
+					throw new Exception("File '" + fileName + "'  indicates no extensions present.");
+				else
+					throw new Exception("File '" + fileName + "' not formatted as FITS file.");
+			}
+
+			header = new ArrayList();
+			if (!FITSFILEOPS.SeekExtension(fs, "BINTABLE", extensionName, ref header, out _, out _, out long tableendposition, out long pcount, out long theap))
+			{
+				fs.Close();
+				throw new Exception("Could not find BINTABLE with name '" + extensionName + "'");
+			}
+
+			FILENAME = fileName;
+			EXTNAME = extensionName;
+
+			BINTABLE = new byte[((int)(tableendposition - fs.Position))];
+
+			fs.Read(BINTABLE, 0, BINTABLE.Length);
+
+			if (pcount != 0)
+			{
+				fs.Position = fs.Position + theap - BINTABLE.Length;
+				HEAPDATA = new byte[((int)(tableendposition + pcount - fs.Position))];
+				fs.Read(HEAPDATA, 0, HEAPDATA.Length);
+			}
+
+			fs.Close();
+
+			EATRAWBINTABLEHEADER(header);
+		}
+		#endregion
+
 		#region PRIVATE CLASS MEMBERS
 
 		private int NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
@@ -27,7 +81,7 @@ namespace JPFITS
 		private TypeCode[]? TCODES;//.NET typcodes for each table entry
 		private string[]? HEADER;//header for the table
 		private string? FILENAME;
-		private string? EXTENSIONNAME;
+		private string? EXTNAME;
 		FITSHeaderKey[]? EXTRAKEYS;
 		private byte[]? BINTABLE;//the table in raw byte format read from disk
 		private byte[]? HEAPDATA;//the table in raw byte format read from disk		
@@ -638,8 +692,8 @@ namespace JPFITS
 				hkeyslist.Add(new FITSHeaderKey("PCOUNT", HEAPDATA.Length.ToString(), "size of heap data area (bytes)"));
 			hkeyslist.Add(new FITSHeaderKey("GCOUNT", "1", "one data group"));
 			hkeyslist.Add(new FITSHeaderKey("TFIELDS", TFIELDS.ToString(), "number of data fields"));
-			if (EXTENSIONNAME != "")
-				hkeyslist.Add(new FITSHeaderKey("EXTNAME", EXTENSIONNAME, "name of this binary table extension"));
+			if (EXTNAME != "")
+				hkeyslist.Add(new FITSHeaderKey("EXTNAME", EXTNAME, "name of this binary table extension"));
 
 			//KEY formats
 			for (int i = 0; i < TTYPES.Length; i++)
@@ -2002,10 +2056,11 @@ namespace JPFITS
 			get { return FORMATBINARYTABLEEXTENSIONHEADER(true); }
 		}
 
-		/// <summary>Return the name of the extension.</summary>
+		/// <summary>Accesses the EXTNAME name of the extension. Can be used to set the name.</summary>
 		public string ExtensionNameEXTNAME
 		{
-			get { return EXTENSIONNAME; }
+			get { return EXTNAME; }
+			set { EXTNAME = value; }
 		}
 
 		/// <summary>Return the width, in bytes, of the table.</summary>
@@ -2025,57 +2080,6 @@ namespace JPFITS
 		{
 			get { return BINTABLE; }
 		}
-		#endregion
-
-		#region CONSTRUCTORS
-		/// <summary>Create an empty FITSBinTable object. TTYPE entries may be added later via SetTTYPEEntries or AddTTYPEEntry. An extension name can be added at writetime.</summary>
-		public FITSBinTable()
-		{
-
-		}
-
-		/// <summary>Create a FITSBinTable object from an existing extension.</summary>
-		/// <param name="fileName">The full path filename.</param>
-		/// <param name="extensionName">The BINTABLE EXTNAME name of the extension. If an empty string is passed the first nameless extension will be found, if one exists.</param>
-		public FITSBinTable(string fileName, string extensionName)
-		{
-			FileStream fs = new FileStream(fileName, FileMode.Open);
-			ArrayList header = null;
-			if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header, out bool hasext) || !hasext)
-			{
-				fs.Close();
-				if (!hasext)
-					throw new Exception("File '" + fileName + "'  indicates no extensions present.");
-				else
-					throw new Exception("File '" + fileName + "' not formatted as FITS file.");
-			}
-
-			header = new ArrayList();
-			if (!FITSFILEOPS.SeekExtension(fs, "BINTABLE", extensionName, ref header, out _, out _, out long tableendposition, out long pcount, out long theap))
-			{
-				fs.Close();
-				throw new Exception("Could not find BINTABLE with name '" + extensionName + "'");
-			}
-
-			FILENAME = fileName;
-			EXTENSIONNAME = extensionName;
-
-			BINTABLE = new byte[((int)(tableendposition - fs.Position))];
-
-			fs.Read(BINTABLE, 0, BINTABLE.Length);
-
-			if (pcount != 0)
-			{
-				fs.Position = fs.Position + theap - BINTABLE.Length;
-				HEAPDATA = new byte[((int)(tableendposition + pcount - fs.Position))];
-				fs.Read(HEAPDATA, 0, HEAPDATA.Length);
-			}
-
-			fs.Close();
-
-			EATRAWBINTABLEHEADER(header);
-		}
-
 		#endregion
 
 		#region MEMBERS
@@ -3430,7 +3434,7 @@ namespace JPFITS
 			}
 		}
 
-		/// <summary>Use this to access individual elements of the table with a string return of the value. Useful for looking at TTYPEs with multiple elements on a row, or, for extracting values to convert to numeric quantities.</summary>
+		/// <summary>Use this to access individual elements of the table with a string return of the value. Useful for looking at TTYPEs with multiple elements on a row, or, for extracting values for display purposes, etc.</summary>
 		/// <param name="ttypeIndex">The index of the TTYPE value.</param>
 		/// <param name="rowindex">The row index of the column.</param>
 		public string GetTTypeEntryRow(int ttypeIndex, int rowindex)
@@ -3906,39 +3910,19 @@ namespace JPFITS
 			}
 		}
 
-		/// <summary>Use this to access individual elements of the table with a string return of the value. Useful for looking at TTYPEs with multiple elements on a row, or, for extracting values to convert to numeric quantities.</summary>
+		/// <summary>Use this to access individual elements of the table with a string return of the value. Useful for looking at TTYPEs with multiple elements on a row, or, for extracting values for display purposes, etc.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="rowindex">The row index of the column.</param>
 		public string GetTTypeEntryRow(string ttypeEntry, int rowindex)
 		{
-			int ttypeindex = -1;
-			for (int i = 0; i < TTYPES.Length; i++)
-				if (TTYPES[i] == ttypeEntry)
-				{
-					ttypeindex = i;
-					break;
-				}
-
-			if (ttypeindex == -1)
-				throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
-
-			return GetTTypeEntryRow(ttypeindex, rowindex);
+			return GetTTypeEntryRow(GetTTYPEIndex(ttypeEntry), rowindex);
 		}
 
 		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements. Operates on heap-stored data where required.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		public void RemoveTTYPEEntry(string ttypeEntry)
 		{
-			int ttypeindex = -1;
-			for (int i = 0; i < TTYPES.Length; i++)
-				if (TTYPES[i] == ttypeEntry)
-				{
-					ttypeindex = i;
-					break;
-				}
-
-			if (ttypeindex == -1)
-				throw new Exception("Extension Entry TTYPE wasn't found: '" + ttypeEntry + "'");
+			int ttypeindex = GetTTYPEIndex(ttypeEntry);
 
 			Array[] newEntryDataObjs = new Array[TFIELDS - 1];
 			string[] newTTYPES = new string[TFIELDS - 1];
@@ -4332,8 +4316,7 @@ namespace JPFITS
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		public TypeCode GetTTYPETypeCode(string ttypeEntry)
 		{
-			int ttypeindex = GetTTYPEIndex(ttypeEntry);
-			return GetTTYPETypeCode(ttypeindex);
+			return GetTTYPETypeCode(GetTTYPEIndex(ttypeEntry));
 		}
 
 		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat heap area vector of vectors.</summary>
@@ -4348,8 +4331,7 @@ namespace JPFITS
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		public bool GetTTYPEIsHeapEntry(string ttypeEntry)
 		{
-			int ttypeindex = GetTTYPEIndex(ttypeEntry);
-            return GetTTYPEIsHeapEntry(ttypeindex);
+            return GetTTYPEIsHeapEntry(GetTTYPEIndex(ttypeEntry));
 		}
 
         /// <summary>Returns the number of elements (repeats) for a given heap entry at a given row.</summary>
@@ -4357,8 +4339,7 @@ namespace JPFITS
         /// <param name="row">The row of the entry.</param>
         public int GetTTYPEHeapEntryRowLength(string ttypeEntry, int row)
 		{
-            int ttypeindex = GetTTYPEIndex(ttypeEntry);
-            return TTYPEHEAPARRAYNELSPOS[ttypeindex][0, row];
+            return TTYPEHEAPARRAYNELSPOS[GetTTYPEIndex(ttypeEntry)][0, row];
 		}
 
         /// <summary>
@@ -4367,18 +4348,11 @@ namespace JPFITS
         /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
         public int GetTTYPEIndex(string ttypeEntry)
 		{
-            int ttypeindex = -1;
             for (int i = 0; i < TTYPES.Length; i++)
                 if (TTYPES[i] == ttypeEntry)
-                {
-                    ttypeindex = i;
-                    break;
-                }
-
-            if (ttypeindex == -1)
-                throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
-
-			return ttypeindex;
+					return i;
+			
+			throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
         }
 
 		/// <summary>Add an extra key to the extension header. If it is to be a COMMENT, just fill the keyValue with eighteen characters, and the keyComment with 54 characters.</summary>
@@ -4450,11 +4424,9 @@ namespace JPFITS
 
 		/// <summary>Write the binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be replaced.</summary>
 		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
-		/// <param name="ExtensionName">The EXTNAME name of the extension. Can be empty (unnamed) but this is poor practice.</param>
 		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
-		public void Write(string FileName, string ExtensionName, bool OverWriteExtensionIfExists)
+		public void Write(string FileName, bool OverWriteExtensionIfExists)
 		{
-			EXTENSIONNAME = ExtensionName;
 			FILENAME = FileName;
 
 			if (!File.Exists(FILENAME))//then write a new file, otherwise check the existing file for existing table, etc.
@@ -4513,11 +4485,11 @@ namespace JPFITS
 				FITSFILEOPS.ScanPrimaryUnit(fs, true, ref headerret, out hasext);
 			}
 
-			bool extensionfound = FITSFILEOPS.SeekExtension(fs, "BINTABLE", EXTENSIONNAME, ref headerret, out long extensionstartposition, out long extensionendposition, out _, out _, out _);
+			bool extensionfound = FITSFILEOPS.SeekExtension(fs, "BINTABLE", EXTNAME, ref headerret, out long extensionstartposition, out long extensionendposition, out _, out _, out _);
 			if (extensionfound && !OverWriteExtensionIfExists)
 			{
 				fs.Close();
-				throw new Exception("ExtensionName '" + EXTENSIONNAME + "' already exists and was told to not overwrite it...");
+				throw new Exception("ExtensionName '" + EXTNAME + "' already exists and was told to not overwrite it...");
 			}
 
 			byte[] arr_prepend;

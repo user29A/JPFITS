@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Security.Policy;
+using System.Windows.Forms;
 
 namespace JPFITS
 {
@@ -16,11 +18,9 @@ namespace JPFITS
 		public FITSHeaderKey(string line)
 		{
 			if (line.Length > 80)
-			{
-				throw new Exception("Header line String: \r\r'" + line + "'\r\r is is longer than 80 characters. The String must contain eighty (or less) elements.");
-			}
-			else if (line.Length < 80)
-				line = line.PadRight(80);
+				throw new Exception("Header line String: \r\r'" + line + "'\r\r is longer than 80 characters. A header line string must contain eighty elements.");
+
+			line = line.PadRight(80);
 
 			try
 			{
@@ -43,8 +43,14 @@ namespace JPFITS
 				else
 				{
 					LINEISCOMMENTFORMAT = false;
-					if (JPMath.IsNumeric(line.Substring(10, 20)))//this has to work if it is supposed to be a numeric value here
-						VALUE = line.Substring(10, 20).Trim();//get rid of leading and trailing white space
+					if (line.Substring(10, 1) != "'")//must be numeric then
+					{
+						int slashind = line.IndexOf("/");
+						if (slashind == -1)
+							VALUE = line.Substring(10).Trim();//get rid of leading and trailing white space
+						else
+							VALUE = line.Substring(10, slashind - 10 - 1).Trim();						
+					}
 					else if (line.Substring(10, 20).Trim() == "T" || line.Substring(10, 20).Trim() == "F")
 						VALUE = line.Substring(10, 20).Trim();
 					else
@@ -62,6 +68,8 @@ namespace JPFITS
 						{
 							VALUE = line.Substring(indx + 1, line.LastIndexOf("'") - indx - 1);
 							VALUE = VALUE.Trim();
+							if (VALUE.Length > 18)
+								VALUE = VALUE.Substring(0, 18);
 						}
 					}
 
@@ -79,31 +87,39 @@ namespace JPFITS
 		}
 
 		/// <summary>
-		/// Creates an instance of a FITSHeaderKey, out of a supplied key name, key value, and key comment. If name is either "COMMENT" or an empty String the key will be formatted as a FITS comment line using value and comment as the comment.
+		/// Creates an instance of a FITSHeaderKey, out of a supplied key name, key value, and key comment. If name is either "COMMENT" or an empty String the key will be formatted as a FITS comment line using comment.
 		/// </summary>
-		/// <param name="name">The header key name.</param>
-		/// <param name="value">The header key value.</param>
+		/// <param name="name">The header key name. Use COMMENT or pass empty string for a comment formatted line with the value empty and comment as the comment.</param>
+		/// <param name="value">The header key value. Leave empty if it is a comment line.</param>
 		/// <param name="comment">The header key comment.</param>
 		public FITSHeaderKey(string name, string value, string comment)
 		{
-			if (name.Length > 8)
-			{
-				throw new Exception("Header line name '" + name + "' cannot exceed 8 characters in length; it is " + name.Length + " characters long.");
-			}
+			NAME = name;
+			VALUE = value;
+			COMMENT = comment;
 
-			if (name.Trim().Equals("COMMENT") || name.Length == 0)
+			if (NAME.Length > 8)
+				throw new Exception("Header line name '" + NAME + "' cannot exceed 8 characters in length; it is " + NAME.Length + " characters long.");
+
+			if (NAME.Equals("COMMENT") || NAME.Length == 0)
 			{
+				if (VALUE != "")
+					throw new Exception("Key value + '" + VALUE + "' should be empty if the line is a comment line.");
+
 				LINEISCOMMENTFORMAT = true;
+				COMMENT = NAME + COMMENT;
 				NAME = "";
-				VALUE = "";
-				COMMENT = name + value + comment;
+
+				if (COMMENT.Length > 80)
+					throw new Exception("Header line string: \r\r'" + COMMENT + "'\r\r is longer than 80 characters. The string must contain eighty (or less) elements.");
 			}
 			else
 			{
+				if (!ValueIsNumeric() && VALUE.Length > 18)
+					VALUE = VALUE.Substring(0, 18);
+					//throw new Exception("Error: Key value cannot exceed 18 characters. Key value: '" + VALUE + "' is " + VALUE.Length + " characters long.");
+
 				LINEISCOMMENTFORMAT = false;
-				NAME = name;
-				VALUE = value;
-				COMMENT = comment;
 			}
 		}
 
@@ -111,21 +127,36 @@ namespace JPFITS
 		public string Name
 		{
 			get { return NAME; }
-			set { NAME = value; }
+			set 
+			{
+				if (value.Length > 8)
+					throw new Exception("Error: Key name '" + value + "' cannot exceed 8 characters in length; it is " + value.Length + " characters long.");
+				NAME = value.ToUpper();
+			}
 		}
 
-		/// <summary>The value of the key (elements 11 through 30 typically).</summary>
+		/// <summary>The value of the key (elements 12 through 30 typically).</summary>
 		public string Value
 		{
 			get { return VALUE; }
-			set { VALUE = value; }
+			set 
+			{
+				if (!JPMath.IsNumeric(value) && value.Length > 18)
+					throw new Exception("Error: Key value cannot exceed 18 characters. Key value: '" + value + "' is " + value.Length + " characters long.");
+				VALUE = value; 
+			}
 		}
 
-		/// <summary>The comment of the key (elements 34 through 80 typically). If the key is a comment then Comment contains the entire key line.</summary>
+		/// <summary>The comment of the key (elements 32 through 80 typically). If the key is a comment then Comment contains the entire key line.</summary>
 		public string Comment
 		{
 			get { return COMMENT; }
-			set { COMMENT = value; }
+			set 
+			{ 
+				if (!LINEISCOMMENTFORMAT && value.Length > 48)
+					throw new Exception("Error: Key comment value cannot exceed 48 characters. Comment value: '" + value + "' is " + value.Length + " characters long.");
+				COMMENT = value;
+			}
 		}
 
 		/// <summary>Returns whether the key line is a comment.</summary>
@@ -156,29 +187,14 @@ namespace JPFITS
 		private string GETFULLYFORMATTEDFITSLINE()
 		{
 			if (LINEISCOMMENTFORMAT)
-				if (VALUE != "")
-				{
-					throw new Exception("Error: Line was indicated as comment but the value field is not empty. key MAY equal COMMENT and comment string MUST be supplied in comment, and value must be empty if it is a comment line.");
-				}
-				else
-					if ((NAME.Length + COMMENT.Length) > 80)
-				{
-					throw new Exception("Error: key name and comment are more than 80 elements: '" + NAME + COMMENT + "' are " + (NAME.Length + COMMENT.Length) + " elements.");
-				}
-				else
-					return (NAME + COMMENT).PadRight(80);
-
-			if (NAME.Length > 8)
-			{
-				throw new Exception("Error: key name was supplied with more than 8 characters: '" + NAME + "' is " + NAME.Length + " elements.");
-			}
+				return (NAME + COMMENT).PadRight(80);
 
 			if (NAME.Trim() == "END")
 				return NAME.Trim().PadRight(80);
 
 			string key = NAME.PadRight(8);
 			key += "= ";
-			//key name formatting done
+			//key name formatting done			
 
 			//do value formatting
 			string value;
@@ -188,10 +204,11 @@ namespace JPFITS
 
 				if (val == 9223372036854775808)//this is the bzero for unsigned int64...and is so large it will get converted to exponential notation which we do not want for this
 					value = "9223372036854775808";
-				else if (Math.Abs(val) <= 1e-6 || Math.Abs(val) >= 1e13)
-					value = val.ToString("0.00###########e+00");
+				else if (Math.Abs(val) <= 1e-4 || Math.Abs(val) >= 1e13)
+					value = val.ToString("0.000##########e+00");
 				else
-					value = val.ToString("G");
+					value = val.ToString("0.#################");
+
 				if (val == 0)//change the exp to integer 0
 					value = "0";
 

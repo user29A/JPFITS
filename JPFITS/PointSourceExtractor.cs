@@ -152,6 +152,8 @@ namespace JPFITS
 
 								src_index++;
 								N_SATURATED++;
+								XPIXs.Add(x);
+								YPIXs.Add(y);
 								Xs.Add(x_centroid);
 								Ys.Add(y_centroid);
 								Ks.Add(kernel_sum);
@@ -178,7 +180,7 @@ namespace JPFITS
 				int intprg = 0;
 				int n0 = (IMAGEWIDTH - 2 * SOURCE_SEPARATION) / Environment.ProcessorCount + SOURCE_SEPARATION;
 
-				Parallel.For(SOURCE_SEPARATION, IMAGEWIDTH - SOURCE_SEPARATION, (int x, ParallelLoopState state) =>
+				Parallel.For(SOURCE_SEPARATION, IMAGEWIDTH - SOURCE_SEPARATION, (Action<int, ParallelLoopState>)((int x, ParallelLoopState state) =>
 				{
 					if (SHOWWAITBAR)
 					{
@@ -294,7 +296,7 @@ namespace JPFITS
 						//if got to here then must centroid at this pixel
 						lock (SOURCE_BOOLEAN_MAP)
 						{
-							if (SOURCE_BOOLEAN_MAP[x, y])
+							if (SOURCE_BOOLEAN_MAP[(int)x, (int)y])
 								continue;
 
 							int[] xdata = new int[(KERNEL_WIDTH)];
@@ -304,19 +306,16 @@ namespace JPFITS
 								xdata[i + KERNEL_RADIUS] = x + i;
 								ydata[i + KERNEL_RADIUS] = y + i;
 							}
-							double[,] kernel = JPMath.MatrixSubScalar(GetKernel(IMAGE, x, y, KERNEL_RADIUS), bg_est, false);
-							Centroid(xdata, ydata, kernel, out double x_centroid, out double y_centroid);
+							double[,] kernel = JPMath.MatrixSubScalar(GetKernel(IMAGE, (int)x, (int)y, KERNEL_RADIUS), bg_est, false);
+							Centroid(xdata, ydata, kernel, out double x_centroid, out double y_centroid);						
 
-							int r_x_cent = (int)Math.Round(x_centroid);
-							int r_y_cent = (int)Math.Round(y_centroid);						
-
-							for (int ii = r_x_cent - KERNEL_RADIUS; ii <= r_x_cent + KERNEL_RADIUS; ii++)
+							for (int ii = x - KERNEL_RADIUS; ii <= x + KERNEL_RADIUS; ii++)
 							{
-								double sx2 = (double)(r_x_cent - ii);
+								double sx2 = (double)(x - ii);
 								sx2 *= sx2;
-								for (int jj = r_y_cent - KERNEL_RADIUS; jj <= r_y_cent + KERNEL_RADIUS; jj++)
+								for (int jj = y - KERNEL_RADIUS; jj <= y + KERNEL_RADIUS; jj++)
 								{
-									double sy = (double)(r_y_cent - jj);
+									double sy = (double)(y - jj);
 									double r2 = (sx2 + sy * sy);
 									if (r2 > KRAD2)
 										continue;
@@ -342,21 +341,21 @@ namespace JPFITS
 							{
 								string file = SAVE_PS_FILENAME;
 								int ind = file.LastIndexOf(".");//for saving PS
-								file = String.Concat(file.Substring(0, ind), "_", Xs.Count.ToString("00000000"), ".fits");
+								file = string.Concat(file.Substring(0, ind), "_", Xs.Count.ToString("00000000"), ".fits");
 
-								JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
+								FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
 								f.WriteImage(TypeCode.Double, false);
 							}
 						}
 					}
-				});
+				}));
 
 				if (SHOWWAITBAR)
 					if (WAITBAR.DialogResult == DialogResult.Cancel)
 						return;
 
-				this.N_SRC = Xs.Count;
-				this.INITARRAYS();
+				N_SRC = Xs.Count;
+				INITARRAYS();
 
 				for (int i = 0; i < N_SRC; i++)
 				{
@@ -704,29 +703,29 @@ namespace JPFITS
 		{
 			CENTROIDS_X_PIXEL = new int[N_SRC];
 			CENTROIDS_Y_PIXEL = new int[N_SRC];
-			CENTROIDS_X = new double[(N_SRC)];
-			CENTROIDS_Y = new double[(N_SRC)];
-			FITS_X = new double[(N_SRC)];
-			FITS_Y = new double[(N_SRC)];
-			FITS_FWHM_X = new double[(N_SRC)];
-			FITS_FWHM_Y = new double[(N_SRC)];
-			FITS_PHI = new double[(N_SRC)];
-			FITS_CHISQNORM = new double[(N_SRC)];
-			CENTROIDS_RA_DEG = new double[(N_SRC)];
-			CENTROIDS_RA_HMS = new string[(N_SRC)];
-			CENTROIDS_DEC_DEG = new double[(N_SRC)];
-			CENTROIDS_DEC_DMS = new string[(N_SRC)];
-			CENTROIDS_AMPLITUDE = new double[(N_SRC)];
-			CENTROIDS_VOLUME = new double[(N_SRC)];
-			CENTROIDS_BGESTIMATE = new double[(N_SRC)];
-			FITS_AMPLITUDE = new double[(N_SRC)];
-			FITS_VOLUME = new double[(N_SRC)];
-			FITS_BGESTIMATE = new double[(N_SRC)];
-			FITS_RA_DEG = new double[(N_SRC)];
-			FITS_RA_HMS = new string[(N_SRC)];
-			FITS_DEC_DEG = new double[(N_SRC)];
-			FITS_DEC_DMS = new string[(N_SRC)];
-			CENTROID_POINTS = new JPMath.PointD[(N_SRC)];
+			CENTROIDS_X = new double[N_SRC];
+			CENTROIDS_Y = new double[N_SRC];
+			FITS_X = new double[N_SRC];
+			FITS_Y = new double[N_SRC];
+			FITS_FWHM_X = new double[N_SRC];
+			FITS_FWHM_Y = new double[N_SRC];
+			FITS_PHI = new double[N_SRC];
+			FITS_CHISQNORM = new double[N_SRC];
+			CENTROIDS_RA_DEG = new double[N_SRC];
+			CENTROIDS_RA_HMS = new string[N_SRC];
+			CENTROIDS_DEC_DEG = new double[N_SRC];
+			CENTROIDS_DEC_DMS = new string[N_SRC];
+			CENTROIDS_AMPLITUDE = new double[N_SRC];
+			CENTROIDS_VOLUME = new double[N_SRC];
+			CENTROIDS_BGESTIMATE = new double[N_SRC];
+			FITS_AMPLITUDE = new double[N_SRC];
+			FITS_VOLUME = new double[N_SRC];
+			FITS_BGESTIMATE = new double[N_SRC];
+			FITS_RA_DEG = new double[N_SRC];
+			FITS_RA_HMS = new string[N_SRC];
+			FITS_DEC_DEG = new double[N_SRC];
+			FITS_DEC_DMS = new string[N_SRC];
+			CENTROID_POINTS = new JPMath.PointD[N_SRC];
 		}
 
 		private void RECURSGROUP(int I, int J, double groupRadius, int groupid, ArrayList groups)
@@ -812,7 +811,7 @@ namespace JPFITS
 			{
 				CENTROIDS_X = value;
 				N_SRC = CENTROIDS_X.Length;
-				CENTROID_POINTS = new JPMath.PointD[(N_SRC)];
+				CENTROID_POINTS = new JPMath.PointD[N_SRC];
 				for (int i = 0; i < N_SRC; i++)
 					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 			}
@@ -826,7 +825,7 @@ namespace JPFITS
 			{
 				CENTROIDS_Y = value;
 				N_SRC = CENTROIDS_Y.Length;
-				CENTROID_POINTS = new JPMath.PointD[(N_SRC)];
+				CENTROID_POINTS = new JPMath.PointD[N_SRC];
 				for (int i = 0; i < N_SRC; i++)
 					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 			}
