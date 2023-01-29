@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Security.Policy;
-using System.Windows.Forms;
 
 namespace JPFITS
 {
@@ -13,18 +11,19 @@ namespace JPFITS
 
 		/// <summary>
 		/// Creates an instance of a FITSHeaderKey, out of a supplied String line. The line may be empty, but not more than 80 elements length. The key will be formatted as a FITS comment line if its internal structure appears to be configured as such.
+		/// <br /> Comment lines are indicated either with COMMENT as the first characters, and, or, no equal sign at element position 9, 0-based index 8.
 		/// </summary>
-		/// <param name="line">The header key line,up to 80 elements in length.</param>
+		/// <param name="line">The header key line, up to 80 elements in length.</param>
 		public FITSHeaderKey(string line)
 		{
 			if (line.Length > 80)
-				throw new Exception("Header line String: \r\r'" + line + "'\r\r is longer than 80 characters. A header line string must contain eighty elements.");
+				throw new Exception("Header line String: \r\r'" + line + "'\r\r is longer than 80 characters. A header line string must contain eighty (or less) elements.");
 
 			line = line.PadRight(80);
 
 			try
 			{
-				NAME = line.Substring(0, 8).Trim();
+				NAME = line.Substring(0, 8).Trim().ToUpper();
 				if (NAME == "END")
 				{
 					LINEISCOMMENTFORMAT = false;
@@ -43,16 +42,19 @@ namespace JPFITS
 				else
 				{
 					LINEISCOMMENTFORMAT = false;
-					if (line.Substring(10, 1) != "'")//must be numeric then
+					if (line.Substring(10, 1) != "'")//must be numeric or T/F then
 					{
-						int slashind = line.IndexOf("/");
-						if (slashind == -1)
-							VALUE = line.Substring(10).Trim();//get rid of leading and trailing white space
+						if (line.Substring(10, 20).Trim() == "T" || line.Substring(10, 20).Trim() == "F")
+							VALUE = line.Substring(10, 20).Trim();
 						else
-							VALUE = line.Substring(10, slashind - 10 - 1).Trim();						
+						{
+							int slashind = line.IndexOf("/");
+							if (slashind == -1)
+								VALUE = line.Substring(10).Trim();//get rid of leading and trailing white space
+							else
+								VALUE = line.Substring(10, slashind - 10 - 1).Trim();
+						}
 					}
-					else if (line.Substring(10, 20).Trim() == "T" || line.Substring(10, 20).Trim() == "F")
-						VALUE = line.Substring(10, 20).Trim();
 					else
 					{
 						int indx = line.IndexOf("'");
@@ -89,17 +91,18 @@ namespace JPFITS
 		/// <summary>
 		/// Creates an instance of a FITSHeaderKey, out of a supplied key name, key value, and key comment. If name is either "COMMENT" or an empty String the key will be formatted as a FITS comment line using comment.
 		/// </summary>
-		/// <param name="name">The header key name. Use COMMENT or pass empty string for a comment formatted line with the value empty and comment as the comment.</param>
-		/// <param name="value">The header key value. Leave empty if it is a comment line.</param>
-		/// <param name="comment">The header key comment.</param>
+		/// <param name="name">The header key name, maximum 8 characters in length, all caps; excess elements will be truncated. Use COMMENT or pass empty string for a comment-formatted line with the value empty and comment as the comment line.</param>
+		/// <param name="value">The header key value, maximum 18 characters in length; excess elements will be truncated. Leave empty if it is a comment line.</param>
+		/// <param name="comment">The header key comment, maximum 80 characters if it is the entire comment line, or maximum 73 characters if name is COMMENT; excess elements will be truncated.</param>
 		public FITSHeaderKey(string name, string value, string comment)
 		{
-			NAME = name;
-			VALUE = value;
-			COMMENT = comment;
+			NAME = name.Trim().ToUpper();
+			VALUE = value.Trim();
+			COMMENT = comment.Trim();
 
 			if (NAME.Length > 8)
-				throw new Exception("Header line name '" + NAME + "' cannot exceed 8 characters in length; it is " + NAME.Length + " characters long.");
+				NAME = NAME.Substring(0, 8).Trim();
+				//throw new Exception("Header line name '" + NAME + "' cannot exceed 8 characters in length; it is " + NAME.Length + " characters long.");
 
 			if (NAME.Equals("COMMENT") || NAME.Length == 0)
 			{
@@ -111,7 +114,8 @@ namespace JPFITS
 				NAME = "";
 
 				if (COMMENT.Length > 80)
-					throw new Exception("Header line string: \r\r'" + COMMENT + "'\r\r is longer than 80 characters. The string must contain eighty (or less) elements.");
+					COMMENT = COMMENT.Substring(0, 80);
+					//throw new Exception("Header line string: \r\r'" + COMMENT + "'\r\r is longer than 80 characters. The string must contain eighty (or less) elements.");
 			}
 			else
 			{
@@ -131,7 +135,7 @@ namespace JPFITS
 			{
 				if (value.Length > 8)
 					throw new Exception("Error: Key name '" + value + "' cannot exceed 8 characters in length; it is " + value.Length + " characters long.");
-				NAME = value.ToUpper();
+				NAME = value.Trim().ToUpper();
 			}
 		}
 
@@ -141,9 +145,9 @@ namespace JPFITS
 			get { return VALUE; }
 			set 
 			{
-				if (!JPMath.IsNumeric(value) && value.Length > 18)
-					throw new Exception("Error: Key value cannot exceed 18 characters. Key value: '" + value + "' is " + value.Length + " characters long.");
-				VALUE = value; 
+				if (!JPMath.IsNumeric(value) && value.Trim().Length > 18)
+					throw new Exception("Error: Key value cannot exceed 18 characters. Key value: '" + value.Trim() + "' is " + value.Trim().Length + " characters long.");
+				VALUE = value.Trim();
 			}
 		}
 
@@ -152,10 +156,12 @@ namespace JPFITS
 		{
 			get { return COMMENT; }
 			set 
-			{ 
-				if (!LINEISCOMMENTFORMAT && value.Length > 48)
-					throw new Exception("Error: Key comment value cannot exceed 48 characters. Comment value: '" + value + "' is " + value.Length + " characters long.");
-				COMMENT = value;
+			{
+				if (!LINEISCOMMENTFORMAT && value.Trim().Length > 48)
+					throw new Exception("Error: Key comment value cannot exceed 48 characters. Comment value: '" + value.Trim() + "' is " + value.Trim().Length + " characters long.");
+				else if (LINEISCOMMENTFORMAT && (NAME + value.Trim()).Length > 80)
+					throw new Exception("Entire comment line cannot be more than 80 characters. Comment value: '" + NAME + value.Trim() + "' is " + (NAME + value.Trim()).Length + " characters long.");
+				COMMENT = value.Trim();
 			}
 		}
 

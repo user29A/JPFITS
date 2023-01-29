@@ -19,8 +19,8 @@ namespace JPFITS
 			MAKE_DEFAULT_HEADER(mayContainExtensions, image);
 		}
 
-		/// <summary>Constructor. Creates an instance of a FITSImageHeader out of a list of header lines. Typically the headerlines would be returned from FITSFILEOPS.SCANPRIMARYUNIT.</summary>
-		/// <param name="headerlines">A String list of header lines to be extrated and formatted into keys, values, and comments, or as comment lines.</param>
+		/// <summary>Constructor. Creates an instance of a FITSImageHeader out of an array list of string header lines. Typically the headerlines would be returned from FITSFILEOPS.SCANPRIMARYUNIT.</summary>
+		/// <param name="headerlines">A String list of header lines to be extrated and formatted into keys, values, and comments, or as comment lines, as FITSHeaderKeys</param>
 		/// <param name="populate_nonessential">If false, non-essential key lines will be ignored. Saves a little bit of construction time if you don't need those, but they'll be lost if you re-write the file without them.</param>
 		public FITSHeader(ArrayList headerlines, bool populate_nonessential)
 		{
@@ -33,6 +33,10 @@ namespace JPFITS
 				HEADERKEYS[i] = new FITSHeaderKey((string)headerlines[i]);
 		}
 
+		/// <summary>
+		/// Constructor. Creates an instance of a FITSImageHeader out of an array of string header lines.
+		/// </summary>
+		/// <param name="headerlines">An array of strings to turn into FITSHeaderKeys.</param>
 		public FITSHeader(string[] headerlines)
 		{
 			HEADERKEYS = new JPFITS.FITSHeaderKey[headerlines.Length];
@@ -41,11 +45,19 @@ namespace JPFITS
 				HEADERKEYS[i] = new FITSHeaderKey(headerlines[i]);
 		}
 
+		/// <summary>
+		/// Constructor. Creates an instance of a FITSImageHeader out of an array of FITSHeaderKeys.
+		/// </summary>
+		/// <param name="headerKeys">An array of keys.</param>
 		public FITSHeader(FITSHeaderKey[] headerKeys)
 		{
 			HEADERKEYS = headerKeys;
 		}
 
+		/// <summary>
+		/// Constructor. Creates an instance of a FITSImageHeader out of an array list of FITSHeaderKeys.
+		/// </summary>
+		/// <param name="FITSheaderKeys">An array list of FITSHeaderKeys</param>
 		public FITSHeader(ArrayList FITSheaderKeys)
 		{
 			HEADERKEYS = new FITSHeaderKey[FITSheaderKeys.Count];
@@ -54,7 +66,7 @@ namespace JPFITS
 		}
 
 		/// <summary>
-		/// Make a header object from an existing FITS file.
+		/// Make a header object from an existing FITS file primary header.
 		/// </summary>
 		/// <param name="fileName">The file from which to get the primary header unit and make this header from.</param>
 		public FITSHeader(string fileName)
@@ -90,7 +102,7 @@ namespace JPFITS
 			set { HEADERKEYS[i] = value; }
 		}
 
-		/// <summary>Returns the number of header key lines in the header, excluding any assumed padding after END key.</summary>
+		/// <summary>Returns the number of header key lines in the header, excluding any padding after END key.</summary>
 		public int Length
 		{
 			get { return HEADERKEYS.Length; }
@@ -554,7 +566,7 @@ namespace JPFITS
 		}
 
 		/// <summary>RemoveAllKeys clears all keys from the primary header. Essential keywords will remain. image is supplied to re-create essential keywords, or pass nullptr to set NAXIS = 0.</summary>
-		public void RemoveAllKeys(double[,] image)
+		public void RemoveAllKeys(double[,]? image)
 		{
 			MAKE_DEFAULT_HEADER(true, image);
 			UPDATEDISPLAYHEADER = true;
