@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Windows.Forms;
 using System.Collections.Concurrent;
+using System.Collections;
+
 #nullable enable
 
 namespace JPFITS
@@ -465,7 +467,8 @@ namespace JPFITS
 
 			if (!REFINE || FITS_IMG == null)
 			{
-				WCSARF.CancelBtn.Text = "Finished";
+				if (WCSARF != null)
+					WCSARF.CancelBtn.Text = "Finished";
 				BGWRKR.ReportProgress(0, "Finished...");
 				return;
 			}
@@ -574,7 +577,8 @@ namespace JPFITS
 			BGWRKR.ReportProgress(0, "WCS Fit Residual Mean (arcsec) = " + WCS.WCSFitResidual_MeanSky);
 			BGWRKR.ReportProgress(0, "WCS Fit Residual Stdv (arcsec) = " + WCS.WCSFitResidual_StdvSky + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "Finished..." + Environment.NewLine);
-			WCSARF.CancelBtn.Text = "Finished";
+			if (WCSARF != null)
+				WCSARF.CancelBtn.Text = "Finished";
 		}
 
 		private void BGWRKR_ProgressChanged(object sender, System.ComponentModel.ProgressChangedEventArgs e)
@@ -759,7 +763,7 @@ namespace JPFITS
 		/// <param name="Catalogue_CVAL2_Name">The name of the entry inside the binary table which lists the CVAL2 (i.e. declination) coordinates.</param>
 		/// <param name="Catalogue_Magnitude_Name">The name of the entry inside the binary table which lists the source magnitudes.</param>
 		/// <param name="Refine">Option to automatically refine the solution further with additional points after the initial solution is found.</param>
-		public WCSAutoSolver(string WCS_type, int Number_of_Points, JPFITS.FITSImage Fits_Img, bool[,] Image_ROI, double Image_Saturation, bool auto_background, int PSE_kernel_radius, int PSE_separation_radius, string Fits_Catalogue_BinTable_File, string Catalogue_Extension_Name, string Catalogue_CVAL1_Name, string Catalogue_CVAL2_Name, string Catalogue_Magnitude_Name, bool Refine)
+		public WCSAutoSolver(string WCS_type, int Number_of_Points, JPFITS.FITSImage Fits_Img, bool[,]? Image_ROI, double Image_Saturation, bool auto_background, int PSE_kernel_radius, int PSE_separation_radius, string Fits_Catalogue_BinTable_File, string Catalogue_Extension_Name, string Catalogue_CVAL1_Name, string Catalogue_CVAL2_Name, string Catalogue_Magnitude_Name, bool Refine)
 		{
 			this.BGWRKR = new BackgroundWorker();
 			this.BGWRKR.WorkerReportsProgress = true;
@@ -907,7 +911,7 @@ namespace JPFITS
 		/// <param name="N_matches_stop">Stop and solve solution when N matches are found between image and catalogue coordinates. N_matches_stop greater than or equal to 3. Suggest 6. Solution likely requires confirmation at 3 or 4.</param>
 		/// <param name="Percentage_matches_stop">Stop and solve solution when Percentage matches are found between image and catalogue coordinates. Suggest 25.</param>
 		/// <param name="condition_arrays">Optionally condition the triangle arrays. Suggest true.</param>
-		/// <param name="show_report_form">Optionally shows a cancellable Form which displays the solution progress.</param>
+		/// <param name="show_report_form">Optionally shows a cancellable Form which displays the solution progress. False equates to a syncronous call.</param>
 		public void SolveAsync(double scale_init, double scale_lb, double scale_ub, double rotation_init, double rotation_lb, double rotation_ub, double vertex_tolerance, int N_matches_stop, int Percentage_matches_stop, bool condition_arrays, bool show_report_form)
 		{
 			SCALE_INIT = scale_init;
@@ -933,13 +937,70 @@ namespace JPFITS
 				if (res == DialogResult.Cancel)
 					CANCELLED = true;
 			}
-			else
-				BGWRKR.RunWorkerAsync();
+			else// non async call
+			{
+				//BGWRKR.RunWorkerAsync();
+				BGWRKR_DoWork(this, new DoWorkEventArgs(null));//runs the PSE and exits
+				BGWRKR_RunWorkerCompleted(this, new RunWorkerCompletedEventArgs(this, null, false));//calls the solver
+			}
 		}
 
 		#endregion
 
 		#region STATIC METHODS
+
+		public static bool SolveWCS_EZ(FITSImage fimg, double scale, double pixelSaturation)
+		{
+			try
+			{
+				string sRA = fimg.Header.GetKeyValue("RA");
+				string sDEC = fimg.Header.GetKeyValue("DEC");
+
+				double dRA, dDEC;
+				if (JPMath.IsNumeric(sRA))
+				{
+					dRA = Convert.ToDouble(sRA);
+					dDEC = Convert.ToDouble(sDEC);
+				}
+				else
+					WorldCoordinateSolution.SexagesimalElementsToDegreeElements(sRA, sDEC, "", out dRA, out dDEC);
+
+				//populate the mandatory arguments for AstraCarta query
+				ArrayList keys = new ArrayList();
+				ArrayList values = new ArrayList();
+
+				keys.Add("-ra");//this is the AstraCarta argument for right ascension
+				values.Add(dRA.ToString());
+
+				keys.Add("-dec");
+				values.Add(dDEC.ToString());
+
+				keys.Add("-scale");//in arcseconds per pixel
+				values.Add(scale.ToString());
+
+				keys.Add("-pixwidth");//width of the image in pixels
+				values.Add(fimg.Width.ToString());
+
+				keys.Add("-pixheight");
+				values.Add(fimg.Height.ToString());
+
+				keys.Add("-fitsout");//need a fits binary table
+				values.Add(" ");//still need to add an empty value to keep table indexes the same
+
+				string fullcataloguepath = AstraCarta.Query(keys, values);
+
+				WCSAutoSolver wcsas = new WCSAutoSolver("TAN", 50, fimg, null, pixelSaturation, true, 2, 21, fullcataloguepath, "", "ra", "dec", "phot_g_mean_mag", true);
+				wcsas.SolveAsync(scale, scale / 1.05, scale * 1.05, 0, -180, 180, 0.15, 6, 25, true, false);
+				fimg.WCS = wcsas.WCS_Solution;
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show(ex.Data + "	" + ex.InnerException + "	" + ex.Message + "	" + ex.Source + "	" + ex.StackTrace + "	" + ex.TargetSite);
+				return false;
+			}
+
+			return true;
+		}
 
 		/// <summary>Conditions the traingle array so that all threads begin with the brightest triangles.</summary>
 		/// <param name="triarray">An array of triangles.</param>
