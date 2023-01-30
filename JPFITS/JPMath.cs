@@ -7335,19 +7335,7 @@ namespace JPFITS
 				Find(Abs(MatrixSubScalar(clipper, m, true), true), sigma * s, ">", true, out xinds, out yinds);
 			}
 			return m;
-		}
-
-		///// <summary>Returns the median of all elements in the data array.</summary>
-		//[MethodImpl(256)]/*256 = agressive inlining*/
-		//public static double Median(double[,] data)
-		//{
-		//	double[] arr = new double[data.Length];
-		//	for (int i = 0; i < data.GetLength(0); i++)
-		//		for (int j = 0; j < data.GetLength(1); j++)
-		//			arr[data.GetLength(1) * i + j] = data[i, j];
-
-		//	return Median(arr);
-		//}
+		}		
 
 		public static double Median(Array data)
 		{
@@ -7436,6 +7424,19 @@ namespace JPFITS
 			*p = *q;
 			*q = temp;
 		}
+
+		///// <summary>Returns the median of all elements in the data array.</summary>
+		//[MethodImpl(256)]/*256 = agressive inlining*/
+		//public static double Median(double[,] data)
+		//{
+		//	double[] arr = new double[data.Length];
+		//	for (int i = 0; i < data.GetLength(0); i++)
+		//		for (int j = 0; j < data.GetLength(1); j++)
+		//			arr[data.GetLength(1) * i + j] = data[i, j];
+
+		//	return Median(arr);
+		//}
+
 
 		//[MethodImpl(256)]/*256 = agressive inlining*/
 		//public static unsafe double Median(double[] data)
