@@ -7337,16 +7337,96 @@ namespace JPFITS
 			return m;
 		}
 
-		/// <summary>Returns the median of all elements in the data array.</summary>
-		[MethodImpl(256)]/*256 = agressive inlining*/
-		public static unsafe double Median(double[,] data)
+		///// <summary>Returns the median of all elements in the data array.</summary>
+		//[MethodImpl(256)]/*256 = agressive inlining*/
+		//public static double Median(double[,] data)
+		//{
+		//	double[] arr = new double[data.Length];
+		//	for (int i = 0; i < data.GetLength(0); i++)
+		//		for (int j = 0; j < data.GetLength(1); j++)
+		//			arr[data.GetLength(1) * i + j] = data[i, j];
+
+		//	return Median(arr);
+		//}
+
+		public static double Median(Array data)
 		{
 			double[] arr = new double[data.Length];
-			for (int i = 0; i < data.GetLength(0); i++)
-				for (int j = 0; j < data.GetLength(1); j++)
-					arr[data.GetLength(1) * i + j] = data[i, j];
 
-			return Median(arr);
+			if (data.Rank == 2)
+				for (int i = 0; i < data.GetLength(0); i++)
+					for (int j = 0; j < data.GetLength(1); j++)
+						arr[data.GetLength(1) * i + j] = ((double[,])data)[i, j];
+			else
+				for (int i = 0; i < data.Length; i++)
+					arr[i] = ((double[])data)[i];
+
+			if (JPMath.IsEven(arr.Length))
+			{
+				int kth1 = arr.Length / 2;
+				int kth2 = (arr.Length - 1) / 2;
+
+				return (arr[nth_element(arr, kth1)] + arr[nth_element(arr, kth2)]) / 2;
+			}
+			else
+				return arr[nth_element(arr, arr.Length / 2)];
+		}
+
+		[MethodImpl(256)]/*256 = agressive inlining*/
+		private static unsafe int nth_element(double[] data, int nth_element)
+		{
+			int middle, ll, hh;
+
+			int low = 0;
+			int high = data.Length - 1;
+
+			fixed (double* arrptr = data)
+			{
+				for (; ; )
+				{
+					if (high <= low)
+						return nth_element;
+
+					if (high == low + 1)
+					{
+						if (data[low] > data[high])
+							SwapElements(arrptr + low, arrptr + high);
+						return nth_element;
+					}
+
+					middle = (low + high) / 2;
+					if (data[middle] > data[high])
+						SwapElements(arrptr + middle, arrptr + high);
+
+					if (data[low] > data[high])
+						SwapElements(arrptr + low, arrptr + high);
+
+					if (data[middle] > data[low])
+						SwapElements(arrptr + middle, arrptr + low);
+
+					SwapElements(arrptr + middle, arrptr + low + 1);
+
+					ll = low + 1;
+					hh = high;
+					for (; ; )
+					{
+						do ll++; while (data[low] > data[ll]);
+						do hh--; while (data[hh] > data[low]);
+
+						if (hh < ll)
+							break;
+
+						SwapElements(arrptr + ll, arrptr + hh);
+					}
+
+					SwapElements(arrptr + low, arrptr + hh);
+
+					if (hh <= nth_element)
+						low = ll;
+					if (hh >= nth_element)
+						high = hh - 1;
+				}
+			}
 		}
 
 		[MethodImpl(256)]/*256 = agressive inlining*/
@@ -7357,67 +7437,68 @@ namespace JPFITS
 			*q = temp;
 		}
 
-		[MethodImpl(256)]/*256 = agressive inlining*/
-		public static unsafe double Median(double[] data)
-		{
-			double[] arr = new double[data.Length];
-			for (int i = 0; i < data.Length; i++)
-				arr[i] = data[i];
+		//[MethodImpl(256)]/*256 = agressive inlining*/
+		//public static unsafe double Median(double[] data)
+		//{
+		//	double[] arr = new double[data.Length];
+		//	for (int i = 0; i < data.Length; i++)
+		//		arr[i] = data[i];
 
-			int middle, ll, hh;
+		//	int middle, ll, hh;
 
-			int low = 0;
-			int high = arr.Length - 1;
-			int median = (low + high) / 2;
+		//	int low = 0;
+		//	int high = arr.Length - 1;
+		//	int median = (low + high) / 2;
 
-			fixed (double* arrptr = arr)
-			{
-				for (; ; )
-				{
-					if (high <= low)
-						return arr[median];
+		//	fixed (double* arrptr = arr)
+		//	{
+		//		for (; ; )
+		//		{
+		//			if (high <= low)
+		//				return arr[median];
 
-					if (high == low + 1)
-					{
-						if (arr[low] > arr[high])
-							SwapElements(arrptr + low, arrptr + high);
-						return arr[median];
-					}
+		//			if (high == low + 1)
+		//			{
+		//				if (arr[low] > arr[high])
+		//					SwapElements(arrptr + low, arrptr + high);
+		//				return arr[median];
+		//			}
 
-					middle = (low + high) / 2;
-					if (arr[middle] > arr[high])
-						SwapElements(arrptr + middle, arrptr + high);
+		//			middle = (low + high) / 2;
+		//			if (arr[middle] > arr[high])
+		//				SwapElements(arrptr + middle, arrptr + high);
 
-					if (arr[low] > arr[high])
-						SwapElements(arrptr + low, arrptr + high);
+		//			if (arr[low] > arr[high])
+		//				SwapElements(arrptr + low, arrptr + high);
 
-					if (arr[middle] > arr[low])
-						SwapElements(arrptr + middle, arrptr + low);
+		//			if (arr[middle] > arr[low])
+		//				SwapElements(arrptr + middle, arrptr + low);
 
-					SwapElements(arrptr + middle, arrptr + low + 1);
+		//			SwapElements(arrptr + middle, arrptr + low + 1);
 
-					ll = low + 1;
-					hh = high;
-					for (; ; )
-					{
-						do ll++; while (arr[low] > arr[ll]);
-						do hh--; while (arr[hh] > arr[low]);
+		//			ll = low + 1;
+		//			hh = high;
+		//			for (; ; )
+		//			{
+		//				do ll++; while (arr[low] > arr[ll]);
+		//				do hh--; while (arr[hh] > arr[low]);
 
-						if (hh < ll)
-							break;
+		//				if (hh < ll)
+		//					break;
 
-						SwapElements(arrptr + ll, arrptr + hh);
-					}
+		//				SwapElements(arrptr + ll, arrptr + hh);
+		//			}
 
-					SwapElements(arrptr + low, arrptr + hh);
+		//			SwapElements(arrptr + low, arrptr + hh);
 
-					if (hh <= median)
-						low = ll;
-					if (hh >= median)
-						high = hh - 1;
-				}
-			}
-		}
+		//			if (hh <= median)
+		//				low = ll;
+		//			if (hh >= median)
+		//				high = hh - 1;
+		//		}
+		//	}
+		//}
+
 
 		public static double[] Histogram_IntegerStep(double[] values, double step, out double[] bincenters)
 		{
