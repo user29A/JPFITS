@@ -495,7 +495,7 @@ namespace JPFITS
 						}
 						if (pathchange)
 						{
-							MessageBox.Show("WE HAD TO UPDATE THE ENVIRONMENT PATH VARIABLE FOR PYTHON.\r\n\r\nPLEASE RESTART CCDLAB FOR THE PATH ENVIRONMENT VARIABLE TO UPDATE");
+							MessageBox.Show("WE HAD TO UPDATE THE ENVIRONMENT PATH VARIABLE FOR PYTHON.\r\n\r\nPLEASE RESTART");
 							this.Close();
 							return;
 						}
@@ -574,7 +574,7 @@ namespace JPFITS
 
 						if (test == "")
 						{
-							MessageTextBox.AppendText("File name parsing error..." + "\r\n");
+							MessageTextBox.AppendText("File name error..." + "\r\n");
 							break;
 						}
 					}
@@ -583,7 +583,7 @@ namespace JPFITS
 				catch
 				{
 					CloseOnCompleteChck.Checked = false;
-					MessageTextBox.AppendText("File name parsing error:" + "\r\n" + OUTFILE);
+					MessageTextBox.AppendText("File name error:" + "\r\n" + OUTFILE);
 				}
 			}
 

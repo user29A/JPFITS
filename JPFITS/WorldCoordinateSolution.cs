@@ -469,28 +469,28 @@ namespace JPFITS
 			header.SetKey("CRPIX2", this.GetCRPIXn(2).ToString(), true, -1);
 		}
 
-		/// <summary>
-		/// Rotate the parameters of a WCS solution by some angle.
-		/// </summary>
-		/// <param name="rotation">The rotation, in degrees.</param>
-		/// <param name="header">Optionally provide a header to update the keywords. Pass null if no header present or necessary.</param>
-		public void Rotate(double rotation, FITSHeader? header)
-		{
-			CDMATRIX[0, 0] = -CDELTN[0] / 3600 * Math.Cos((CROTAN[0] + rotation) * Math.PI / 180);
-			CDMATRIX[1, 0] = CDELTN[1] / 3600 * Math.Sin((CROTAN[1] + rotation) * Math.PI / 180);
-			CDMATRIX[0, 1] = -CDELTN[0] / 3600 * Math.Sin((CROTAN[0] + rotation) * Math.PI / 180);
-			CDMATRIX[1, 1] = -CDELTN[1] / 3600 * Math.Cos((CROTAN[1] + rotation) * Math.PI / 180);
+		///// <summary>
+		///// Rotate the CD parameters of a WCS solution by some angle.
+		///// </summary>
+		///// <param name="rotation">The rotation, in degrees.</param>
+		///// <param name="header">Optionally provide a header to update the keywords. Pass null if no header present or necessary.</param>
+		//public void Rotate(double rotation, FITSHeader? header)
+		//{
+		//	CDMATRIX[0, 0] = -CDELTN[0] / 3600 * Math.Cos((CROTAN[0] + rotation) * Math.PI / 180);
+		//	CDMATRIX[1, 0] = CDELTN[1] / 3600 * Math.Sin((CROTAN[1] + rotation) * Math.PI / 180);
+		//	CDMATRIX[0, 1] = -CDELTN[0] / 3600 * Math.Sin((CROTAN[0] + rotation) * Math.PI / 180);
+		//	CDMATRIX[1, 1] = -CDELTN[1] / 3600 * Math.Cos((CROTAN[1] + rotation) * Math.PI / 180);
 
-			CD1_1 = CDMATRIX[0, 0];
-			CD1_2 = CDMATRIX[1, 0];
-			CD2_1 = CDMATRIX[0, 1];
-			CD2_2 = CDMATRIX[1, 1];
+		//	CD1_1 = CDMATRIX[0, 0];
+		//	CD1_2 = CDMATRIX[1, 0];
+		//	CD2_1 = CDMATRIX[0, 1];
+		//	CD2_2 = CDMATRIX[1, 1];
 
-			CROTAN[0] += rotation;
-			CROTAN[1] += rotation;
+		//	CROTAN[0] += rotation;
+		//	CROTAN[1] += rotation;
 
-			SET_CDMATRIXINV();
-		}
+		//	SET_CDMATRIXINV();
+		//}
 
 		/// <summary>Recomputes the existing grid so that it can be updated for new display settings.</summary>
 		public void Grid_Refresh()
@@ -656,13 +656,11 @@ namespace JPFITS
 		/// <param name="cval1">An array of coordinate values in degrees on coordinate axis 1.</param>
 		/// <param name="cval2">An array of coordinate values in degrees on coordinate axis 2.</param>
 		/// <param name="header">An FITSImageHeader instance to write the solution into. Pass null if not required.</param>
-		public void Solve_WCS(string WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, JPFITS.FITSHeader header)
+		public void Solve_WCS(string WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, FITSHeader header)
 		{
 			//should first do a check of WCS type to make sure it is valid
 			if (WCS_Type != "TAN")
-			{
 				throw new Exception("Solution type: '" + WCS_Type + "' is invalid. Valid solution types are: 'TAN'");
-			}
 
 			CTYPEN = new string[2];
 			CTYPEN[0] = "RA---" + WCS_Type;
@@ -831,14 +829,12 @@ namespace JPFITS
 		/// <param name="cval2">A coordinate value in degrees on coordinats axis 2 (i.e. declination).</param>
 		public void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, string WCS_Type, out double cval1, out double cval2)
 		{
-
 			Get_Coordinate(X_pix, Y_pix, zero_based_pixels, WCS_Type, out cval1, out cval2, out string sx1, out string sx2);
 		}
 
 		/// <summary>Gets the cval1 and cval2 world coordinate in sexagesimal for a given image [x, y] pixel position.</summary>
 		public void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, string WCS_Type, out string cval1_sxgsml, out string cval2_sxgsml)
 		{
-
 			Get_Coordinate(X_pix, Y_pix, zero_based_pixels, WCS_Type, out double cv1, out double cv2, out cval1_sxgsml, out cval2_sxgsml);
 		}
 
@@ -974,7 +970,7 @@ namespace JPFITS
 			}
 		}
 
-		/// <summary>Copy WCS parameters from the current instance into another FITSHeader.</summary>
+		/// <summary>Copy WCS parameters from the current instance into a FITSHeader.</summary>
 		public void CopyTo(JPFITS.FITSHeader header)
 		{
 			try
@@ -1091,6 +1087,11 @@ namespace JPFITS
 			return WCSEXISTS;
 		}
 
+		/// <summary>
+		/// Draws a WCS grid onto a PictureBox control.
+		/// </summary>
+		/// <param name="pictureBox">The picture box.</param>
+		/// <param name="e">The PaintEventArgs from the PictureBox's Paint callback.</param>
 		public void Grid_DrawWCSGrid(System.Windows.Forms.PictureBox pictureBox, PaintEventArgs e)
 		{
 			if (!WCSEXISTS)
@@ -1136,7 +1137,7 @@ namespace JPFITS
 			}
 		}
 
-		void DrawRotatedTextAt(Graphics gr, float angle, string txt, PointF point, Font the_font, Brush the_brush)
+		private void DrawRotatedTextAt(Graphics gr, float angle, string txt, PointF point, Font the_font, Brush the_brush)
 		{
 			// Save the graphics state.
 			GraphicsState state = gr.Save();

@@ -608,7 +608,11 @@ namespace JPFITS
 		public JPFITS.WorldCoordinateSolution WCS
 		{
 			get { return WORLDCOORDINATESOLUTION; }
-			set { WORLDCOORDINATESOLUTION = value; }
+			set 
+			{
+				WORLDCOORDINATESOLUTION = value;
+				value.CopyTo(this.Header);
+			}
 		}
 		#endregion
 

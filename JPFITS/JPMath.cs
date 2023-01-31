@@ -7337,17 +7337,119 @@ namespace JPFITS
 			return m;
 		}		
 
-		public static double Median(Array data)
+		public static double Median(Array vectorOrArray)
 		{
-			double[] arr = new double[data.Length];
+			double[] arr = new double[vectorOrArray.Length];
 
-			if (data.Rank == 2)
-				for (int i = 0; i < data.GetLength(0); i++)
-					for (int j = 0; j < data.GetLength(1); j++)
-						arr[data.GetLength(1) * i + j] = ((double[,])data)[i, j];
-			else
-				for (int i = 0; i < data.Length; i++)
-					arr[i] = ((double[])data)[i];
+			switch (Type.GetTypeCode((vectorOrArray.GetType()).GetElementType()))
+			{
+				case TypeCode.Double:
+				{
+					if (vectorOrArray.Rank == 2)
+						for (int i = 0; i < vectorOrArray.GetLength(0); i++)
+							for (int j = 0; j < vectorOrArray.GetLength(1); j++)
+								arr[vectorOrArray.GetLength(1) * i + j] = ((double[,])vectorOrArray)[i, j];
+					else
+						for (int i = 0; i < vectorOrArray.Length; i++)
+							arr[i] = ((double[])vectorOrArray)[i];
+
+					break;
+				}
+
+				case TypeCode.Single:
+				{
+					if (vectorOrArray.Rank == 2)
+						for (int i = 0; i < vectorOrArray.GetLength(0); i++)
+							for (int j = 0; j < vectorOrArray.GetLength(1); j++)
+								arr[vectorOrArray.GetLength(1) * i + j] = ((float[,])vectorOrArray)[i, j];
+					else
+						for (int i = 0; i < vectorOrArray.Length; i++)
+							arr[i] = ((float[])vectorOrArray)[i];
+
+					break;
+				}
+
+				case TypeCode.UInt64:
+				{
+					if (vectorOrArray.Rank == 2)
+						for (int i = 0; i < vectorOrArray.GetLength(0); i++)
+							for (int j = 0; j < vectorOrArray.GetLength(1); j++)
+								arr[vectorOrArray.GetLength(1) * i + j] = ((ulong[,])vectorOrArray)[i, j];
+					else
+						for (int i = 0; i < vectorOrArray.Length; i++)
+							arr[i] = ((ulong[])vectorOrArray)[i];
+
+					break;
+				}
+
+				case TypeCode.Int64:
+				{
+					if (vectorOrArray.Rank == 2)
+						for (int i = 0; i < vectorOrArray.GetLength(0); i++)
+							for (int j = 0; j < vectorOrArray.GetLength(1); j++)
+								arr[vectorOrArray.GetLength(1) * i + j] = ((long[,])vectorOrArray)[i, j];
+					else
+						for (int i = 0; i < vectorOrArray.Length; i++)
+							arr[i] = ((long[])vectorOrArray)[i];
+
+					break;
+				}
+
+				case TypeCode.UInt32:
+				{
+					if (vectorOrArray.Rank == 2)
+						for (int i = 0; i < vectorOrArray.GetLength(0); i++)
+							for (int j = 0; j < vectorOrArray.GetLength(1); j++)
+								arr[vectorOrArray.GetLength(1) * i + j] = ((uint[,])vectorOrArray)[i, j];
+					else
+						for (int i = 0; i < vectorOrArray.Length; i++)
+							arr[i] = ((uint[])vectorOrArray)[i];
+
+					break;
+				}
+
+				case TypeCode.Int32:
+				{
+					if (vectorOrArray.Rank == 2)
+						for (int i = 0; i < vectorOrArray.GetLength(0); i++)
+							for (int j = 0; j < vectorOrArray.GetLength(1); j++)
+								arr[vectorOrArray.GetLength(1) * i + j] = ((int[,])vectorOrArray)[i, j];
+					else
+						for (int i = 0; i < vectorOrArray.Length; i++)
+							arr[i] = ((int[])vectorOrArray)[i];
+
+					break;
+				}
+
+				case TypeCode.UInt16:
+				{
+					if (vectorOrArray.Rank == 2)
+						for (int i = 0; i < vectorOrArray.GetLength(0); i++)
+							for (int j = 0; j < vectorOrArray.GetLength(1); j++)
+								arr[vectorOrArray.GetLength(1) * i + j] = ((ushort[,])vectorOrArray)[i, j];
+					else
+						for (int i = 0; i < vectorOrArray.Length; i++)
+							arr[i] = ((ushort[])vectorOrArray)[i];
+
+					break;
+				}
+
+				case TypeCode.Int16:
+				{
+					if (vectorOrArray.Rank == 2)
+						for (int i = 0; i < vectorOrArray.GetLength(0); i++)
+							for (int j = 0; j < vectorOrArray.GetLength(1); j++)
+								arr[vectorOrArray.GetLength(1) * i + j] = ((short[,])vectorOrArray)[i, j];
+					else
+						for (int i = 0; i < vectorOrArray.Length; i++)
+							arr[i] = ((short[])vectorOrArray)[i];
+
+					break;
+				}
+
+				default:
+					throw new Exception("Typecode '" + Type.GetTypeCode((vectorOrArray.GetType()).GetElementType()).ToString() + "' not supported for Median.");
+			}
 
 			if (JPMath.IsEven(arr.Length))
 			{

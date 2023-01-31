@@ -1687,7 +1687,7 @@ namespace JPFITS
 				}
 			}
 
-			else// returnType == TTYPEReturn.Default
+			else// returnType == TTYPEReturn.Native
 			{
 				switch (entryTypeCode)
 				{
@@ -2986,7 +2986,7 @@ namespace JPFITS
 				}
 			}
 
-			else //returnType == TTYPEReturn.Default
+			else //returnType == TTYPEReturn.Native
 			{
 				if (TTYPEISHEAPARRAYDESC[ttypeindex])//get from heap
 					return GETHEAPTTYPE(ttypeindex, out entryTypeCode, out entryNElements, returnType);
@@ -4355,10 +4355,10 @@ namespace JPFITS
 			throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
         }
 
-		/// <summary>Add an extra key to the extension header. If it is to be a COMMENT, just fill the keyValue with eighteen characters, and the keyComment with 54 characters.</summary>
-		/// <param name="keyName">The name of the key.</param>
-		/// <param name="keyValue">The value of the key. Pass numeric types as a string.</param>
-		/// <param name="keyComment">The comment of the key.</param>
+		/// <summary>Add an extra key to the extension header. If the key is intended as a COMMENT, leave the keyValue empty, and place the entire comment in keyComment.</summary>
+		/// <param name="keyName">The name of the key. If they key is a comment, either use COMMENT here, or just pass an empty string and put the entire comment line in keyComment.</param>
+		/// <param name="keyValue">The value of the key. Pass numeric types as a string. If the key is intended as a comment, pass an empty string.</param>
+		/// <param name="keyComment">The header key comment, maximum 80 characters if it is the entire comment line, or maximum 73 characters if keyName is COMMENT; excess elements will be truncated.</param>
 		public void AddExtraHeaderKey(string keyName, string keyValue, string keyComment)
 		{
 			if (EXTRAKEYS == null)

@@ -763,7 +763,7 @@ namespace JPFITS
 		/// <param name="Catalogue_CVAL2_Name">The name of the entry inside the binary table which lists the CVAL2 (i.e. declination) coordinates.</param>
 		/// <param name="Catalogue_Magnitude_Name">The name of the entry inside the binary table which lists the source magnitudes.</param>
 		/// <param name="Refine">Option to automatically refine the solution further with additional points after the initial solution is found.</param>
-		public WCSAutoSolver(string WCS_type, int Number_of_Points, JPFITS.FITSImage Fits_Img, bool[,]? Image_ROI, double Image_Saturation, bool auto_background, int PSE_kernel_radius, int PSE_separation_radius, string Fits_Catalogue_BinTable_File, string Catalogue_Extension_Name, string Catalogue_CVAL1_Name, string Catalogue_CVAL2_Name, string Catalogue_Magnitude_Name, bool Refine)
+		public WCSAutoSolver(string WCS_type, int Number_of_Points, FITSImage Fits_Img, bool[,]? Image_ROI, double Image_Saturation, bool auto_background, int PSE_kernel_radius, int PSE_separation_radius, string Fits_Catalogue_BinTable_File, string Catalogue_Extension_Name, string Catalogue_CVAL1_Name, string Catalogue_CVAL2_Name, string Catalogue_Magnitude_Name, bool Refine)
 		{
 			this.BGWRKR = new BackgroundWorker();
 			this.BGWRKR.WorkerReportsProgress = true;
@@ -802,7 +802,7 @@ namespace JPFITS
 			PIXTHRESH = IMAMP / DIV + IMMED;
 		}
 
-		/// <summary>Initializes the WCS_AutoSolver class for an existing pair of pixel source and catalogue coordinates.</summary>
+		/// <summary>Initializes the WCS_AutoSolver class for an existing pair of unmatched pixel source and catalogue coordinates.</summary>
 		/// <param name="WCS_type">The WCS transformation type. Solution only uses TAN at this time.</param>
 		/// <param name="pixels">The source pixel positions in computer graphics coordinate orientation, i.e., origin top left of image.</param>
 		/// <param name="zero_based_pixels">If the source pixel positions are zero-based.</param>
@@ -955,15 +955,15 @@ namespace JPFITS
 		/// <br /> Queries GaiaDR3 for the catalogue.
 		/// <br /> Requires Python 3.10 or higher, and installation of AstraCarta via *pip install AstraCarta* on the command window.
 		/// </summary>
-		/// <param name="fimg">The FITSImage to solve the WCS for.</param>
+		/// <param name="fitsImage">The FITSImage to solve the WCS for.</param>
 		/// <param name="scale">The plate scale of the image, to within +-5% (need not be totally precise). Arcseconds per pixel.</param>
 		/// <param name="pixelSaturation">The saturation level of the image. For example, for 16bit ADU's, saturation occurs ~65,535, but you should specify a 15% lower value than this, so ~55e3.</param>
-		public static bool SolveWCS_EZ(FITSImage fimg, double scale, double pixelSaturation)
+		public static bool SolveWCS_EZ(FITSImage fitsImage, double scale, double pixelSaturation)
 		{
 			try
 			{
-				string sRA = fimg.Header.GetKeyValue("RA");
-				string sDEC = fimg.Header.GetKeyValue("DEC");
+				string sRA = fitsImage.Header.GetKeyValue("RA");
+				string sDEC = fitsImage.Header.GetKeyValue("DEC");
 
 				double dRA, dDEC;
 				if (JPMath.IsNumeric(sRA))
@@ -979,7 +979,7 @@ namespace JPFITS
 				ArrayList values = new ArrayList();
 
 				keys.Add("-ra");//this is the AstraCarta argument for right ascension
-				values.Add(dRA.ToString());
+				values.Add(dRA.ToString());//degree.degree string
 
 				keys.Add("-dec");
 				values.Add(dDEC.ToString());
@@ -988,22 +988,21 @@ namespace JPFITS
 				values.Add(scale.ToString());
 
 				keys.Add("-pixwidth");//width of the image in pixels
-				values.Add(fimg.Width.ToString());
+				values.Add(fitsImage.Width.ToString());
 
 				keys.Add("-pixheight");
-				values.Add(fimg.Height.ToString());
+				values.Add(fitsImage.Height.ToString());
 
 				keys.Add("-fitsout");//need a fits binary table
-				values.Add(" ");//still need to add an empty value to keep table indexes the same
+				values.Add(" ");//still need to add an empty value to keep list indexes aligned...if anything came after this
 
-				string fullcataloguepath = AstraCarta.Query(keys, values);
+				string fullcataloguepath = AstraCarta.Query(keys, values);//query will take a fre moments
 
-				WCSAutoSolver wcsas = new WCSAutoSolver("TAN", 50, fimg, null, pixelSaturation, true, 2, 21, fullcataloguepath, "", "ra", "dec", "phot_g_mean_mag", true);
-				wcsas.SolveAsync(scale, scale / 1.05, scale * 1.05, 0, -180, 180, 0.15, 6, 25, true, false);
+				WCSAutoSolver wcsas = new WCSAutoSolver("TAN", 50, fitsImage, null, pixelSaturation, true, 2, 21, fullcataloguepath, "", "ra", "dec", "phot_g_mean_mag", true);//instatiate a solver
+				wcsas.SolveAsync(scale, scale / 1.05, scale * 1.05, 0, -180, 180, 0.25, 6, 25, true, false);//should solve quickly
 				if (wcsas.Solved)
 				{
-					fimg.WCS = wcsas.WCS_Solution;
-					wcsas.WCS_Solution.CopyTo(fimg.Header);
+					fitsImage.WCS = wcsas.WCS_Solution;
 					return true;
 				}
 				else
