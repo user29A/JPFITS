@@ -949,6 +949,15 @@ namespace JPFITS
 
 		#region STATIC METHODS
 
+		/// <summary>
+		/// Solves a WCS solution for a FITSImage and writes the WCS keywords into its header (but does not save the file). Should work for most visible and near-visible images, and uses a bunch of default settings. 
+		/// <br /> Failure to solve is given by a false return, in which case you need to use a contructor and specify additional settings.
+		/// <br /> Queries GaiaDR3 for the catalogue.
+		/// <br /> Requires Python 3.10 or higher, and installation of AstraCarta via *pip install AstraCarta* on the command window.
+		/// </summary>
+		/// <param name="fimg">The FITSImage to solve the WCS for.</param>
+		/// <param name="scale">The plate scale of the image, to within +-5% (need not be totally precise). Arcseconds per pixel.</param>
+		/// <param name="pixelSaturation">The saturation level of the image. For example, for 16bit ADU's, saturation occurs ~65,535, but you should specify a 15% lower value than this, so ~55e3.</param>
 		public static bool SolveWCS_EZ(FITSImage fimg, double scale, double pixelSaturation)
 		{
 			try
@@ -991,15 +1000,20 @@ namespace JPFITS
 
 				WCSAutoSolver wcsas = new WCSAutoSolver("TAN", 50, fimg, null, pixelSaturation, true, 2, 21, fullcataloguepath, "", "ra", "dec", "phot_g_mean_mag", true);
 				wcsas.SolveAsync(scale, scale / 1.05, scale * 1.05, 0, -180, 180, 0.15, 6, 25, true, false);
-				fimg.WCS = wcsas.WCS_Solution;
+				if (wcsas.Solved)
+				{
+					fimg.WCS = wcsas.WCS_Solution;
+					wcsas.WCS_Solution.CopyTo(fimg.Header);
+					return true;
+				}
+				else
+					return false;
 			}
 			catch (Exception ex)
 			{
 				MessageBox.Show(ex.Data + "	" + ex.InnerException + "	" + ex.Message + "	" + ex.Source + "	" + ex.StackTrace + "	" + ex.TargetSite);
 				return false;
 			}
-
-			return true;
 		}
 
 		/// <summary>Conditions the traingle array so that all threads begin with the brightest triangles.</summary>
