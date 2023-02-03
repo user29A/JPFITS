@@ -48,9 +48,9 @@ namespace JPFITS
 		/// <param name="scale">The plate scale in arcseconds per pixel.</param>
 		/// <param name="pixwidth">The number of horizontal pixels of the image.</param>
 		/// <param name="pixheight">The number of vertical pixels of the image</param>
-		/// <param name="optArgs">Optional arguments list. Possible argument can be found here: https://github.com/user29A/AstraCarta/wiki.
-		/// <br />Do not pass the switch "-", for example do not pass "-buffer", but only "buffer", etc.
-		/// <br />Argument and their values should be consecutive, for example: optArgs.Add("buffer); optArgs.Add(2); and so on.</param>
+		/// <param name="optArgs">Optional arguments list. Possible arguments can be found here: https://github.com/user29A/AstraCarta/wiki.
+		/// <br />Be sure to pass the switch "-argument"; for example do not pass "buffer", but pass "-buffer", etc.
+		/// <br />Argument and their values should be consecutive, for example: optArgs.Add("-buffer); optArgs.Add(2); and so on.</param>
 		public static string Query(double ra, double dec, double scale, int pixwidth, int pixheight, ArrayList? optArgs = null)
 		{
 			try
@@ -61,30 +61,30 @@ namespace JPFITS
 				int n;
 
 				double maglimit = 100;
-				n = optArgs.IndexOf("maglimit");
+				n = optArgs.IndexOf("-maglimit");
 				if (n != -1)
 					maglimit = Convert.ToDouble(optArgs[n + 1]);
 
 				double buffer = 0;
-				n = optArgs.IndexOf("buffer");
+				n = optArgs.IndexOf("-buffer");
 				if (n != -1)
 					buffer = Convert.ToDouble(optArgs[n + 1]); //arcminutes
 
 				double offsetra = 0;
-				n = optArgs.IndexOf("offsetra");
+				n = optArgs.IndexOf("-offsetra");
 				if (n != -1)
 					offsetra = Convert.ToDouble(optArgs[n + 1]); //arcminutes
 				ra += (offsetra / 60);
 
 				double offsetdec = 0;
-				n = optArgs.IndexOf("offsetdec");
+				n = optArgs.IndexOf("-offsetdec");
 				if (n != -1)
 					offsetdec = Convert.ToDouble(optArgs[n + 1]); //arcminutes
 				dec += (offsetdec / 60);
 
 				string shape = "rectangle";
 				int shapenum = 1;
-				n = optArgs.IndexOf("shape");
+				n = optArgs.IndexOf("-shape");
 				if (n != -1)
 					if ((string)optArgs[n + 1] != "circle" && (string)optArgs[n + 1] != "rectangle")
 						throw new Exception("shape may only be \"circle\" or \"rectangle\"");
@@ -99,7 +99,7 @@ namespace JPFITS
 				double radiuspix = radius / (scale / 3600);
 
 				double rotation = 0;
-				n = optArgs.IndexOf("rotation");
+				n = optArgs.IndexOf("-rotation");
 				if (n != -1)
 					if (shape == "circle")
 						throw new Exception("rotation doesn't make sense with a cirlce query.");
@@ -166,7 +166,7 @@ namespace JPFITS
 
 				string catalogue = "GaiaDR3";
 				int cataloguenum = 1;
-				n = optArgs.IndexOf("catalogue");
+				n = optArgs.IndexOf("-catalogue");
 				if (n != -1)
 					catalogue = (string)optArgs[n + 1];
 				if (catalogue != "GaiaDR3")
@@ -174,7 +174,7 @@ namespace JPFITS
 
 				string filter = "g";
 				int filternum = 3;
-				n = optArgs.IndexOf("filter");
+				n = optArgs.IndexOf("-filter");
 				if (n != -1)
 					filter = (string)optArgs[n + 1];
 				if (catalogue == "GaiaDR3")
@@ -197,25 +197,25 @@ namespace JPFITS
 						throw new Exception("Filter " + filter + " not valid for Catalogue " + catalogue);
 
 				bool imageout = false;
-				n = optArgs.IndexOf("imageout");
+				n = optArgs.IndexOf("-imageout");
 				if (n != -1)
 					imageout = (bool)optArgs[n + 1];
 
 				string outformat = ".csv";
 				bool fitsout = false;
-				n = optArgs.IndexOf("fitsout");
+				n = optArgs.IndexOf("-fitsout");
 				if (n != -1)
 					fitsout = true;
 				if (fitsout == true)
 					outformat = ".fit";
 
 				bool imageshow = false;
-				n = optArgs.IndexOf("imageshow");
+				n = optArgs.IndexOf("-imageshow");
 				if (n != -1)
 					imageshow = true;
 
 				string outdir = Directory.GetCurrentDirectory();
-				n = optArgs.IndexOf("outdir");
+				n = optArgs.IndexOf("-outdir");
 				if (n != -1)
 					outdir = (string)optArgs[n + 1];
 				if (!Directory.Exists(outdir))
@@ -226,22 +226,22 @@ namespace JPFITS
 					Directory.CreateDirectory(rawoutdir);
 
 				bool forcenew = false;
-				n = optArgs.IndexOf("forcenew");
+				n = optArgs.IndexOf("-forcenew");
 				if (n != -1)
 					forcenew = true;
 
 				int nquery = 500;
-				n = optArgs.IndexOf("nquery");
+				n = optArgs.IndexOf("-nquery");
 				if (n != -1)
 					nquery = Convert.ToInt32(optArgs[n + 1]);
 
 				double pmepoch = 0;
-				n = optArgs.IndexOf("pmepoch");
+				n = optArgs.IndexOf("-pmepoch");
 				if (n != -1)
 					pmepoch = Convert.ToDouble(optArgs[n + 1]);
 
 				double pmlimit = Double.MaxValue;
-				n = optArgs.IndexOf("pmlimit");
+				n = optArgs.IndexOf("-pmlimit");
 				if (n != -1)
 					if (pmepoch == 0)
 						throw new Exception("pmlimit is only valid if pmepoch is specified");
@@ -249,7 +249,7 @@ namespace JPFITS
 						pmlimit = Convert.ToDouble(optArgs[n + 1]);
 
 				string entries = "ref_epoch, ra, ra_error, dec, dec_error, pmra, pmra_error, pmdec, pmdec_error, pm, phot_bp_mean_mag, phot_g_mean_mag, phot_rp_mean_mag";
-				n = optArgs.IndexOf("entries");
+				n = optArgs.IndexOf("-entries");
 				if (n != -1)
 					if ((string)optArgs[n + 1] == "all")
 						entries = "*";
@@ -257,12 +257,12 @@ namespace JPFITS
 						entries += " " + (string)optArgs[n + 1];
 
 				bool notableout = false;
-				n = optArgs.IndexOf("notableout");
+				n = optArgs.IndexOf("-notableout");
 				if (n != -1)
 					notableout = true;
 
 				bool rmvrawquery = false;
-				n = optArgs.IndexOf("rmvrawquery");
+				n = optArgs.IndexOf("-rmvrawquery");
 				if (n != -1)
 					rmvrawquery = true;
 
@@ -280,19 +280,19 @@ namespace JPFITS
 				}
 
 				string outname = fileoutfilenamehash.ToString();
-				n = optArgs.IndexOf("outname");
+				n = optArgs.IndexOf("-outname");
 				if (n != -1)
 					outname = (string)optArgs[n + 1];
 
 				bool overwrite = false;
-				n = optArgs.IndexOf("overwrite");
+				n = optArgs.IndexOf("-overwrite");
 				if (n != -1)
 					overwrite = true;
 
 				#pragma warning disable CS0219 // Variable is assigned but its value is never used
 				bool silent = false;
 				#pragma warning restore CS0219 // Variable is assigned but its value is never used
-				n = optArgs.IndexOf("silent");
+				n = optArgs.IndexOf("-silent");
 				if (n != -1)
 					silent = true;
 
@@ -601,27 +601,27 @@ namespace JPFITS
 			int n;
 
 			BufferTextBox.Text = "";
-			n = optArgs.IndexOf("buffer");
+			n = optArgs.IndexOf("-buffer");
 			if (n != -1)
 				BufferTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			RAOffsetTextBox.Text = "";
-			n = optArgs.IndexOf("offsetra");
+			n = optArgs.IndexOf("-offsetra");
 			if (n != -1)
 				RAOffsetTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			DecOffsetTextBox.Text = "";
-			n = optArgs.IndexOf("offsetdec");
+			n = optArgs.IndexOf("-offsetdec");
 			if (n != -1)
 				DecOffsetTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			NameTextBox.Text = "";
-			n = optArgs.IndexOf("outname");
+			n = optArgs.IndexOf("-outname");
 			if (n != -1)
 				NameTextBox.Text = string.Join("_", ((string)optArgs[n + 1]).Split(Path.GetInvalidFileNameChars())) + "_AstraCarta";
 
 			CatalogueDrop.SelectedIndex = 0;//GaiaDR3
-			n = optArgs.IndexOf("catalogue");
+			n = optArgs.IndexOf("-catalogue");
 			if (n != -1)
 				if ((string)optArgs[n + 1] == "GaiaDR3")
 					CatalogueDrop.SelectedIndex = 0;
@@ -629,7 +629,7 @@ namespace JPFITS
 					throw new Exception("Catalogue: '" + (string)optArgs[n + 1] + "' not recognized...");
 
 			FilterDrop.SelectedIndex = 1;//GaiaDR3 g
-			n = optArgs.IndexOf("filter");
+			n = optArgs.IndexOf("-filter");
 			if (n != -1)
 				if (CatalogueDrop.SelectedIndex == 0)//gaiadr3
 				{
@@ -646,12 +646,12 @@ namespace JPFITS
 					throw new Exception("Filter: '" + (string)optArgs[n + 1] + "' not recognized...");
 
 			MagLimitTextBox.Text = "";
-			n = optArgs.IndexOf("maglimit");
+			n = optArgs.IndexOf("-maglimit");
 			if (n != -1)
 				MagLimitTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			ShapeDrop.SelectedIndex = 0;
-			n = optArgs.IndexOf("shape");
+			n = optArgs.IndexOf("-shape");
 			if (n != -1)
 				if ((string)optArgs[n + 1] == "circle")
 					ShapeDrop.SelectedIndex = 1;
@@ -661,72 +661,72 @@ namespace JPFITS
 					throw new Exception("Shape: '" + (string)optArgs[n + 1] + "' not recognized.");
 
 			RotationTextBox.Text = "";
-			n = optArgs.IndexOf("rotation");
+			n = optArgs.IndexOf("-rotation");
 			if (n != -1)
 				RotationTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			NQueryTextBox.Text = "500";
-			n = optArgs.IndexOf("nquery");
+			n = optArgs.IndexOf("-nquery");
 			if (n != -1)
 				NQueryTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			PMEpochTextBox.Text = "";
-			n = optArgs.IndexOf("pmepoch");
+			n = optArgs.IndexOf("-pmepoch");
 			if (n != -1)
 				PMEpochTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			PMLimitTextBox.Text = "";
-			n = optArgs.IndexOf("pmlimit");
+			n = optArgs.IndexOf("-pmlimit");
 			if (n != -1)
 				PMLimitTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			DirectoryTextBox.Text = "";
-			n = optArgs.IndexOf("outdir");
+			n = optArgs.IndexOf("-outdir");
 			if (n != -1)
 				DirectoryTextBox.Text = (string)optArgs[n + 1];
 
 			EntriesTextBox.Text = "";
-			n = optArgs.IndexOf("entries");
+			n = optArgs.IndexOf("-entries");
 			if (n != -1)
 				EntriesTextBox.Text = (string)optArgs[n + 1];
 
 			SaveTableChck.Checked = true;
-			n = optArgs.IndexOf("notable");
+			n = optArgs.IndexOf("-notable");
 			if (n != -1)
 				SaveTableChck.Checked = false;
 
 			FITSTableChck.Checked = false;
-			n = optArgs.IndexOf("fitsout");
+			n = optArgs.IndexOf("-fitsout");
 			if (n != -1)
 				FITSTableChck.Checked = true;
 
 			ShowImageChck.Checked = false;
-			n = optArgs.IndexOf("imageshow");
+			n = optArgs.IndexOf("-imageshow");
 			if (n != -1)
 				ShowImageChck.Checked = true;
 
 			SaveImageChck.Checked = false;
-			n = optArgs.IndexOf("outimage");
+			n = optArgs.IndexOf("-outimage");
 			if (n != -1)
 				SaveImageChck.Checked = true;
 
 			ForceNewChck.Checked = false;
-			n = optArgs.IndexOf("forcenew");
+			n = optArgs.IndexOf("-forcenew");
 			if (n != -1)
 				ForceNewChck.Checked = true;
 
 			RemoveRawQueryChck.Checked = false;
-			n = optArgs.IndexOf("rmvrawquery");
+			n = optArgs.IndexOf("-rmvrawquery");
 			if (n != -1)
 				RemoveRawQueryChck.Checked = true;
 
 			SilentChck.Checked = false;
-			n = optArgs.IndexOf("silent");
+			n = optArgs.IndexOf("-silent");
 			if (n != -1)
 				SilentChck.Checked = true;
 
 			OverwriteChck.Checked = false;
-			n = optArgs.IndexOf("overwrite");
+			n = optArgs.IndexOf("-overwrite");
 			if (n != -1)
 				OverwriteChck.Checked = true;
 		}
@@ -736,76 +736,76 @@ namespace JPFITS
 			ArrayList optArgs = new ArrayList();
 			if (BufferTextBox.Text != "")
 			{
-				optArgs.Add("buffer");
+				optArgs.Add("-buffer");
 				optArgs.Add(Convert.ToDouble(BufferTextBox.Text));
 			}
 			if (RAOffsetTextBox.Text != "")
 			{
-				optArgs.Add("offsetra");
+				optArgs.Add("-offsetra");
 				optArgs.Add(Convert.ToDouble(RAOffsetTextBox.Text));
 			}
 			if (DecOffsetTextBox.Text != "")
 			{
-				optArgs.Add("offsetdec");
+				optArgs.Add("-offsetdec");
 				optArgs.Add(Convert.ToDouble(DecOffsetTextBox.Text));
 			}
 			if (NameTextBox.Text != "")
 			{
-				optArgs.Add("outname");
+				optArgs.Add("-outname");
 				optArgs.Add(NameTextBox.Text);
 			}
-			optArgs.Add("catalogue");
+			optArgs.Add("-catalogue");
 			optArgs.Add(CatalogueDrop.SelectedItem.ToString());
-			optArgs.Add("filter");
+			optArgs.Add("-filter");
 			optArgs.Add(FilterDrop.SelectedItem.ToString());
 			if (MagLimitTextBox.Text != "")
 			{
-				optArgs.Add("maglimit");
+				optArgs.Add("-maglimit");
 				optArgs.Add(Convert.ToDouble(MagLimitTextBox.Text));
 			}
-			optArgs.Add("shape");
+			optArgs.Add("-shape");
 			optArgs.Add(ShapeDrop.SelectedItem.ToString());
 			if (ShapeDrop.SelectedItem.ToString() == "rectangle")
 				if (RotationTextBox.Text != "")
 				{
-					optArgs.Add("rotation");
+					optArgs.Add("-rotation");
 					optArgs.Add(Convert.ToDouble(RotationTextBox.Text));
 				}
-			optArgs.Add("nquery");
+			optArgs.Add("-nquery");
 			optArgs.Add(NQueryTextBox.Text);
 			if (PMEpochTextBox.Text != "")
 			{
-				optArgs.Add("pmepoch");
+				optArgs.Add("-pmepoch");
 				optArgs.Add(Convert.ToDouble(PMEpochTextBox.Text));
 			}
 			if (PMLimitTextBox.Text != "")
 			{
-				optArgs.Add("pmlimit");
+				optArgs.Add("-pmlimit");
 				optArgs.Add(Convert.ToDouble(PMLimitTextBox.Text));
 			}
 			if (DirectoryTextBox.Text != "")
 			{
-				optArgs.Add("outdir");
+				optArgs.Add("-outdir");
 				optArgs.Add(DirectoryTextBox.Text);
 			}
-			optArgs.Add("entries");
+			optArgs.Add("-entries");
 			optArgs.Add(EntriesTextBox.Text);
 			if (!SaveTableChck.Checked)
-				optArgs.Add("notable");
+				optArgs.Add("-notable");
 			if (FITSTableChck.Checked)
-				optArgs.Add("fitsout");
+				optArgs.Add("-fitsout");
 			if (ShowImageChck.Checked)
-				optArgs.Add("imageshow");
+				optArgs.Add("-imageshow");
 			if (SaveImageChck.Checked)
-				optArgs.Add("outimage");
+				optArgs.Add("-outimage");
 			if (ForceNewChck.Checked)
-				optArgs.Add("forcenew");
+				optArgs.Add("-forcenew");
 			if (RemoveRawQueryChck.Checked)
-				optArgs.Add("rmvrawquery");
+				optArgs.Add("-rmvrawquery");
 			if (SilentChck.Checked)
-				optArgs.Add("silent");
+				optArgs.Add("-silent");
 			if (OverwriteChck.Checked)
-				optArgs.Add("overwrite");
+				optArgs.Add("-overwrite");
 
 			double ra = Convert.ToDouble(RATextBox.Text);
 			double dec = Convert.ToDouble(DecTextBox.Text);
