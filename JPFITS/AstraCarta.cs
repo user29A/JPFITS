@@ -3,174 +3,567 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows.Forms;
 using System.Collections;
-using System.Diagnostics;
+using System.Net;
+using System.Text;
 #nullable enable
 
 namespace JPFITS
 {
 	public partial class AstraCarta : Form
 	{
-		System.Diagnostics.ProcessStartInfo? PSI;
-		System.Diagnostics.Process? PROC;
 		string OUTFILE = "";
-		string ERR = "";
-		string CURVERS = "";
-		string LATVERS = "";
+		//string ERR = "";
 		bool OPENFROMARGS = false;
 		bool EXECUTEONSHOW = false;
 		bool PERFORMEXECUTE = false;
 		bool CANCELLED = false;
 		bool ERROR = false;
+		bool CLOSEONCOMPLETE = false;
 
 		public string Result_Filename
 		{
 			get { return OUTFILE; }
 		}
 
-		/// <summary>
-		/// Perform a query with no user interface dialog form. Will throw an informative exception if something goes wrong. Returns a string which is the filename of the catalogue data downloaded.
-		/// </summary>
-		/// <param name="keys">A string list of keys such as "-ra", "-dec", "-scale", etc.</param>
-		/// <param name="values">A string list of key values for the keys. Keys with no arguments must have empty strings passed as their values.</param>
-		public static string Query(ArrayList keys, ArrayList values)
+		public bool ExecuteOnShow
 		{
-			string argstring = "";
-			int n;
+			get { return EXECUTEONSHOW; }
+			set { EXECUTEONSHOW = value; }
+		}
 
-			n = keys.IndexOf("-ra");
-			if (n != -1)
-				argstring += String.Format("-ra {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-dec");
-			if (n != -1)
-				argstring += String.Format("-dec {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-scale");
-			if (n != -1)
-				argstring += String.Format("-scale {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-pixwidth");
-			if (n != -1)
-				argstring += String.Format("-pixwidth {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-pixheight");
-			if (n != -1)
-				argstring += String.Format("-pixheight {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-buffer");
-			if (n != -1)
-				argstring += String.Format("-buffer {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-offsetra");
-			if (n != -1)
-				argstring += String.Format("-offsetra {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-offsetdec");
-			if (n != -1)
-				argstring += String.Format("-offsetdec {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-outname");
-			if (n != -1)
-				argstring += String.Format("-outname {0} ", "\"" + string.Join("_", ((string)values[n]).Split(Path.GetInvalidFileNameChars())) + "_AstraCarta" + "\"");
-
-			n = keys.IndexOf("-catalogue");
-			if (n != -1)
-				argstring += String.Format("-catalogue {0} ", "\"" + (string)values[n] + "\"");
-
-			n = keys.IndexOf("-filter");
-			if (n != -1)
-				argstring += String.Format("-filter {0} ", "\"" + (string)values[n] + "\"");
-
-			n = keys.IndexOf("-maglimit");
-			if (n != -1)
-				argstring += String.Format("-maglimit {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-shape");
-			if (n != -1)
-				argstring += String.Format("-shape {0} ", "\"" + (string)values[n] + "\"");
-
-			n = keys.IndexOf("-rotation");
-			if (n != -1)
-				argstring += String.Format("-rotation {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-nquery");
-			if (n != -1)
-				argstring += String.Format("-nquery {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-pmepoch");
-			if (n != -1)
-				argstring += String.Format("-pmepoch {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-pmlimit");
-			if (n != -1)
-				argstring += String.Format("-pmlimit {0} ", (string)values[n]);
-
-			n = keys.IndexOf("-outdir");
-			if (n != -1)
-				argstring += String.Format("-outdir {0} ", "\"" + (string)values[n] + "\"");
-
-			n = keys.IndexOf("-entries");
-			if (n != -1)
-				argstring += String.Format("-entries {0} ", "\"" + (string)values[n] + "\"");
-
-			n = keys.IndexOf("-notable");
-			if (n != -1)
-				argstring += String.Format("-notable ");
-
-			n = keys.IndexOf("-fitsout");
-			if (n != -1)
-				argstring += String.Format("-fitsout ");
-
-			n = keys.IndexOf("-imageshow");
-			if (n != -1)
-				argstring += String.Format("-imageshow ");
-
-			n = keys.IndexOf("-outimage");
-			if (n != -1)
-				argstring += String.Format("-outimage ");
-
-			n = keys.IndexOf("-forcenew");
-			if (n != -1)
-				argstring += String.Format("-forcenew ");
-
-			n = keys.IndexOf("-rmvrawquery");
-			if (n != -1)
-				argstring += String.Format("-rmvrawquery ");
-
-			n = keys.IndexOf("-silent");
-			if (n != -1)
-				argstring += String.Format("-silent ");
-
-			n = keys.IndexOf("-overwrite");
-			if (n != -1)
-				argstring += String.Format("-overwrite ");
-
-			ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "astracarta " + argstring);
-			psi.UseShellExecute = false;
-			psi.CreateNoWindow = true;
-			psi.RedirectStandardError = true;
-			psi.RedirectStandardOutput = true;
-			System.Diagnostics.Process proc = new System.Diagnostics.Process();
-			proc = System.Diagnostics.Process.Start(psi);
-			proc.WaitForExit();
-
-			string outfile = proc.StandardOutput.ReadToEnd().Trim();
-			string test = outfile;
-			string errstr = proc.StandardError.ReadToEnd().Trim();
-			if (outfile == "")
-				throw new Exception("Query failed with message: \r\n\r\n" + errstr + "\r\n\r\n" + proc.StandardOutput.ReadToEnd().Trim() + "\r\n\r\n" + argstring);
-			
-			int c = 0;
-			while (!File.Exists(test))
+		public bool CloseOnComplete
+		{
+			get { return CloseOnCompleteChck.Checked; }
+			set 
 			{
-				c++;
-				test = outfile.Substring(c);
-
-				if (test.Length == 1)
-					throw new Exception("Query failed from possible output file: '" + outfile + "'");
+				CloseOnCompleteChck.Checked = value; 
 			}
+		}
 
-			return test.Trim();
+		/// <summary>
+		/// Perform a query with no user interface dialog form. Will throw an informative exception if something goes wrong. Returns a string which is the filename of the catalogue data downloaded. If nothing was found the string will be empty.
+		/// </summary>
+		/// <param name="ra">The right acension of the field center.</param>
+		/// <param name="dec">The declination of the field center.</param>
+		/// <param name="scale">The plate scale in arcseconds per pixel.</param>
+		/// <param name="pixwidth">The number of horizontal pixels of the image.</param>
+		/// <param name="pixheight">The number of vertical pixels of the image</param>
+		/// <param name="optArgs">Optional arguments list. Possible argument can be found here: https://github.com/user29A/AstraCarta/wiki.
+		/// <br />Do not pass the switch "-", for example do not pass "-buffer", but only "buffer", etc.
+		/// <br />Argument and their values should be consecutive, for example: optArgs.Add("buffer); optArgs.Add(2); and so on.</param>
+		public static string Query(double ra, double dec, double scale, int pixwidth, int pixheight, ArrayList? optArgs = null)
+		{
+			try
+			{
+				if (optArgs == null)
+					optArgs = new ArrayList();
+
+				int n;
+
+				double maglimit = 100;
+				n = optArgs.IndexOf("maglimit");
+				if (n != -1)
+					maglimit = Convert.ToDouble(optArgs[n + 1]);
+
+				double buffer = 0;
+				n = optArgs.IndexOf("buffer");
+				if (n != -1)
+					buffer = Convert.ToDouble(optArgs[n + 1]); //arcminutes
+
+				double offsetra = 0;
+				n = optArgs.IndexOf("offsetra");
+				if (n != -1)
+					offsetra = Convert.ToDouble(optArgs[n + 1]); //arcminutes
+				ra += (offsetra / 60);
+
+				double offsetdec = 0;
+				n = optArgs.IndexOf("offsetdec");
+				if (n != -1)
+					offsetdec = Convert.ToDouble(optArgs[n + 1]); //arcminutes
+				dec += (offsetdec / 60);
+
+				string shape = "rectangle";
+				int shapenum = 1;
+				n = optArgs.IndexOf("shape");
+				if (n != -1)
+					if ((string)optArgs[n + 1] != "circle" && (string)optArgs[n + 1] != "rectangle")
+						throw new Exception("shape may only be \"circle\" or \"rectangle\"");
+					else
+						shape = (string)optArgs[n + 1];
+				if (shape == "circle")
+					if (pixwidth != pixheight)
+						throw new Exception("shape may only be \"circle\" if pixwidth and pixheight are equal");
+					else
+						shapenum = 2;
+				double radius = scale / 3600 * pixwidth / 2 + buffer / 60;// degrees
+				double radiuspix = radius / (scale / 3600);
+
+				double rotation = 0;
+				n = optArgs.IndexOf("rotation");
+				if (n != -1)
+					if (shape == "circle")
+						throw new Exception("rotation doesn't make sense with a cirlce query.");
+					else
+						rotation = Convert.ToDouble(optArgs[n + 1]) * Math.PI / 180;// radians
+
+				double cd11 = -scale / 3600 * Math.Cos(rotation);
+				double cd12 = scale / 3600 * Math.Sin(rotation);
+				double cd21 = -scale / 3600 * Math.Sin(rotation);
+				double cd22 = -scale / 3600 * Math.Cos(rotation);
+				double crval1 = ra;
+				double crval2 = dec;
+				double crpix1 = pixwidth / 2;
+				double crpix2 = pixheight / 2;
+				double det = 1 / ((cd11 * cd22 - cd12 * cd21) * Math.PI / 180);
+				double cdinv11 = det * cd22;
+				double cdinv12 = -det * cd12;
+				double cdinv21 = -det * cd21;
+				double cdinv22 = det * cd11;
+				double xpix_topleft = 0, ypix_topleft = 0, dec_topleft = 0, ra_topleft = 0, xpix_topright = 0, ypix_topright = 0, ra_topright = 0, dec_topright = 0, xpix_bottomright = 0, ypix_bottomright = 0, ra_bottomright = 0, dec_bottomright = 0, xpix_bottomleft = 0, ypix_bottomleft = 0, ra_bottomleft = 0, dec_bottomleft = 0;
+
+				if (shape == "rectangle")
+				{
+					// top left
+					xpix_topleft = 1 - (buffer / 60 * 3600 / scale);
+					ypix_topleft = 1 - (buffer / 60 * 3600 / scale);
+					double X_intrmdt = cd11 * (xpix_topleft - crpix1) * Math.PI / 180 + cd12 * (ypix_topleft - crpix2) * Math.PI / 180;
+					double Y_intrmdt = cd21 * (xpix_topleft - crpix1) * Math.PI / 180 + cd22 * (ypix_topleft - crpix2) * Math.PI / 180;
+					ra_topleft = (crval1 * Math.PI / 180 + Math.Atan(X_intrmdt / (Math.Cos(crval2 * Math.PI / 180) - Y_intrmdt * Math.Sin(crval2 * Math.PI / 180)))) * 180 / Math.PI;
+					dec_topleft = (Math.Asin((Math.Sin(crval2 * Math.PI / 180) + Y_intrmdt * Math.Cos(crval2 * Math.PI / 180)) / Math.Sqrt(1 + X_intrmdt * X_intrmdt + Y_intrmdt * Y_intrmdt))) * 180 / Math.PI;
+					if (ra_topleft < 0)
+						ra_topleft += 360;
+
+					// top right
+					xpix_topright = pixwidth + (buffer / 60 * 3600 / scale);
+					ypix_topright = 1 - (buffer / 60 * 3600 / scale);
+					X_intrmdt = cd11 * (xpix_topright - crpix1) * Math.PI / 180 + cd12 * (ypix_topright - crpix2) * Math.PI / 180;
+					Y_intrmdt = cd21 * (xpix_topright - crpix1) * Math.PI / 180 + cd22 * (ypix_topright - crpix2) * Math.PI / 180;
+					ra_topright = (crval1 * Math.PI / 180 + Math.Atan(X_intrmdt / (Math.Cos(crval2 * Math.PI / 180) - Y_intrmdt * Math.Sin(crval2 * Math.PI / 180)))) * 180 / Math.PI;
+					dec_topright = (Math.Asin((Math.Sin(crval2 * Math.PI / 180) + Y_intrmdt * Math.Cos(crval2 * Math.PI / 180)) / Math.Sqrt(1 + X_intrmdt * X_intrmdt + Y_intrmdt * Y_intrmdt))) * 180 / Math.PI;
+					if (ra_topright < 0)
+						ra_topright += 360;
+
+					// bottom right
+					xpix_bottomright = pixwidth + (buffer / 60 * 3600 / scale);
+					ypix_bottomright = pixheight + (buffer / 60 * 3600 / scale);
+					X_intrmdt = cd11 * (xpix_bottomright - crpix1) * Math.PI / 180 + cd12 * (ypix_bottomright - crpix2) * Math.PI / 180;
+					Y_intrmdt = cd21 * (xpix_bottomright - crpix1) * Math.PI / 180 + cd22 * (ypix_bottomright - crpix2) * Math.PI / 180;
+					ra_bottomright = (crval1 * Math.PI / 180 + Math.Atan(X_intrmdt / (Math.Cos(crval2 * Math.PI / 180) - Y_intrmdt * Math.Sin(crval2 * Math.PI / 180)))) * 180 / Math.PI;
+					dec_bottomright = (Math.Asin((Math.Sin(crval2 * Math.PI / 180) + Y_intrmdt * Math.Cos(crval2 * Math.PI / 180)) / Math.Sqrt(1 + X_intrmdt * X_intrmdt + Y_intrmdt * Y_intrmdt))) * 180 / Math.PI;
+					if (ra_bottomright < 0)
+						ra_bottomright += 360;
+
+					// bottom left
+					xpix_bottomleft = 1 - (buffer / 60 * 3600 / scale);
+					ypix_bottomleft = pixheight + (buffer / 60 * 3600 / scale);
+					X_intrmdt = cd11 * (xpix_bottomleft - crpix1) * Math.PI / 180 + cd12 * (ypix_bottomleft - crpix2) * Math.PI / 180;
+					Y_intrmdt = cd21 * (xpix_bottomleft - crpix1) * Math.PI / 180 + cd22 * (ypix_bottomleft - crpix2) * Math.PI / 180;
+					ra_bottomleft = (crval1 * Math.PI / 180 + Math.Atan(X_intrmdt / (Math.Cos(crval2 * Math.PI / 180) - Y_intrmdt * Math.Sin(crval2 * Math.PI / 180)))) * 180 / Math.PI;
+					dec_bottomleft = (Math.Asin((Math.Sin(crval2 * Math.PI / 180) + Y_intrmdt * Math.Cos(crval2 * Math.PI / 180)) / Math.Sqrt(1 + X_intrmdt * X_intrmdt + Y_intrmdt * Y_intrmdt))) * 180 / Math.PI;
+					if (ra_bottomleft < 0)
+						ra_bottomleft += 360;
+				}
+
+				string catalogue = "GaiaDR3";
+				int cataloguenum = 1;
+				n = optArgs.IndexOf("catalogue");
+				if (n != -1)
+					catalogue = (string)optArgs[n + 1];
+				if (catalogue != "GaiaDR3")
+					throw new Exception("Catalogue " + catalogue + " not valid.");
+
+				string filter = "g";
+				int filternum = 3;
+				n = optArgs.IndexOf("filter");
+				if (n != -1)
+					filter = (string)optArgs[n + 1];
+				if (catalogue == "GaiaDR3")
+					if (filter == "bp" || filter == "b")
+					{
+						filter = "phot_bp_mean_mag";
+						filternum = 1;
+					}
+					else if (filter == "rp" || filter == "r")
+					{
+						filter = "phot_rp_mean_mag";
+						filternum = 2;
+					}
+					else if (filter == "g")
+					{
+						filter = "phot_g_mean_mag";
+						filternum = 3;
+					}
+					else
+						throw new Exception("Filter " + filter + " not valid for Catalogue " + catalogue);
+
+				bool imageout = false;
+				n = optArgs.IndexOf("imageout");
+				if (n != -1)
+					imageout = (bool)optArgs[n + 1];
+
+				string outformat = ".csv";
+				bool fitsout = false;
+				n = optArgs.IndexOf("fitsout");
+				if (n != -1)
+					fitsout = true;
+				if (fitsout == true)
+					outformat = ".fit";
+
+				bool imageshow = false;
+				n = optArgs.IndexOf("imageshow");
+				if (n != -1)
+					imageshow = true;
+
+				string outdir = Directory.GetCurrentDirectory();
+				n = optArgs.IndexOf("outdir");
+				if (n != -1)
+					outdir = (string)optArgs[n + 1];
+				if (!Directory.Exists(outdir))
+					Directory.CreateDirectory(outdir);
+
+				string rawoutdir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AstraCarta", "AstraCartaRawQueries");
+				if (!Directory.Exists(rawoutdir))
+					Directory.CreateDirectory(rawoutdir);
+
+				bool forcenew = false;
+				n = optArgs.IndexOf("forcenew");
+				if (n != -1)
+					forcenew = true;
+
+				int nquery = 500;
+				n = optArgs.IndexOf("nquery");
+				if (n != -1)
+					nquery = Convert.ToInt32(optArgs[n + 1]);
+
+				double pmepoch = 0;
+				n = optArgs.IndexOf("pmepoch");
+				if (n != -1)
+					pmepoch = Convert.ToDouble(optArgs[n + 1]);
+
+				double pmlimit = Double.MaxValue;
+				n = optArgs.IndexOf("pmlimit");
+				if (n != -1)
+					if (pmepoch == 0)
+						throw new Exception("pmlimit is only valid if pmepoch is specified");
+					else
+						pmlimit = Convert.ToDouble(optArgs[n + 1]);
+
+				string entries = "ref_epoch, ra, ra_error, dec, dec_error, pmra, pmra_error, pmdec, pmdec_error, pm, phot_bp_mean_mag, phot_g_mean_mag, phot_rp_mean_mag";
+				n = optArgs.IndexOf("entries");
+				if (n != -1)
+					if ((string)optArgs[n + 1] == "all")
+						entries = "*";
+					else
+						entries += " " + (string)optArgs[n + 1];
+
+				bool notableout = false;
+				n = optArgs.IndexOf("notableout");
+				if (n != -1)
+					notableout = true;
+
+				bool rmvrawquery = false;
+				n = optArgs.IndexOf("rmvrawquery");
+				if (n != -1)
+					rmvrawquery = true;
+
+				double rawqueryfilenamehash, fileoutfilenamehash;
+				if (shape == "circle")
+				{
+					rawqueryfilenamehash = (double)Tuple.Create(ra, dec, nquery, cataloguenum, filternum, radius * 3600, shapenum).GetHashCode() + Int32.MaxValue + 1;
+					fileoutfilenamehash = (double)Tuple.Create(rawqueryfilenamehash, maglimit, pmepoch, pmlimit).GetHashCode() + Int32.MaxValue + 1;
+				}
+				else
+				{
+					rawqueryfilenamehash = (double)Tuple.Create(ra, dec, nquery, cataloguenum, filternum, rotation, ra_topleft, dec_topleft).GetHashCode();
+					rawqueryfilenamehash = (double)Tuple.Create(rawqueryfilenamehash, ra_topright, dec_topright, ra_bottomright, dec_bottomright, ra_bottomleft, dec_bottomleft, shapenum).GetHashCode() + Int32.MaxValue + 1;
+					fileoutfilenamehash = (double)(new double[] { rawqueryfilenamehash, maglimit, pmepoch, pmlimit }).GetHashCode() + Int32.MaxValue + 1;
+				}
+
+				string outname = fileoutfilenamehash.ToString();
+				n = optArgs.IndexOf("outname");
+				if (n != -1)
+					outname = (string)optArgs[n + 1];
+
+				bool overwrite = false;
+				n = optArgs.IndexOf("overwrite");
+				if (n != -1)
+					overwrite = true;
+
+				#pragma warning disable CS0219 // Variable is assigned but its value is never used
+				bool silent = false;
+				#pragma warning restore CS0219 // Variable is assigned but its value is never used
+				n = optArgs.IndexOf("silent");
+				if (n != -1)
+					silent = true;
+
+				string rawqueryfilename = Path.Combine(rawoutdir, rawqueryfilenamehash.ToString() + ".csv");
+				string resultsfilename = Path.Combine(outdir, outname + outformat);
+				string imagefilename = Path.Combine(outdir, outname + ".jpg");
+
+				if (!overwrite)
+					if (File.Exists(resultsfilename) || File.Exists(imagefilename))
+					{
+						int f = 1;
+						resultsfilename = Path.Combine(outdir, outname + string.Format(" ({0})", f) + outformat);
+						imagefilename = Path.Combine(outdir, outname + string.Format(" ({0})", f) + ".jpg");
+
+						while (File.Exists(resultsfilename) || File.Exists(imagefilename))
+						{
+							f += 1;
+							resultsfilename = Path.Combine(outdir, outname + string.Format(" ({0})", f) + outformat);
+							imagefilename = Path.Combine(outdir, outname + string.Format(" ({0})", f) + ".jpg");
+						}
+					}
+
+				if (!File.Exists(rawqueryfilename) || forcenew) //query new table download
+				{
+					string jobstr;
+					if (catalogue == "GaiaDR3")
+					{
+						jobstr = "REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY=";
+
+						if (nquery == 0)
+							jobstr += "SELECT " + entries + " FROM gaiadr3.gaia_source" + Environment.NewLine;
+						else
+							jobstr += string.Format("SELECT TOP {0}", nquery) + " " + entries + " FROM gaiadr3.gaia_source" + Environment.NewLine;
+
+						jobstr += "WHERE 1=CONTAINS(POINT('ICRS', gaiadr3.gaia_source.ra,gaiadr3.gaia_source.dec),";
+
+						if (shape == "rectangle")
+							jobstr += string.Format("POLYGON('ICRS',{0},{1},{2},{3},{4},{5},{6},{7}))", ra_topleft, dec_topleft, ra_topright, dec_topright, ra_bottomright, dec_bottomright, ra_bottomleft, dec_bottomleft) + Environment.NewLine;
+						else
+							jobstr += string.Format("CIRCLE('ICRS',{0},{1},{2}))", ra, dec, radius) + Environment.NewLine;
+
+						jobstr += "ORDER by gaiadr3.gaia_source." + filter + " ASC";
+
+						WebResponse response = default;
+						HttpWebRequest tapQueryRequest = HttpWebRequest.CreateHttp("https://gea.esac.esa.int/tap-server/tap/sync?");
+						tapQueryRequest.CookieContainer = new CookieContainer();
+						tapQueryRequest.Method = "POST";
+						tapQueryRequest.ContentType = "application/x-www-form-urlencoded";
+						byte[] paramsStream = Encoding.UTF8.GetBytes(jobstr);
+						tapQueryRequest.ContentLength = paramsStream.Length;
+						var requestStream = tapQueryRequest.GetRequestStream();
+						requestStream.Write(paramsStream, 0, paramsStream.Length);
+						requestStream.Close();
+						response = tapQueryRequest.GetResponse();
+						string content = "";
+						using (var dataStream = response.GetResponseStream())
+						{
+							content = new StreamReader(dataStream, Encoding.UTF8).ReadToEnd();
+						}
+						response.Close();
+						response = default;
+
+						string[] lines = content.Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+						using (var stream = File.CreateText(rawqueryfilename))
+						{
+							for (int i = 0; i < lines.Length - 1; i++)//last line always empty so ignore
+								stream.WriteLine(lines[i]);
+						}						
+					}
+				}
+
+				int rowswritten = 0;
+				StreamReader querystream = new StreamReader(rawqueryfilename);
+				string header = querystream.ReadLine();
+				string rawquery = querystream.ReadToEnd();
+				querystream.Close();
+				string[] ttypes = header.Split(',');
+				string[] rows = rawquery.Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+				using (var resultsstream = File.CreateText(resultsfilename))
+				{					
+					resultsstream.WriteLine(header);
+
+					foreach (string row in rows)
+					{
+						if (row.Trim().Length == 0)//last row is always blank
+							continue;
+
+						string[] values = row.Split(',');
+
+						if (values[Array.IndexOf(ttypes, filter)] != "")
+							if (Convert.ToDouble(values[Array.IndexOf(ttypes, filter)]) <= maglimit)
+								if (pmepoch != 0)//update ra & dec
+								{
+									if (values[Array.IndexOf(ttypes, "pm")] != "" && Convert.ToDouble(values[Array.IndexOf(ttypes, "pm")]) < pmlimit)
+									{
+										double dt = pmepoch - Convert.ToDouble(values[Array.IndexOf(ttypes, "ref_epoch")]);
+										values[Array.IndexOf(ttypes, "ref_epoch")] = (Convert.ToDouble(values[Array.IndexOf(ttypes, "ref_epoch")]) + dt).ToString();
+										values[Array.IndexOf(ttypes, "ra")] = (Convert.ToDouble(values[Array.IndexOf(ttypes, "ra")]) + dt * Convert.ToDouble(values[Array.IndexOf(ttypes, "pmra")]) / 3600 / 1000).ToString();
+										values[Array.IndexOf(ttypes, "dec")] = (Convert.ToDouble(values[Array.IndexOf(ttypes, "dec")]) + dt * Convert.ToDouble(values[Array.IndexOf(ttypes, "pmdec")]) / 3600 / 1000).ToString();
+										string line = "";
+										for (int i = 0; i < values.Length; i++)
+											line += values[i] + ",";
+										line = line.Substring(0, line.Length - 1);
+										resultsstream.WriteLine(line);
+										rowswritten++;
+									}
+								}
+								else
+								{
+									string line = "";
+									for (int i = 0; i < values.Length; i++)
+										line += values[i] + ",";
+									line = line.Substring(0, line.Length - 1);
+									resultsstream.WriteLine(line);
+									rowswritten++;
+								}
+					}
+				}
+
+				if (rmvrawquery)
+					File.Delete(rawqueryfilename);
+
+				if (rowswritten == 0)
+				{
+					File.Delete(resultsfilename);
+					return "";
+				}
+
+				Plotter plot = new Plotter();
+				plot.jpChart1.ChartAreas[0].AxisY.IsReversed = true;
+				plot.Width = 500;
+				plot.Height = 500;
+				plot.Name = "AstraCarta";
+				plot.Text = "AstraCarta";
+
+				if (imageshow || imageout)
+				{
+					double[] x = new double[rowswritten];
+					double[] y = new double[rowswritten];
+					double a0 = crval1 * Math.PI / 180;
+					double d0 = crval2 * Math.PI / 180;
+
+					StreamReader resultsstream = new StreamReader(resultsfilename);
+					header = resultsstream.ReadLine();
+					string results = resultsstream.ReadToEnd();
+					resultsstream.Close();
+					ttypes = header.Split(',');
+					rows = results.Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+					for (int i = 0; i < rowswritten; i++)
+					{
+						string[] values = rows[i].Split(',');
+
+						ra = Convert.ToDouble(values[Array.IndexOf(ttypes, "ra")]);
+						dec = Convert.ToDouble(values[Array.IndexOf(ttypes, "dec")]);
+						double a = ra * Math.PI / 180;
+						double d = dec * Math.PI / 180;
+						double X_intrmdt = Math.Cos(d) * Math.Sin(a - a0) / (Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0) + Math.Sin(d0) * Math.Sin(d));
+						double Y_intrmdt = (Math.Cos(d0) * Math.Sin(d) - Math.Cos(d) * Math.Sin(d0) * Math.Cos(a - a0)) / (Math.Sin(d0) * Math.Sin(d) + Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0));
+						x[i] = cdinv11 * X_intrmdt + cdinv12 * Y_intrmdt + crpix1;
+						y[i] = cdinv21 * X_intrmdt + cdinv22 * Y_intrmdt + crpix2;
+					}
+					
+					plot.jpChart1.PlotXYData(x, y, "Found " + rowswritten + " Sources", "Horizontal Image Axis (Pixels)", "Vertical Image Axis (Pixels)", JPChart.JPChart.SeriesType.Point, "astracarta", System.Drawing.Color.Blue);
+					plot.jpChart1.SetAxesLimits(1, pixwidth, 1, pixheight);
+					double xlimmin = 1;
+					double xlimmax = pixwidth;
+					double ylimmin = 1;
+					double ylimmax = pixheight;
+
+					if (shape == "rectangle")
+					{
+						if (buffer > 0)
+						{
+							plot.jpChart1.AddXYData(new double[] { 1, 1, pixwidth, pixwidth, 1 }, new double[] { 1, pixheight, pixheight, 1, 1 }, JPChart.JPChart.SeriesType.Line, "imagebox", System.Drawing.Color.Black);
+							plot.jpChart1.SetAxesLimits(xpix_topleft, xpix_topright, ypix_topleft, ypix_bottomleft);
+							xlimmin = xpix_topleft;
+							xlimmax = xpix_topright;
+							ylimmin = ypix_topleft;
+							ylimmax = ypix_bottomleft;
+						}
+						else if (buffer < 0)
+							plot.jpChart1.AddXYData(new double[] { xpix_topleft, xpix_topright, xpix_bottomright, xpix_bottomleft, xpix_topleft }, new double[] { ypix_topleft, ypix_topright, ypix_bottomright, ypix_bottomleft, ypix_topleft }, JPChart.JPChart.SeriesType.Line, "imagebox", System.Drawing.Color.Black);
+					}
+					else if (shape == "circle")
+					{
+						double rimage = 0;
+						if (buffer >= 0)
+						{
+							rimage = crpix1;
+							if (buffer > 0)
+							{
+								xlimmin -= (radiuspix - rimage);
+								xlimmax += (radiuspix - rimage);
+								ylimmin -= (radiuspix - rimage);
+								ylimmax += (radiuspix - rimage);
+							}
+                        
+						}
+						else if (buffer < 0)
+							rimage = radiuspix;
+
+						double[] theta = new double[361];
+						double[] xc = new double[361];
+						double[] yc = new double[361];							
+
+						for (int i = 0; i < theta.Length; i++)
+						{
+							theta[i] = i;
+							xc[i] = rimage * Math.Sin(theta[i] * Math.PI / 180) + crpix1;
+							yc[i] = rimage * Math.Cos(theta[i] * Math.PI / 180) + crpix2;
+						}
+
+						plot.jpChart1.AddXYData(xc, yc, JPChart.JPChart.SeriesType.Line, "imagecircle", System.Drawing.Color.Black);
+					}
+
+					plot.jpChart1.SetAxesLimits(xlimmin, xlimmax, ylimmin, ylimmax);
+
+					if (imageout)
+						plot.jpChart1.SaveImage(imagefilename, System.Windows.Forms.DataVisualization.Charting.ChartImageFormat.Jpeg);
+				}
+
+				if (notableout)
+					File.Delete(resultsfilename);
+				else if (fitsout)
+				{
+					StreamReader resultsstream = new StreamReader(resultsfilename);
+					header = resultsstream.ReadLine();
+					string results = resultsstream.ReadToEnd();
+					resultsstream.Close();
+					ttypes = header.Split(',');
+					rows = results.Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+					double[][] table = new double[ttypes.Length][];
+					for (int i = 0; i < ttypes.Length; i++)
+						table[i] = new double[rowswritten];
+
+					for (int i = 0; i < rowswritten; i++)
+					{
+						string[] rowentries = rows[i].Split(',');
+
+						for (int j = 0; j < rowentries.Length; j++)
+							if (rowentries[j].Trim() == "")
+								table[j][i] = Double.NaN;
+							else
+								table[j][i] = Convert.ToDouble(rowentries[j]);
+					}
+
+					FITSBinTable fbt = new FITSBinTable(catalogue);
+					fbt.SetTTYPEEntries(ttypes, null, table);
+					File.Delete(resultsfilename);
+					resultsfilename = resultsfilename.Split('.')[0];
+					resultsfilename += ".fit";
+					fbt.Write(resultsfilename, true);
+				}
+
+				if (imageshow)
+					plot.ShowDialog();
+
+				if (notableout)
+					return "";
+
+				return resultsfilename;
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show(ex.Message + Environment.NewLine + ex.TargetSite + Environment.NewLine + ex.StackTrace + Environment.NewLine + ex.Source + Environment.NewLine + ex.InnerException);
+				return "";
+			}
 		}
 
 		/// <summary>
@@ -184,346 +577,266 @@ namespace JPFITS
 		/// <summary>
 		/// Construct AstraCarta with keys and their values. Useful for repeating/specifying user interface option settings.
 		/// </summary>
-		/// <param name="keys">A string list of keys such as "-ra", "-dec", "-scale", etc.</param>
-		/// <param name="values">A string list of key values for the keys. Keys with no arguments must have empty strings passed as their values.</param>
-		/// <param name="executeOnShow">Execute the query immediately upon Load, which is when the form is first shown.</param>
-		public AstraCarta(ArrayList keys, ArrayList values, bool executeOnShow)
+		/// <param name="ra">The right acension of the field center.</param>
+		/// <param name="dec">The declination of the field center.</param>
+		/// <param name="scale">The plate scale in arcseconds per pixel.</param>
+		/// <param name="pixwidth">The number of horizontal pixels of the image.</param>
+		/// <param name="pixheight">The number of vertical pixels of the image</param>
+		/// <param name="optArgs">Optional arguments list.</param>
+		public AstraCarta(double ra, double dec, double scale, int pixwidth, int pixheight, ArrayList? optArgs = null)
 		{
 			InitializeComponent();
 
 			OPENFROMARGS = true;
-			EXECUTEONSHOW = executeOnShow;
+
+			RATextBox.Text = ra.ToString();
+			DecTextBox.Text = dec.ToString();
+			ScaleTextBox.Text = scale.ToString();
+			WidthTextBox.Text = pixwidth.ToString();
+			HeightTextBox.Text = pixheight.ToString();
+
+			if (optArgs == null)
+				return;
 
 			int n;
 
-			n = keys.IndexOf("-ra");
-			if (n != -1)
-				RATextBox.Text = (string)values[n];
-
-			n = keys.IndexOf("-dec");
-			if (n != -1)
-				DecTextBox.Text = (string)values[n];
-
-			n = keys.IndexOf("-scale");
-			if (n != -1)
-				ScaleTextBox.Text = (string)values[n];
-
-			n = keys.IndexOf("-pixwidth");
-			if (n != -1)
-				WidthTextBox.Text = (string)values[n];
-
-			n = keys.IndexOf("-pixheight");
-			if (n != -1)
-				HeightTextBox.Text = (string)values[n];
-
 			BufferTextBox.Text = "";
-			n = keys.IndexOf("-buffer");
+			n = optArgs.IndexOf("buffer");
 			if (n != -1)
-				BufferTextBox.Text = (string)values[n];
+				BufferTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			RAOffsetTextBox.Text = "";
-			n = keys.IndexOf("-offsetra");
+			n = optArgs.IndexOf("offsetra");
 			if (n != -1)
-				RAOffsetTextBox.Text = (string)values[n];
+				RAOffsetTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			DecOffsetTextBox.Text = "";
-			n = keys.IndexOf("-offsetdec");
+			n = optArgs.IndexOf("offsetdec");
 			if (n != -1)
-				DecOffsetTextBox.Text = (string)values[n];
+				DecOffsetTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			NameTextBox.Text = "";
-			n = keys.IndexOf("-outname");
+			n = optArgs.IndexOf("outname");
 			if (n != -1)
-				NameTextBox.Text = string.Join("_", ((string)values[n]).Split(Path.GetInvalidFileNameChars())) + "_AstraCarta";
+				NameTextBox.Text = string.Join("_", ((string)optArgs[n + 1]).Split(Path.GetInvalidFileNameChars())) + "_AstraCarta";
 
 			CatalogueDrop.SelectedIndex = 0;//GaiaDR3
-			n = keys.IndexOf("-catalogue");
+			n = optArgs.IndexOf("catalogue");
 			if (n != -1)
-				if ((string)values[n] == "GaiaDR3")
+				if ((string)optArgs[n + 1] == "GaiaDR3")
 					CatalogueDrop.SelectedIndex = 0;
 				else
-					throw new Exception("Catalogue: '" + (string)values[n] + "' not recognized...");
+					throw new Exception("Catalogue: '" + (string)optArgs[n + 1] + "' not recognized...");
 
 			FilterDrop.SelectedIndex = 1;//GaiaDR3 g
-			n = keys.IndexOf("-filter");
+			n = optArgs.IndexOf("filter");
 			if (n != -1)
 				if (CatalogueDrop.SelectedIndex == 0)//gaiadr3
 				{
-					if ((string)values[n] == "bp")
+					if ((string)optArgs[n + 1] == "bp")
 						FilterDrop.SelectedIndex = 0;
-					else if ((string)values[n] == "g")
+					else if ((string)optArgs[n + 1] == "g")
 						FilterDrop.SelectedIndex = 1;
-					else if ((string)values[n] == "rp")
+					else if ((string)optArgs[n + 1] == "rp")
 						FilterDrop.SelectedIndex = 2;
 					else
-						throw new Exception("Filter: '" + (string)values[n] + "' not recognized for catalogue '" + CatalogueDrop.SelectedItem.ToString() + "'");
+						throw new Exception("Filter: '" + (string)optArgs[n + 1] + "' not recognized for catalogue '" + CatalogueDrop.SelectedItem.ToString() + "'");
 				}
 				else
-					throw new Exception("Filter: '" + (string)values[n] + "' not recognized...");
+					throw new Exception("Filter: '" + (string)optArgs[n + 1] + "' not recognized...");
 
 			MagLimitTextBox.Text = "";
-			n = keys.IndexOf("-maglimit");
+			n = optArgs.IndexOf("maglimit");
 			if (n != -1)
-				MagLimitTextBox.Text = (string)values[n];
+				MagLimitTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			ShapeDrop.SelectedIndex = 0;
-			n = keys.IndexOf("-shape");
+			n = optArgs.IndexOf("shape");
 			if (n != -1)
-				if ((string)values[n] == "circle")
+				if ((string)optArgs[n + 1] == "circle")
 					ShapeDrop.SelectedIndex = 1;
-				else if ((string)values[n] == "rectangle" || (string)values[n] == "square")
+				else if ((string)optArgs[n + 1] == "rectangle" || (string)optArgs[n + 1] == "square")
 					ShapeDrop.SelectedIndex = 0;
 				else
-					throw new Exception("Shape: '" + (string)values[n] + "' not recognized.");
+					throw new Exception("Shape: '" + (string)optArgs[n + 1] + "' not recognized.");
 
 			RotationTextBox.Text = "";
-			n = keys.IndexOf("-rotation");
+			n = optArgs.IndexOf("rotation");
 			if (n != -1)
-				RotationTextBox.Text = (string)values[n];
+				RotationTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			NQueryTextBox.Text = "500";
-			n = keys.IndexOf("-nquery");
+			n = optArgs.IndexOf("nquery");
 			if (n != -1)
-				NQueryTextBox.Text = (string)values[n];
+				NQueryTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			PMEpochTextBox.Text = "";
-			n = keys.IndexOf("-pmepoch");
+			n = optArgs.IndexOf("pmepoch");
 			if (n != -1)
-				PMEpochTextBox.Text = (string)values[n];
+				PMEpochTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			PMLimitTextBox.Text = "";
-			n = keys.IndexOf("-pmlimit");
+			n = optArgs.IndexOf("pmlimit");
 			if (n != -1)
-				PMLimitTextBox.Text = (string)values[n];
+				PMLimitTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
 
 			DirectoryTextBox.Text = "";
-			n = keys.IndexOf("-outdir");
+			n = optArgs.IndexOf("outdir");
 			if (n != -1)
-				DirectoryTextBox.Text = (string)values[n];
+				DirectoryTextBox.Text = (string)optArgs[n + 1];
 
 			EntriesTextBox.Text = "";
-			n = keys.IndexOf("-entries");
+			n = optArgs.IndexOf("entries");
 			if (n != -1)
-				EntriesTextBox.Text = (string)values[n];
+				EntriesTextBox.Text = (string)optArgs[n + 1];
 
 			SaveTableChck.Checked = true;
-			n = keys.IndexOf("-notable");
+			n = optArgs.IndexOf("notable");
 			if (n != -1)
 				SaveTableChck.Checked = false;
 
 			FITSTableChck.Checked = false;
-			n = keys.IndexOf("-fitsout");
+			n = optArgs.IndexOf("fitsout");
 			if (n != -1)
 				FITSTableChck.Checked = true;
 
 			ShowImageChck.Checked = false;
-			n = keys.IndexOf("-imageshow");
+			n = optArgs.IndexOf("imageshow");
 			if (n != -1)
 				ShowImageChck.Checked = true;
 
 			SaveImageChck.Checked = false;
-			n = keys.IndexOf("-outimage");
+			n = optArgs.IndexOf("outimage");
 			if (n != -1)
 				SaveImageChck.Checked = true;
 
 			ForceNewChck.Checked = false;
-			n = keys.IndexOf("-forcenew");
+			n = optArgs.IndexOf("forcenew");
 			if (n != -1)
 				ForceNewChck.Checked = true;
 
 			RemoveRawQueryChck.Checked = false;
-			n = keys.IndexOf("-rmvrawquery");
+			n = optArgs.IndexOf("rmvrawquery");
 			if (n != -1)
 				RemoveRawQueryChck.Checked = true;
 
 			SilentChck.Checked = false;
-			n = keys.IndexOf("-silent");
+			n = optArgs.IndexOf("silent");
 			if (n != -1)
 				SilentChck.Checked = true;
 
 			OverwriteChck.Checked = false;
-			n = keys.IndexOf("-overwrite");
+			n = optArgs.IndexOf("overwrite");
 			if (n != -1)
 				OverwriteChck.Checked = true;
 		}
 
 		private void ExecuteBtn_Click(object sender, EventArgs e)
 		{
-			if (ExecuteBtn.Text.Contains("Execute"))
-			{
-				CANCELLED = false;
-				ExecuteBtn.Text = "Cancel";
-			}
-			else
-			{
-				CANCELLED = true;
-				ExecuteBtn.Text = "Execute";
-				ExecuteBtn.Enabled = false;
-				PROC.Kill();
-				PROC.Close();
-				BGWrkr.CancelAsync();
-
-				return;
-			}
-			ERROR = false;
-
-			string argstring = "";// = String.Format("-ra {0} -dec {1} -scale {2} -pixwidth {3} -pixheight {4} -shape {5} -buffer {6} -outdir {7} -outname {8} -filter {9} -nquery {10} -fitsout", ra_deg, dec_deg, scale, pixwidth, pixheight, "\"" + shape + "\"", buffer, "\"" + outdir + "\"", "\"" + outname + "\"", "\"" + filter + "\"", nquery);
-			argstring += String.Format("-ra {0} ", RATextBox.Text);
-			argstring += String.Format("-dec {0} ", DecTextBox.Text);
-			argstring += String.Format("-scale {0} ", ScaleTextBox.Text);
-			argstring += String.Format("-pixwidth {0} ", WidthTextBox.Text);
-			argstring += String.Format("-pixheight {0} ", HeightTextBox.Text);
+			ArrayList optArgs = new ArrayList();
 			if (BufferTextBox.Text != "")
-				argstring += String.Format("-buffer {0} ", BufferTextBox.Text);
+			{
+				optArgs.Add("buffer");
+				optArgs.Add(Convert.ToDouble(BufferTextBox.Text));
+			}
 			if (RAOffsetTextBox.Text != "")
-				argstring += String.Format("-offsetra {0} ", RAOffsetTextBox.Text);
+			{
+				optArgs.Add("offsetra");
+				optArgs.Add(Convert.ToDouble(RAOffsetTextBox.Text));
+			}
 			if (DecOffsetTextBox.Text != "")
-				argstring += String.Format("-offsetdec {0} ", DecOffsetTextBox.Text);
+			{
+				optArgs.Add("offsetdec");
+				optArgs.Add(Convert.ToDouble(DecOffsetTextBox.Text));
+			}
 			if (NameTextBox.Text != "")
-				argstring += String.Format("-outname {0} ", "\"" + NameTextBox.Text + "\"");
-			argstring += String.Format("-catalogue {0} ", "\"" + CatalogueDrop.SelectedItem.ToString() + "\"");
-			argstring += String.Format("-filter {0} ", "\"" + FilterDrop.SelectedItem.ToString() + "\"");
+			{
+				optArgs.Add("outname");
+				optArgs.Add(NameTextBox.Text);
+			}
+			optArgs.Add("catalogue");
+			optArgs.Add(CatalogueDrop.SelectedItem.ToString());
+			optArgs.Add("filter");
+			optArgs.Add(FilterDrop.SelectedItem.ToString());
 			if (MagLimitTextBox.Text != "")
-				argstring += String.Format("-maglimit {0} ", MagLimitTextBox.Text);
-			argstring += String.Format("-shape {0} ", "\"" + ShapeDrop.SelectedItem.ToString() + "\"");
+			{
+				optArgs.Add("maglimit");
+				optArgs.Add(Convert.ToDouble(MagLimitTextBox.Text));
+			}
+			optArgs.Add("shape");
+			optArgs.Add(ShapeDrop.SelectedItem.ToString());
 			if (ShapeDrop.SelectedItem.ToString() == "rectangle")
 				if (RotationTextBox.Text != "")
-					argstring += String.Format("-rotation {0} ", RotationTextBox.Text);
-			argstring += String.Format("-nquery {0} ", NQueryTextBox.Text);
+				{
+					optArgs.Add("rotation");
+					optArgs.Add(Convert.ToDouble(RotationTextBox.Text));
+				}
+			optArgs.Add("nquery");
+			optArgs.Add(NQueryTextBox.Text);
 			if (PMEpochTextBox.Text != "")
-				argstring += String.Format("-pmepoch {0} ", PMEpochTextBox.Text);
+			{
+				optArgs.Add("pmepoch");
+				optArgs.Add(Convert.ToDouble(PMEpochTextBox.Text));
+			}
 			if (PMLimitTextBox.Text != "")
-				argstring += String.Format("-pmlimit {0} ", PMLimitTextBox.Text);
+			{
+				optArgs.Add("pmlimit");
+				optArgs.Add(Convert.ToDouble(PMLimitTextBox.Text));
+			}
 			if (DirectoryTextBox.Text != "")
-				argstring += String.Format("-outdir {0} ", "\"" + DirectoryTextBox.Text + "\"");
-			argstring += String.Format("-entries {0} ", "\"" + EntriesTextBox.Text + "\"");
+			{
+				optArgs.Add("outdir");
+				optArgs.Add(DirectoryTextBox.Text);
+			}
+			optArgs.Add("entries");
+			optArgs.Add(EntriesTextBox.Text);
 			if (!SaveTableChck.Checked)
-				argstring += String.Format("-notable ");
+				optArgs.Add("notable");
 			if (FITSTableChck.Checked)
-				argstring += String.Format("-fitsout ");
+				optArgs.Add("fitsout");
 			if (ShowImageChck.Checked)
-				argstring += String.Format("-imageshow ");
+				optArgs.Add("imageshow");
 			if (SaveImageChck.Checked)
-				argstring += String.Format("-outimage ");
+				optArgs.Add("outimage");
 			if (ForceNewChck.Checked)
-				argstring += "-forcenew ";
+				optArgs.Add("forcenew");
 			if (RemoveRawQueryChck.Checked)
-				argstring += "-rmvrawquery ";
+				optArgs.Add("rmvrawquery");
 			if (SilentChck.Checked)
-				argstring += "-silent ";
+				optArgs.Add("silent");
 			if (OverwriteChck.Checked)
-				argstring += "-overwrite ";
+				optArgs.Add("overwrite");
 
-			argstring = argstring.TrimEnd();
-			PSI = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "astracarta " + argstring);
-			PSI.UseShellExecute = false;
-			PSI.CreateNoWindow = true;
-			PSI.RedirectStandardError = true;
-			PSI.RedirectStandardOutput = true;
-			PROC = new System.Diagnostics.Process();
+			double ra = Convert.ToDouble(RATextBox.Text);
+			double dec = Convert.ToDouble(DecTextBox.Text);
+			double scale = Convert.ToDouble(ScaleTextBox.Text);
+			int pixwidth = Convert.ToInt32(WidthTextBox.Text);
+			int pixheight = Convert.ToInt32(HeightTextBox.Text);
 
-			MessageTextBox.Clear();
-			MessageTextBox.AppendText("Calling up AstraCarta. Please wait a moment...\r\n");
-			BGWrkr.RunWorkerAsync();
+			BGWrkr.RunWorkerAsync(new object[] { ra, dec, scale, pixwidth, pixheight, optArgs });
 		}
 
 		private void BGWrkr_DoWork(object sender, DoWorkEventArgs e)
 		{
-			PROC = System.Diagnostics.Process.Start(PSI);
-			PROC.WaitForExit();
+			double ra = (double)((object[])e.Argument)[0];
+			double dec = (double)((object[])e.Argument)[1];
+			double scale = (double)((object[])e.Argument)[2];
+			int pixwidth = (int)((object[])e.Argument)[3];
+			int pixheight = (int)((object[])e.Argument)[4];
+			ArrayList optArgs = (ArrayList)((object[])e.Argument)[5];
+
+			BGWrkr.ReportProgress(0, "Calling AstraCarta.Query(ra, dec, scale, pixwidth, pixheight, optArgs)" + Environment.NewLine);
+
+			OUTFILE = AstraCarta.Query(ra, dec, scale, pixwidth, pixheight, optArgs);
 
 			if (CANCELLED)
 				return;
 
-			OUTFILE = PROC.StandardOutput.ReadToEnd();
-			ERR = PROC.StandardError.ReadToEnd();
-
 			if (OUTFILE == "")
-				if (ERR != "")
-				{
-					BGWrkr.ReportProgress(0, "Error: " + ERR + "\r\n");
-					if (ERR.Contains("\'astracarta\' is not recognized"))
-					{
-						BGWrkr.ReportProgress(0, "Installing AstraCarta..." + "\r\n");
-						BGWrkr.ReportProgress(0, ">>pip install astracarta" + "\r\n");
-						BGWrkr.ReportProgress(0, ">>Please wait one minute..." + "\r\n");
-						PSI = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip install astracarta");
-						PROC = System.Diagnostics.Process.Start(PSI);
-						PROC.WaitForExit();
-
-						if (CANCELLED)
-							return;
-
-						string appdatapypath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Python");
-						string[] astracartapths = Directory.GetFiles(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Python"), "AstraCarta.exe", SearchOption.AllDirectories);
-						string acpath = "";
-						bool pathchange = false;
-						var oldValue = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User);
-						if (astracartapths.Length > 0)
-						{
-							acpath = Directory.GetParent(astracartapths[0]).FullName;
-							if (!oldValue.Contains(acpath))
-							{
-								BGWrkr.ReportProgress(0, "Adding to Path: " + acpath + "\r\n");
-								var newValue = oldValue + ";" + acpath;
-								Environment.SetEnvironmentVariable("Path", newValue, EnvironmentVariableTarget.User);
-								oldValue = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User);
-								pathchange = true;
-							}
-						}
-
-						if (CANCELLED)
-							return;
-
-						PSI = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "python -c \"import os, sys; print(os.path.dirname(sys.executable))\"");
-						PSI.UseShellExecute = false;
-						PSI.CreateNoWindow = true;
-						PSI.RedirectStandardError = true;
-						PSI.RedirectStandardOutput = true;
-						PROC = new System.Diagnostics.Process();
-						PROC = System.Diagnostics.Process.Start(PSI);
-						PROC.WaitForExit();
-						acpath = Path.Combine(PROC.StandardOutput.ReadToEnd().Trim(), "Scripts");
-						oldValue = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User);
-						if (!oldValue.Contains(acpath))
-						{
-							BGWrkr.ReportProgress(0, "Adding to Path: " + acpath + "\r\n");
-							var newValue = oldValue + ";" + acpath;
-							Environment.SetEnvironmentVariable("Path", newValue, EnvironmentVariableTarget.User);
-							oldValue = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User);
-							pathchange = true;
-						}
-						if (pathchange)
-						{
-							MessageBox.Show("WE HAD TO UPDATE THE ENVIRONMENT PATH VARIABLE FOR PYTHON.\r\n\r\nPLEASE RESTART");
-							this.Close();
-							return;
-						}
-
-						if (CANCELLED)
-							return;
-
-						PERFORMEXECUTE = true;
-						return;
-					}
-					else
-					{
-						CloseOnCompleteChck.Checked = false;
-						ERROR = true;
-						BGWrkr.ReportProgress(0, "ERROR (A): Unhandled error. Please see the message box..." + "\r\n");
-						return;
-					}
-				}
-				else
-				{
-					CloseOnCompleteChck.Checked = false;
-					ERROR = true;
-					BGWrkr.ReportProgress(0, "ERROR (B): Unknown error. Is Python >= v. 3.10 installed?" + "\r\n");
-					return;
-				}
+				;
 			else
 			{
-				BGWrkr.ReportProgress(0, OUTFILE + "\r\n");
+				BGWrkr.ReportProgress(0, OUTFILE + Environment.NewLine);
 			}		
 		}
 
@@ -561,45 +874,12 @@ namespace JPFITS
 				return;
 			}
 
-			if (SaveTableChck.Checked)
-			{
-				try
-				{
-					int c = 0;
-					string test = OUTFILE.Trim();
-					while (!File.Exists(test))
-					{
-						c++;
-						test = OUTFILE.Substring(c);
-
-						if (test == "")
-						{
-							MessageTextBox.AppendText("File name error..." + "\r\n");
-							break;
-						}
-					}
-					OUTFILE = test.Trim();
-				}
-				catch
-				{
-					CloseOnCompleteChck.Checked = false;
-					MessageTextBox.AppendText("File name error:" + "\r\n" + OUTFILE);
-				}
-			}
-
-			if (CloseOnCompleteChck.Checked)
+			if (CLOSEONCOMPLETE)
 				this.Close();
-		}
-
-		private void WorkTimer_Tick(object sender, EventArgs e)
-		{
-			BGWrkr.ReportProgress(0);
 		}
 
 		private void AstraCarta_Load(object sender, EventArgs e)
 		{
-			VersionBGWrkr.RunWorkerAsync("versioncheck");
-
 			if (!OPENFROMARGS)
 			{
 				CatalogueDrop.SelectedIndex = Convert.ToInt32(REG.GetReg("AstraCarta", "CatalogueDrop"));
@@ -724,107 +1004,13 @@ namespace JPFITS
 		private void CloseOnCompleteChck_CheckedChanged(object sender, EventArgs e)
 		{
 			REG.SetReg("AstraCarta", "CloseOnCompleteChck", CloseOnCompleteChck.Checked);
+
+			CLOSEONCOMPLETE = CloseOnCompleteChck.Checked;
 		}
 
 		private void NumericTextBox_TextChanged(object sender, EventArgs e)
 		{
 			REG.SetReg("AstraCarta", ((TextBox)sender).Name, ((TextBox)sender).Text);			
-		}
-
-		private void VersionBGWrkr_DoWork(object sender, DoWorkEventArgs e)
-		{
-			if ((string)e.Argument == "versioncheck")
-			{
-				System.Diagnostics.ProcessStartInfo verspsi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "py --version");
-				verspsi.UseShellExecute = false;
-				verspsi.CreateNoWindow = true;
-				verspsi.RedirectStandardError = true;
-				verspsi.RedirectStandardOutput = true;
-				System.Diagnostics.Process versproc = new System.Diagnostics.Process();
-				versproc = System.Diagnostics.Process.Start(verspsi);
-				versproc.WaitForExit();
-				string versout = versproc.StandardOutput.ReadToEnd();
-				if (versout.Trim() == "")
-				{
-					ERROR = true;
-					MessageBox.Show("No Python found. Please install Python version 3.10 or greater on your machine first. Thank you!" + "\r\n\r\nMAKE SURE to CHECK \"Add Python 3.10 to PATH;\r\nCustomize Installation->Next\r\nCHECK Install for all users.", "Error...");
-					this.DialogResult = DialogResult.Cancel;
-					this.Close();
-					return;
-				}
-				else
-				{
-					bool update = false;
-					string[] splitvers = versout.Replace("Python ","").Trim().Split(new string[] { "." }, StringSplitOptions.RemoveEmptyEntries);
-					if (Convert.ToInt32(splitvers[0]) < 3)
-						update = true;
-					else if (Convert.ToInt32(splitvers[0]) == 3 && Convert.ToInt32(splitvers[1]) < 10)
-						update = true;
-					if (update)
-					{
-						ERROR = true;
-						MessageBox.Show("Please install Python version 3.10 or greater on your machine first. Thank you!" + "\r\n\r\nCurrent Version: Python " + splitvers[0] + "." + splitvers[1] + "\r\n\r\nMAKE SURE to CHECK \"Add Python 3.10 to PATH;\r\nCustomize Installation->Next\r\nCHECK Install for all users.", "Error...");
-						this.DialogResult = DialogResult.Cancel;
-						this.Close();
-						return;
-					}
-				}
-
-				verspsi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip index versions astracarta");
-				verspsi.UseShellExecute = false;
-				verspsi.CreateNoWindow = true;
-				verspsi.RedirectStandardError = true;
-				verspsi.RedirectStandardOutput = true;
-				versproc = new System.Diagnostics.Process();
-				versproc = System.Diagnostics.Process.Start(verspsi);
-				versproc.WaitForExit();
-				versout = versproc.StandardOutput.ReadToEnd();
-
-				if (versout.IndexOf("INSTALLED:") == -1)
-				{
-					ERROR = true;
-					return;
-				}
-
-				CURVERS = versout.Substring(versout.IndexOf("INSTALLED:"), versout.IndexOf("LATEST:") - versout.IndexOf("INSTALLED:")).Replace("INSTALLED:", "").Trim();
-				LATVERS = versout.Substring(versout.IndexOf("LATEST:")).Replace("LATEST:", "").Trim();
-
-				if (LATVERS != CURVERS)
-				{
-					CloseOnCompleteChck.Checked = false;
-					UpdatMenuBtn.Visible = true;
-					UpdatMenuBtn.BackColor = System.Drawing.Color.PaleVioletRed;
-					Refresh();
-				}
-			}
-
-			if ((string)e.Argument == "update")
-			{
-				if (BGWrkr.IsBusy)
-				{
-					MessageBox.Show("Please wait until AstraCarta is finished its query process, and close any waiting plot windows if open...", "Wait...");
-					return;
-				}
-
-				if (MessageBox.Show("Update AstraCarta from " + CURVERS + " to " + LATVERS + "?", "Update...", MessageBoxButtons.OKCancel) == DialogResult.Cancel)
-					return;
-
-				MessageTextBox.Clear();
-				MessageTextBox.AppendText("Updating AstraCarta. Please wait a moment..." + "\r\n");
-				MessageTextBox.AppendText(">>pip install astracarta --upgrade" + "\r\n");
-				System.Diagnostics.ProcessStartInfo verspsi = new System.Diagnostics.ProcessStartInfo("cmd", "/c " + "pip install astracarta --upgrade");
-				System.Diagnostics.Process versproc = new System.Diagnostics.Process();
-				versproc = System.Diagnostics.Process.Start(verspsi);
-				versproc.WaitForExit();
-				UpdatMenuBtn.BackColor = System.Drawing.SystemColors.Control;
-				UpdatMenuBtn.Visible = false;
-				MessageTextBox.AppendText("AstraCarta updated to version: " + LATVERS + "\r\n");
-			}
-		}
-
-		private void UpdatMenuBtn_Click(object sender, EventArgs e)
-		{
-			VersionBGWrkr.RunWorkerAsync("update");
 		}
 
 		private void AstraCarta_KeyDown(object sender, KeyEventArgs e)

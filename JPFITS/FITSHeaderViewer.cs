@@ -6,11 +6,11 @@ namespace JPFITS
 {
 	public partial class FITSHeaderViewer : Form
 	{
-		private JPFITS.FITSHeader HEADER;
-		private JPFITS.FITSImageSet IMAGESET;
+		private FITSHeader HEADER;
+		private FITSImageSet IMAGESET;
 		private int IMAGESETHEADERINDEX = -1;
 
-		public FITSHeaderViewer(JPFITS.FITSHeader header)
+		public FITSHeaderViewer(FITSHeader header)
 		{
 			InitializeComponent();
 
@@ -27,7 +27,7 @@ namespace JPFITS
 			HeaderKeysListBox.ResumeLayout();
 		}
 
-		public FITSHeaderViewer(JPFITS.FITSImageSet imageSet, int imageSetIndex)
+		public FITSHeaderViewer(FITSImageSet imageSet, int imageSetIndex)
 		{
 			InitializeComponent();
 
@@ -42,7 +42,7 @@ namespace JPFITS
 			HeaderKeysListBox.ResumeLayout();
 		}
 
-		public JPFITS.FITSHeader Header
+		public FITSHeader Header
 		{
 			get 
 			{ 
@@ -113,7 +113,7 @@ namespace JPFITS
 			if (!FITSHeader.ValidKeyEdit(HEADER[HeaderKeysListBox.SelectedIndex].Name, true))
 				return;
 
-			JPFITS.FITSHeaderKeyDialog hkd = new JPFITS.FITSHeaderKeyDialog(HEADER[HeaderKeysListBox.SelectedIndex]);
+			FITSHeaderKeyDialog hkd = new JPFITS.FITSHeaderKeyDialog(HEADER[HeaderKeysListBox.SelectedIndex]);
 			if (hkd.ShowDialog() == DialogResult.Cancel)
 				return;
 
@@ -358,11 +358,6 @@ namespace JPFITS
 				return;
 
 			this.Header = new FITSHeader(true, IMAGESET[IMAGESETHEADERINDEX].Image);
-		}
-
-		private void FITSHeaderViewer_Shown(object sender, EventArgs e)
-		{
-
 		}
 
 		private void CancelBtn_Click(object sender, EventArgs e)

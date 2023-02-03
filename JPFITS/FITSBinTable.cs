@@ -1158,7 +1158,7 @@ namespace JPFITS
 					continue;
 
 				//should now only be where extra keys might remain...so add them etc, but ignore END
-				if (strheaderline.Substring(0, 8).Trim() != "END" && strheaderline.Substring(0, 8).Trim() != "PCOUNT" && strheaderline.Substring(0, 8).Trim() != "GCOUNT" && strheaderline.Substring(0, 8).Trim() != "EXTNAME" && strheaderline.Substring(0, 8).Trim() != "XTENSION")
+				if (strheaderline.Substring(0, 8).Trim() != "END" && strheaderline.Substring(0, 8).Trim() != "PCOUNT" && strheaderline.Substring(0, 8).Trim() != "GCOUNT" && strheaderline.Substring(0, 8).Trim() != "EXTNAME" && strheaderline.Substring(0, 8).Trim() != "XTENSION" && strheaderline.Substring(0, 8).Trim() != "BITPIX" && strheaderline.Substring(0, 8).Trim() != "NAXIS")
 					extras.Add(strheaderline);
 			}
 
@@ -4219,10 +4219,10 @@ namespace JPFITS
 		}
 
 		/// <summary>Set the bintable full of basic entries all at once. More efficient than adding a large number of entries once at a time. Useful to use with a brand new and empty FITSBinTable. NOTE: THIS CLEARS ANY EXISTING ENTRIES INCLUDING THE HEAP.
-		/// <br />Do not use for n &gt;= 3 dimensional, or complex, or heap variable-repeat entries.</summary>
+		/// <br />Do not use for n &gt;= 3 dimensional, or complex, or heap (variable-repeat) entries.</summary>
 		/// <param name="ttypeEntries">The names of the binary table extension entries, i.e. the TTYPE values.</param>
-		/// <param name="entryUnits">The physical units of the values of the arrays. Pass null if not needed, or with null elements or empty elements where not required, etc.</param>
-		/// <param name="entryArrays">An array of vectors or 2D arrays to enter into the table, all of which have the same height NAXIS2.</param>
+		/// <param name="entryUnits">The physical units of the values of the arrays. Pass null if not needed, or with null elements or empty elements where not required.</param>
+		/// <param name="entryArrays">An array of vectors or 2D arrays to enter into the table as TTYPEs, all of which have the same height NAXIS2.</param>
 		public void SetTTYPEEntries(string[] ttypeEntries, string[]? entryUnits, Array[] entryArrays)
 		{
 			for (int i = 0; i < entryArrays.Length; i++)
