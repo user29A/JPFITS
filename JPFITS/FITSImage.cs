@@ -611,7 +611,6 @@ namespace JPFITS
 			set 
 			{
 				WORLDCOORDINATESOLUTION = value;
-				value.CopyTo(this.Header);
 			}
 		}
 		#endregion

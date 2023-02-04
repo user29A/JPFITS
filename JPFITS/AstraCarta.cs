@@ -9,6 +9,9 @@ using System.Text;
 
 namespace JPFITS
 {
+	/// <summary>
+	/// Provides query access to the Gaia Archive, for downloading catalogue regions given an RA, DEC, and field scale and size, etc. Used by WCSAutoSolver.
+	/// </summary>
 	public partial class AstraCarta : Form
 	{
 		string OUTFILE = "";
@@ -36,8 +39,37 @@ namespace JPFITS
 			get { return CloseOnCompleteChck.Checked; }
 			set 
 			{
-				CloseOnCompleteChck.Checked = value; 
+				CloseOnCompleteChck.Checked = value;
 			}
+		}
+
+		public static void Help()
+		{
+			StringBuilder sb = new StringBuilder();
+			sb.AppendLine("\"-maglimit\" Magnitude limit below which to flag bright sources and save to output table. Default is 100, to pass all, given that there is no such low magnitude." + Environment.NewLine);
+			sb.AppendLine("\"-buffer\" Tolerance buffer around image field, in arcminutes. This field can be negative, if one wishes to mitigate image padding in the query." + Environment.NewLine);
+			sb.AppendLine("\"-offsetra\" Offset the center of the query region in right ascension. Units in arcminutes." + Environment.NewLine);
+			sb.AppendLine("\"-offsetdec\" Offset the center of the query region in declination. Units in arcminutes." + Environment.NewLine);
+			sb.AppendLine("\"-shape\" Shape of field to query: \"rectangle\" (default) or \"circle\". Circle may only be used if pixwidth and pixheight are equal. Rectangle query uses a polygon query with corners defined by an ad-hoc WCS given the supplied field parameters, whereas circle uses a radius." + Environment.NewLine);
+			sb.AppendLine("\"-rotation\" Field rotation, applicable to a rectangle query. Raises an exception if used for a circle query." + Environment.NewLine);
+			sb.AppendLine("\"-catalogue\" Catalogue or Service to query. Valid options are currently: \"GaiaDR3\" (default)." + Environment.NewLine);
+			sb.AppendLine("\"-filter\" Filter of the catalogue to sort on. Options are: for GaiaDR3: \"rp\", \"bp\", \"g\" (default)." + Environment.NewLine);
+			sb.AppendLine("\"-forcenew\" Force new astroquery. The raw query is saved with a filename based on a hash of the astroquery parameters, and therefore should be unique for unique queries, and the same for the same queries. The exception is for the \"entries\" option which cannot be hashed non-randomly. Therefore if everything else stays the same except for \"entries\", one would need to force a new query." + Environment.NewLine);
+			sb.AppendLine("\"-imageout\" Output an image field plot with maglimit sources marked." + Environment.NewLine);
+			sb.AppendLine("\"-imageshow\" Show the image field plot." + Environment.NewLine);
+			sb.AppendLine("\"-outdir\" Directory to save files. By default files are saved in the current working directory." + Environment.NewLine);
+			sb.AppendLine("\"-outname\" The name to use for output files. If not supplied a settings-consistent but random hash will be used for output file names. Existing filenames will not be overwritten." + Environment.NewLine);
+			sb.AppendLine("\"-overwrite\" Overwrite the output table if one is produced, instead of appending an instance number." + Environment.NewLine);
+			sb.AppendLine("\"-fitsout\" Output results table format as FITS binary table (instead of csv)." + Environment.NewLine);
+			sb.AppendLine("\"-rmvrawquery\" Remove the raw query folder and its contents after running. This will force future astroqueries." + Environment.NewLine);
+			sb.AppendLine("\"-nquery\" Number of brightest sources in the filter to retreive from the query service. Pass 0 to retreive all sources. Default 500." + Environment.NewLine);
+			sb.AppendLine("\"-pmepoch\" Pass the year.year value of the observation to update the RA and Dec entries of the table with their proper motion adjustments, given the catalogue reference epoch. Only entries in the query which have valid proper motion entries will be saved to output." + Environment.NewLine);
+			sb.AppendLine("\"-pmlimit\" Limit the output to proper motions whose absolute value are less than pmlimit. Milliarcseconds per year." + Environment.NewLine);
+			sb.AppendLine("\"-entries\" A commaspace \", \" separated list of source columns to request from the query. Pass entries=\"all\" to get everything from the query source. Default is for GaiaDR3, entries=\"ref_epoch, ra, ra_err, dec, dec_err, pmra, pmra_err, pmdec, pmdec_err, pm, phot_bp_mean_mag, phot_g_mean_mag, phot_rp_mean_mag\". Thus, if entries is supplied, it appends additional entries to the default. For example if you additionally wanted the absolute value of proper motion errors then passing entries=\"pm_error\" would append \", pm_error\" to the string." + Environment.NewLine);
+			sb.AppendLine("\"-notableout\" Do not write an output file even when sources have been found. Useful if only wanting to view images but do not want to fill up a directory with table results." + Environment.NewLine);
+			sb.AppendLine("\"-silent\" Do not output process milestones to command window. Default false." + Environment.NewLine);
+
+			MessageBox.Show(sb.ToString());
 		}
 
 		/// <summary>
@@ -48,9 +80,10 @@ namespace JPFITS
 		/// <param name="scale">The plate scale in arcseconds per pixel.</param>
 		/// <param name="pixwidth">The number of horizontal pixels of the image.</param>
 		/// <param name="pixheight">The number of vertical pixels of the image</param>
-		/// <param name="optArgs">Optional arguments list. Possible arguments can be found here: https://github.com/user29A/AstraCarta/wiki.
+		/// <param name="optArgs">Optional arguments list. Possible arguments can be found here: https://github.com/user29A/AstraCarta/wiki, or with AstraCarta.Help call.
 		/// <br />Be sure to pass the switch "-argument"; for example do not pass "buffer", but pass "-buffer", etc.
-		/// <br />Argument and their values should be consecutive, for example: optArgs.Add("-buffer); optArgs.Add(2); and so on.</param>
+		/// <br />Arguments and their values must be consecutive, for example: optArgs.Add("-buffer); optArgs.Add(2); and so on.
+		/// <br />Boolean arguments do not require a value, and their presence indicates true. For example the presence of optArgs.Add("-fitsout") equates to true for writing the file as a FITS bintable.</param>
 		public static string Query(double ra, double dec, double scale, int pixwidth, int pixheight, ArrayList? optArgs = null)
 		{
 			try
@@ -582,7 +615,10 @@ namespace JPFITS
 		/// <param name="scale">The plate scale in arcseconds per pixel.</param>
 		/// <param name="pixwidth">The number of horizontal pixels of the image.</param>
 		/// <param name="pixheight">The number of vertical pixels of the image</param>
-		/// <param name="optArgs">Optional arguments list.</param>
+		/// <param name="optArgs">Optional arguments list. Possible arguments can be found here: https://github.com/user29A/AstraCarta/wiki, or with AstraCarta.Help call.
+		/// <br />Be sure to pass the switch "-argument"; for example do not pass "buffer", but pass "-buffer", etc.
+		/// <br />Arguments and their values must be consecutive, for example: optArgs.Add("-buffer); optArgs.Add(2); and so on.
+		/// <br />Boolean arguments do not require a value, and their presence indicates true. For example the presence of optArgs.Add("-fitsout") equates to true for writing the file as a FITS bintable.</param>
 		public AstraCarta(double ra, double dec, double scale, int pixwidth, int pixheight, ArrayList? optArgs = null)
 		{
 			InitializeComponent();
@@ -1017,6 +1053,11 @@ namespace JPFITS
 		{
 			if (e.KeyCode == Keys.Escape)
 				this.Close();
+		}
+
+		private void AstraCarta_HelpRequested(object sender, HelpEventArgs hlpevent)
+		{
+			AstraCarta.Help();
 		}
 	}
 }

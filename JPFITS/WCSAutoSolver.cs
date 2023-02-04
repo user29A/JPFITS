@@ -832,13 +832,13 @@ namespace JPFITS
 		/// <summary>
 		/// Solves a WCS solution for a FITSImage and writes the WCS keywords into its header (but does not save the file). Should work for most visible and near-visible images, and uses a bunch of default settings. 
 		/// <br /> Failure to solve is given by a false return, in which case you need to use a contructor and specify additional settings.
-		/// <br /> Queries GaiaDR3 for the catalogue.
-		/// <br /> Requires Python 3.10 or higher, and installation of AstraCarta via *pip install AstraCarta* on the command window.
+		/// <br /> Queries GaiaDR3 with JPFITS.AstraCarta for the catalogue using http web request.
 		/// </summary>
 		/// <param name="fitsImage">The FITSImage to solve the WCS for.</param>
 		/// <param name="scale">The plate scale of the image, to within +-5% (need not be totally precise). Arcseconds per pixel.</param>
 		/// <param name="pixelSaturation">The saturation level of the image. For example, for 16bit ADU's, saturation occurs ~65,535, but you should specify a 15% lower value than this, so ~55e3.</param>
-		public static bool SolveWCS_EZ(FITSImage fitsImage, double scale, double pixelSaturation)
+		/// <param name="ROI">The region of interest of the FITS image to search for point sources, of identical size to the FITS image. Pass null or all true for entire image.</param>
+		public static bool SolveWCS_EZ(FITSImage fitsImage, double scale, double pixelSaturation, bool[,]? ROI)
 		{
 			try
 			{
@@ -856,15 +856,19 @@ namespace JPFITS
 
 				//populate the mandatory arguments for AstraCarta query
 				ArrayList keys = new ArrayList();
-				keys.Add("fitsout");//need a fits binary table
+				keys.Add("-fitsout");//need a fits binary table
+				keys.Add("-overwrite");//
+				keys.Add("-buffer");
+				keys.Add((double)2);
 
 				string fullcataloguepath = AstraCarta.Query(dRA, dDEC, scale, fitsImage.Width, fitsImage.Height, keys);//query will take a few moments
 
-				WCSAutoSolver wcsas = new WCSAutoSolver("TAN", 50, fitsImage, null, pixelSaturation, true, 2, 21, fullcataloguepath, "GaiaDR3", "ra", "dec", "phot_g_mean_mag", true);//instatiate a solver
+				WCSAutoSolver wcsas = new WCSAutoSolver("TAN", 75, fitsImage, ROI, pixelSaturation, true, 2, 21, fullcataloguepath, "GaiaDR3", "ra", "dec", "phot_g_mean_mag", true);//instatiate a solver
 				wcsas.SolveAsync(scale, scale / 1.05, scale * 1.05, 0, -180, 180, 0.25, 6, 25, true, false);//should solve quickly
 				if (wcsas.Solved)
 				{
 					fitsImage.WCS = wcsas.WCS_Solution;
+					wcsas.WCS.CopyTo(fitsImage.Header);
 					return true;
 				}
 				else
