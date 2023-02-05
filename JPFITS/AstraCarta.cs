@@ -1059,5 +1059,25 @@ namespace JPFITS
 		{
 			AstraCarta.Help();
 		}
+
+		private void LoadMenuBtn_Click(object sender, EventArgs e)
+		{
+
+		}
+
+		private void SaveMenuBtn_Click(object sender, EventArgs e)
+		{
+			//SaveFileDialog sfd = new SaveFileDialog
+			//{
+			//	Filter = "FITS|*.fit",
+			//	InitialDirectory = Environment.CurrentDirectory
+			//};
+
+			//if (sfd.ShowDialog() == DialogResult.Cancel)
+			//	return;
+
+			//FITSBinTable fbt = new FITSBinTable("astracarta");
+
+		}
 	}
 }

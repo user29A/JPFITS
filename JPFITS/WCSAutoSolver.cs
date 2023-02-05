@@ -868,7 +868,7 @@ namespace JPFITS
 				if (wcsas.Solved)
 				{
 					fitsImage.WCS = wcsas.WCS_Solution;
-					wcsas.WCS.CopyTo(fitsImage.Header);
+					wcsas.WCS.CopyTo(fitsImage.Header, false);
 					return true;
 				}
 				else

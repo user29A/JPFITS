@@ -433,12 +433,14 @@ namespace JPFITS
 		/// <param name="header">Optionally provide a header to update the keywords. Pass null if no header present or necessary.</param>
 		public void Bin(int binning, JPFITS.FITSHeader? header)
 		{
-			this.SetCDi_j(1, 1, this.GetCDi_j(1, 1) * (double)binning);
-			this.SetCDi_j(1, 2, this.GetCDi_j(1, 2) * (double)binning);
-			this.SetCDi_j(2, 1, this.GetCDi_j(2, 1) * (double)binning);
-			this.SetCDi_j(2, 2, this.GetCDi_j(2, 2) * (double)binning);
-			this.SetCRPIXn(1, this.GetCRPIXn(1) / (double)binning);
-			this.SetCRPIXn(2, this.GetCRPIXn(2) / (double)binning);
+			this.SetCDi_j(1, 1, this.GetCDi_j(1, 1) * binning);
+			this.SetCDi_j(1, 2, this.GetCDi_j(1, 2) * binning);
+			this.SetCDi_j(2, 1, this.GetCDi_j(2, 1) * binning);
+			this.SetCDi_j(2, 2, this.GetCDi_j(2, 2) * binning);
+			this.SetCRPIXn(1, this.GetCRPIXn(1) / binning);
+			this.SetCRPIXn(2, this.GetCRPIXn(2) / binning);
+			this.CDELTN[0] *= binning;
+			this.CDELTN[1] *= binning;
 
 			if (header == null)
 				return;
@@ -449,6 +451,8 @@ namespace JPFITS
 			header.SetKey("CD2_2", this.GetCDi_j(2, 2).ToString(), true, -1);
 			header.SetKey("CRPIX1", this.GetCRPIXn(1).ToString(), true, -1);
 			header.SetKey("CRPIX2", this.GetCRPIXn(2).ToString(), true, -1);
+			header.SetKey("CDELT1", this.GetCDELTn(1).ToString(), true, -1);
+			header.SetKey("CDELT2", this.GetCDELTn(2).ToString(), true, -1);
 		}
 
 		/// <summary>
@@ -656,7 +660,8 @@ namespace JPFITS
 		/// <param name="cval1">An array of coordinate values in degrees on coordinate axis 1.</param>
 		/// <param name="cval2">An array of coordinate values in degrees on coordinate axis 2.</param>
 		/// <param name="header">An FITSImageHeader instance to write the solution into. Pass null if not required.</param>
-		public void Solve_WCS(string WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, FITSHeader header)
+		/// <param name="verbose">Copy all WCS diagnostic data into the header in addition to essential WCS keywords.</param>
+		public void Solve_WCS(string WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, FITSHeader header, bool verbose = false)
 		{
 			//should first do a check of WCS type to make sure it is valid
 			if (WCS_Type != "TAN")
@@ -775,7 +780,7 @@ namespace JPFITS
 			CCVALS2 = ccvals2;
 
 			ClearWCS(header);
-			this.CopyTo(header);
+			this.CopyTo(header, verbose);
 		}
 
 		/// <summary>Gets the image [x, y] pixel position for a given world coordinate in degrees at cval1 and cval2.</summary>
@@ -971,7 +976,9 @@ namespace JPFITS
 		}
 
 		/// <summary>Copy WCS parameters from the current instance into a FITSHeader.</summary>
-		public void CopyTo(JPFITS.FITSHeader header)
+		/// <param name="header">The JPFITSHeader to copy the WCS parameters into.</param>
+		/// <param name="verbose">Copy all WCS diagnostic data into the header in addition to essential WCS keywords.</param>
+		public void CopyTo(JPFITS.FITSHeader header, bool verbose = false)
 		{
 			try
 			{
@@ -989,10 +996,16 @@ namespace JPFITS
 				header.SetKey("CDELT2", CDELTN[1].ToString("F8"), "WCS plate Scale on axis 2 (arcsec per pixel)", true, -1);
 				header.SetKey("CROTA1", CROTAN[0].ToString("F8"), "WCS field rotation angle on axis 1 (degrees)", true, -1);
 				header.SetKey("CROTA2", CROTAN[1].ToString("F8"), "WCS field rotation angle on axis 2 (degrees)", true, -1);
-				header.SetKey("CCVALD1", CCVALD1.ToString("F8"), "WCS field center on axis 1 (degrees)", true, -1);
-				header.SetKey("CCVALD2", CCVALD2.ToString("F8"), "WCS field center on axis 2 (degrees)", true, -1);
 				header.SetKey("CCVALS1", CCVALS1, "WCS field center on axis 1 (sexagesimal h m s)", true, -1);
 				header.SetKey("CCVALS2", CCVALS2, "WCS field center on axis 2 (sexagesimal d am as)", true, -1);
+				header.SetKey("CVALRM", CVALRM.ToString("G"), "Mean of WCS residuals (arcsec)", true, -1);
+				header.SetKey("CVALRS", CVALRS.ToString("G"), "Standard dev of WCS residuals (arcsec)", true, -1);
+
+				if (!verbose)
+					return;
+
+				header.SetKey("CCVALD1", CCVALD1.ToString("F8"), "WCS field center on axis 1 (degrees)", true, -1);
+				header.SetKey("CCVALD2", CCVALD2.ToString("F8"), "WCS field center on axis 2 (degrees)", true, -1);				
 				header.SetKey("CPIX1RM", CPIX1RM.ToString("G"), "Mean of WCS residuals on axis 1 (pixels)", true, -1);
 				header.SetKey("CPIX1RS", CPIX1RS.ToString("G"), "Standard dev of WCS residuals on axis 1 (pixels)", true, -1);
 				header.SetKey("CVAL1RM", CVAL1RM.ToString("G"), "Mean of WCS residuals on axis 1 (arcsec)", true, -1);
@@ -1002,9 +1015,7 @@ namespace JPFITS
 				header.SetKey("CVAL2RM", CVAL2RM.ToString("G"), "Mean of WCS residuals on axis 2 (arcsec)", true, -1);
 				header.SetKey("CVAL2RS", CVAL2RS.ToString("G"), "Standard dev of WCS residuals on axis 2 (arcsec)", true, -1);
 				header.SetKey("CPIXRM", CPIXRM.ToString("G"), "Mean of WCS residuals (pixels)", true, -1);
-				header.SetKey("CPIXRS", CPIXRS.ToString("G"), "Standard dev of WCS residuals (pixels)", true, -1);
-				header.SetKey("CVALRM", CVALRM.ToString("G"), "Mean of WCS residuals (arcsec)", true, -1);
-				header.SetKey("CVALRS", CVALRS.ToString("G"), "Standard dev of WCS residuals (arcsec)", true, -1);
+				header.SetKey("CPIXRS", CPIXRS.ToString("G"), "Standard dev of WCS residuals (pixels)", true, -1);				
 
 				int key = 0, num = 1;
 				while (key != -1)

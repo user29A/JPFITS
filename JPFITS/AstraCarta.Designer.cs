@@ -557,12 +557,14 @@
 			this.LoadMenuBtn.Name = "LoadMenuBtn";
 			this.LoadMenuBtn.Size = new System.Drawing.Size(45, 22);
 			this.LoadMenuBtn.Text = "Load";
+			this.LoadMenuBtn.Click += new System.EventHandler(this.LoadMenuBtn_Click);
 			// 
 			// SaveMenuBtn
 			// 
 			this.SaveMenuBtn.Name = "SaveMenuBtn";
 			this.SaveMenuBtn.Size = new System.Drawing.Size(43, 22);
 			this.SaveMenuBtn.Text = "Save";
+			this.SaveMenuBtn.Click += new System.EventHandler(this.SaveMenuBtn_Click);
 			// 
 			// CloseOnCompleteChck
 			// 
@@ -672,7 +674,7 @@
 			this.HelpButton = true;
 			this.KeyPreview = true;
 			this.MainMenuStrip = this.MainMenu;
-			this.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+			this.Margin = new System.Windows.Forms.Padding(2);
 			this.MaximizeBox = false;
 			this.MinimizeBox = false;
 			this.Name = "AstraCarta";
