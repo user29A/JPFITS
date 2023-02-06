@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Windows.Forms;
 using System.Collections.Concurrent;
 using System.Collections;
-
 #nullable enable
 
 namespace JPFITS
@@ -45,6 +44,7 @@ namespace JPFITS
 		double DIV;
 		int NITERS, MAXITERS;
 		double IMMAX, IMMED, IMAMP, PIXTHRESH;
+		bool VERBOSEHEADER = false;
 
 		private void BGWRKR_DoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
 		{
@@ -85,7 +85,7 @@ namespace JPFITS
 
 				//get the brightest few catlaogue points
 				BGWRKR.ReportProgress(0, "Making Catalogue points...");
-				CAT_PTS = new JPMath.PointD[(N_POINTS)];
+				CAT_PTS = new JPMath.PointD[N_POINTS];
 				for (int i = 0; i < CAT_PTS.Length; i++)
 					CAT_PTS[i] = new JPMath.PointD(CAT_CVAL1s[i], CAT_CVAL2s[i], CAT_MAGs[i]);
 
@@ -446,7 +446,7 @@ namespace JPFITS
 				return;
 
 			BGWRKR.ReportProgress(0, "Solving for " + c + " point pair matches out of a possible " + N_POINTS);
-			WCS.Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header);
+			WCS.Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
 			BGWRKR.ReportProgress(0, "Solution:" + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "CRPIX1 = " + WCS.GetCRPIXn(1));
 			BGWRKR.ReportProgress(0, "CRPIX2 = " + WCS.GetCRPIXn(2));
@@ -477,7 +477,7 @@ namespace JPFITS
 				return;
 			
 			BGWRKR.ReportProgress(0, "Refining solution...");
-			N_POINTS *= 3;
+			N_POINTS  = 2500;
 			NITERS = 0;
 			PSE = new JPFITS.PointSourceExtractor();
 			BGWRKR.ReportProgress(0, Environment.NewLine + "Searching '" + FITS_IMG.FileName + "' for " + N_POINTS + " point sources...");
@@ -506,8 +506,8 @@ namespace JPFITS
 				N_POINTS = CAT_CVAL1s.Length;
 
 			//get the brightest catlaogue points
-			cval1 = new double[(N_POINTS)];
-			cval2 = new double[(N_POINTS)];
+			cval1 = new double[N_POINTS];
+			cval2 = new double[N_POINTS];
 			for (int i = 0; i < N_POINTS; i++)
 			{
 				cval1[i] = CAT_CVAL1s[i];
@@ -515,14 +515,14 @@ namespace JPFITS
 			}
 
 			//get the catlaogue pixel locations
-			cpix1 = new double[(N_POINTS)];
-			cpix2 = new double[(N_POINTS)];
+			cpix1 = new double[N_POINTS];
+			cpix2 = new double[N_POINTS];
 			WCS.Get_Pixels(cval1, cval2, "TAN", out cpix1, out cpix2, true);
 
 			//check for catlaogue pixels which fall onto PSE pixels
 			int nmatches = 0;
-			bool[] match = new bool[(N_POINTS)];
-			int[] matchinds = new int[(N_POINTS)];
+			bool[] match = new bool[N_POINTS];
+			int[] matchinds = new int[N_POINTS];
 			for (int i = 0; i < N_POINTS; i++)
 			{
 				int x = (int)Math.Round(cpix1[i]);
@@ -557,7 +557,7 @@ namespace JPFITS
 				return;
 
 			WorldCoordinateSolution.ClearWCS(FITS_IMG.Header);
-			WCS.Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header);
+			WCS.Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
 			BGWRKR.ReportProgress(0, Environment.NewLine + nmatches + " sources of " + N_POINTS + " were able to be used for WCS refinement.");
 			BGWRKR.ReportProgress(0, Environment.NewLine + "Refined solution:" + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "CRPIX1 = " + WCS.GetCRPIXn(1));
@@ -718,6 +718,11 @@ namespace JPFITS
 		#endregion
 
 		#region PROPERTIES
+
+		public bool VerboseHeader
+		{
+			set { VERBOSEHEADER = value; }
+		}
 
 		/// <summary>Returns the World Coordinate Solution</summary>
 		public WorldCoordinateSolution WCS_Solution
