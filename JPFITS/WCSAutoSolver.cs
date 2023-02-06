@@ -812,9 +812,8 @@ namespace JPFITS
 			SHOW_REPORT_FORM = show_report_form;
 			SOLVING = true;
 
-			if (SHOW_REPORT_FORM)
+			if (SHOW_REPORT_FORM && DO_PSE)
 			{
-				SHOW_REPORT_FORM = false;
 				WCSARF = new WCSAutoSolverReportingForm(this);
 				WCSARF.WCSAutoReportingTimer.Enabled = true;
 				BGWRKR.RunWorkerAsync();
@@ -822,9 +821,10 @@ namespace JPFITS
 				if (res == DialogResult.Cancel)
 					CANCELLED = true;
 			}
-			else// non async call
-			{
-				//BGWRKR.RunWorkerAsync();
+			else if (SHOW_REPORT_FORM && !DO_PSE)
+				BGWRKR.RunWorkerAsync();
+			else//sync call
+			{				
 				BGWRKR_DoWork(this, new DoWorkEventArgs(null));//runs the PSE and exits
 				BGWRKR_RunWorkerCompleted(this, new RunWorkerCompletedEventArgs(this, null, false));//calls the solver
 			}
