@@ -858,7 +858,7 @@ namespace JPFITS
 			{
 				double[] fwhm = new double[FITS_FWHM_Y.Length];
 				for (int i = 0; i < fwhm.Length; i++)
-					fwhm[i] = Math.Sqrt(FITS_FWHM_Y[i] * FITS_FWHM_Y[i] + FITS_FWHM_X[i] * FITS_FWHM_X[i]);
+					fwhm[i] = (FITS_FWHM_Y[i] + FITS_FWHM_X[i]) / 2;
 
 				return fwhm;
 			}
