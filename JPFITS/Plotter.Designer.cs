@@ -29,29 +29,35 @@
 		private void InitializeComponent()
 		{
 			this.components = new System.ComponentModel.Container();
-			System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-			this.jpChart1 = new JPChart.JPChart();
+			System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+			this.ChartGraph = new JPChart.JPChartControl();
 			this.EscBtn = new System.Windows.Forms.Button();
-			((System.ComponentModel.ISupportInitialize)(this.jpChart1)).BeginInit();
+			((System.ComponentModel.ISupportInitialize)(this.ChartGraph)).BeginInit();
 			this.SuspendLayout();
 			// 
-			// jpChart1
+			// ChartGraph
 			// 
-			this.jpChart1.BackColor = System.Drawing.Color.DarkGray;
-			this.jpChart1.BackGradientStyle = System.Windows.Forms.DataVisualization.Charting.GradientStyle.TopBottom;
-			chartArea1.AxisX.MajorGrid.Enabled = false;
-			chartArea1.AxisX.ScrollBar.Enabled = false;
-			chartArea1.AxisY.MajorGrid.Enabled = false;
-			chartArea1.AxisY.ScrollBar.Enabled = false;
-			chartArea1.Name = "ChartArea1";
-			this.jpChart1.ChartAreas.Add(chartArea1);
-			this.jpChart1.Dock = System.Windows.Forms.DockStyle.Fill;
-			this.jpChart1.Location = new System.Drawing.Point(0, 0);
-			this.jpChart1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-			this.jpChart1.Name = "jpChart1";
-			this.jpChart1.Size = new System.Drawing.Size(848, 683);
-			this.jpChart1.TabIndex = 0;
-			this.jpChart1.Text = "jpChart1";
+			this.ChartGraph.BackColor = System.Drawing.Color.DarkGray;
+			this.ChartGraph.BackGradientStyle = System.Windows.Forms.DataVisualization.Charting.GradientStyle.TopBottom;
+			this.ChartGraph.BackSecondaryColor = System.Drawing.Color.Gainsboro;
+			this.ChartGraph.BorderlineColor = System.Drawing.Color.Black;
+			chartArea2.AxisX.MajorGrid.Enabled = false;
+			chartArea2.AxisX.Maximum = 0D;
+			chartArea2.AxisX.Minimum = 0D;
+			chartArea2.AxisX.ScrollBar.Enabled = false;
+			chartArea2.AxisY.MajorGrid.Enabled = false;
+			chartArea2.AxisY.Maximum = 0D;
+			chartArea2.AxisY.Minimum = 0D;
+			chartArea2.AxisY.ScrollBar.Enabled = false;
+			chartArea2.BorderDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
+			chartArea2.Name = "ChartArea1";
+			this.ChartGraph.ChartAreas.Add(chartArea2);
+			this.ChartGraph.Dock = System.Windows.Forms.DockStyle.Fill;
+			this.ChartGraph.Location = new System.Drawing.Point(0, 0);
+			this.ChartGraph.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+			this.ChartGraph.Name = "ChartGraph";
+			this.ChartGraph.Size = new System.Drawing.Size(848, 683);
+			this.ChartGraph.TabIndex = 0;
 			// 
 			// EscBtn
 			// 
@@ -71,20 +77,21 @@
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.CancelButton = this.EscBtn;
 			this.ClientSize = new System.Drawing.Size(848, 683);
-			this.Controls.Add(this.jpChart1);
+			this.Controls.Add(this.ChartGraph);
 			this.Controls.Add(this.EscBtn);
 			this.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
 			this.Name = "Plotter";
 			this.ShowIcon = false;
-			this.Text = "FitsExtensionTablePlotter";
-			((System.ComponentModel.ISupportInitialize)(this.jpChart1)).EndInit();
+			this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Plotter_FormClosing);
+			this.Load += new System.EventHandler(this.Plotter_Load);
+			((System.ComponentModel.ISupportInitialize)(this.ChartGraph)).EndInit();
 			this.ResumeLayout(false);
 
 		}
 
 		#endregion
 
-		public JPChart.JPChart jpChart1;
+		public JPChart.JPChartControl ChartGraph;
 		private System.Windows.Forms.Button EscBtn;
 	}
 }

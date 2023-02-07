@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using System.Collections;
 using System.Net;
 using System.Text;
+using System.Windows.Forms.DataVisualization.Charting;
 #nullable enable
 
 namespace JPFITS
@@ -456,11 +457,10 @@ namespace JPFITS
 					return "";
 				}
 
-				Plotter plot = new Plotter();
-				plot.jpChart1.ChartAreas[0].AxisY.IsReversed = true;
+				Plotter plot = new Plotter("AstraCarta", true, true);
+				plot.ChartGraph.ChartAreas[0].AxisY.IsReversed = true; 
 				plot.Width = 500;
 				plot.Height = 500;
-				plot.Name = "AstraCarta";
 				plot.Text = "AstraCarta";
 
 				if (imageshow || imageout)
@@ -491,8 +491,7 @@ namespace JPFITS
 						y[i] = cdinv21 * X_intrmdt + cdinv22 * Y_intrmdt + crpix2;
 					}
 					
-					plot.jpChart1.PlotXYData(x, y, "Found " + rowswritten + " Sources", "Horizontal Image Axis (Pixels)", "Vertical Image Axis (Pixels)", JPChart.JPChart.SeriesType.Point, "astracarta", System.Drawing.Color.Blue);
-					plot.jpChart1.SetAxesLimits(1, pixwidth, 1, pixheight);
+					plot.ChartGraph.PlotXYData(x, y, "Found " + rowswritten + " Sources", "Horizontal Image Axis (Pixels)", "Vertical Image Axis (Pixels)", JPChart.JPChartControl.SeriesType.Point, "astracarta", System.Drawing.Color.Blue);
 					double xlimmin = 1;
 					double xlimmax = pixwidth;
 					double ylimmin = 1;
@@ -502,15 +501,14 @@ namespace JPFITS
 					{
 						if (buffer > 0)
 						{
-							plot.jpChart1.AddXYData(new double[] { 1, 1, pixwidth, pixwidth, 1 }, new double[] { 1, pixheight, pixheight, 1, 1 }, JPChart.JPChart.SeriesType.Line, "imagebox", System.Drawing.Color.Black);
-							plot.jpChart1.SetAxesLimits(xpix_topleft, xpix_topright, ypix_topleft, ypix_bottomleft);
+							plot.ChartGraph.AddXYData(new double[] { 1, 1, pixwidth, pixwidth, 1 }, new double[] { 1, pixheight, pixheight, 1, 1 }, JPChart.JPChartControl.SeriesType.Line, "imagebox", System.Drawing.Color.Black);
 							xlimmin = xpix_topleft;
 							xlimmax = xpix_topright;
 							ylimmin = ypix_topleft;
 							ylimmax = ypix_bottomleft;
 						}
 						else if (buffer < 0)
-							plot.jpChart1.AddXYData(new double[] { xpix_topleft, xpix_topright, xpix_bottomright, xpix_bottomleft, xpix_topleft }, new double[] { ypix_topleft, ypix_topright, ypix_bottomright, ypix_bottomleft, ypix_topleft }, JPChart.JPChart.SeriesType.Line, "imagebox", System.Drawing.Color.Black);
+							plot.ChartGraph.AddXYData(new double[] { xpix_topleft, xpix_topright, xpix_bottomright, xpix_bottomleft, xpix_topleft }, new double[] { ypix_topleft, ypix_topright, ypix_bottomright, ypix_bottomleft, ypix_topleft }, JPChart.JPChartControl.SeriesType.Line, "imagebox", System.Drawing.Color.Black);
 					}
 					else if (shape == "circle")
 					{
@@ -541,13 +539,15 @@ namespace JPFITS
 							yc[i] = rimage * Math.Cos(theta[i] * Math.PI / 180) + crpix2;
 						}
 
-						plot.jpChart1.AddXYData(xc, yc, JPChart.JPChart.SeriesType.Line, "imagecircle", System.Drawing.Color.Black);
+						plot.ChartGraph.AddXYData(xc, yc, JPChart.JPChartControl.SeriesType.Line, "imagecircle", System.Drawing.Color.Black);
 					}
 
-					plot.jpChart1.SetAxesLimits(xlimmin, xlimmax, ylimmin, ylimmax);
+					plot.ChartGraph.SetAxesLimits(Math.Floor(xlimmin), Math.Ceiling(xlimmax), Math.Floor(ylimmin), Math.Ceiling(ylimmax));
+					//plot.jpChart1.ChartAreas[0].AxisY.Crossing = Math.Ceiling(ylimmax);
+					//plot.jpChart1.Series[0].XAxisType = AxisType.Secondary;
 
 					if (imageout)
-						plot.jpChart1.SaveImage(imagefilename, System.Windows.Forms.DataVisualization.Charting.ChartImageFormat.Jpeg);
+						plot.ChartGraph.SaveImage(imagefilename, System.Windows.Forms.DataVisualization.Charting.ChartImageFormat.Jpeg);
 				}
 
 				if (notableout)

@@ -28,7 +28,7 @@ namespace JPFITS
 		private double[]? CAT_MAGs;
 		private JPMath.PointD[]? PSE_PTS;
 		private JPMath.PointD[]? CAT_PTS;
-		private int PROGRESS, IMAGE_WIDTH, IMAGE_HEIGHT, N_POINTS, PSE_KERNEL_RADIUS, PSE_SEP_RADIUS, N_MATCHES_STOP, PERC_MATCHES_STOP;
+		private int PROGRESS, IMAGE_WIDTH, IMAGE_HEIGHT, N_SOLVE_PTS, PSE_KERNEL_RADIUS, PSE_SEP_RADIUS, N_MATCHES_STOP, PERC_MATCHES_STOP, N_REFINE_PTS;
 		private double SCALE_INIT, SCALE_LB, SCALE_UB, ROTATION_INIT, ROTATION_LB, ROTATION_UB, WCS_VERTEX_TOL, PIX_SAT;
 		//ulong NCOMPARES;
 		private WorldCoordinateSolution? WCS;
@@ -85,7 +85,7 @@ namespace JPFITS
 
 				//get the brightest few catlaogue points
 				BGWRKR.ReportProgress(0, "Making Catalogue points...");
-				CAT_PTS = new JPMath.PointD[N_POINTS];
+				CAT_PTS = new JPMath.PointD[N_SOLVE_PTS];
 				for (int i = 0; i < CAT_PTS.Length; i++)
 					CAT_PTS[i] = new JPMath.PointD(CAT_CVAL1s[i], CAT_CVAL2s[i], CAT_MAGs[i]);
 
@@ -94,7 +94,7 @@ namespace JPFITS
 				IMAGE_WIDTH = FITS_IMG.Width;
 				IMAGE_HEIGHT = FITS_IMG.Height;
 
-				BGWRKR.ReportProgress(0, Environment.NewLine + "Searching '" + FITS_IMG.FileName + "' for " + N_POINTS + " point sources...");				
+				BGWRKR.ReportProgress(0, Environment.NewLine + "Searching '" + FITS_IMG.FileName + "' for " + N_SOLVE_PTS + " point sources...");				
 				while (NITERS <= MAXITERS)
 				{
 					NITERS++;
@@ -103,14 +103,14 @@ namespace JPFITS
 
 					BGWRKR.ReportProgress(0, "Found " + PSE.N_Sources + " point sources on iteration " + NITERS);
 
-					if (PSE.N_Sources >= N_POINTS)
+					if (PSE.N_Sources >= N_SOLVE_PTS)
 						break;
 
 					DIV *= 2;
 					PIXTHRESH = IMAMP / DIV + IMMED;
 				}
-				if (PSE.N_Sources > N_POINTS)
-					PSE.ClipToNBrightest(N_POINTS);
+				if (PSE.N_Sources > N_SOLVE_PTS)
+					PSE.ClipToNBrightest(N_SOLVE_PTS);
 				BGWRKR.ReportProgress(0, "Stopped searching on iteration " + NITERS + " with " + PSE.N_Sources + " point sources");
 
 				//turn the PSE results into points
@@ -417,11 +417,11 @@ namespace JPFITS
 			if (CANCELLED)
 				return;
 
-			BGWRKR.ReportProgress(0, "Matching all the points that I can given the " + N_POINTS + " input point pairs...");
-			double[] cval1 = new double[(total_pt_matches)];
-			double[] cval2 = new double[(total_pt_matches)];
-			double[] cpix1 = new double[(total_pt_matches)];
-			double[] cpix2 = new double[(total_pt_matches)];
+			BGWRKR.ReportProgress(0, "Matching all the points that I can given the " + N_SOLVE_PTS + " input point pairs...");
+			double[] cval1 = new double[total_pt_matches];
+			double[] cval2 = new double[total_pt_matches];
+			double[] cpix1 = new double[total_pt_matches];
+			double[] cpix2 = new double[total_pt_matches];
 			c = 0;
 			for (int k = 0; k < CATpts_intrmdt.Length; k++)
 			{
@@ -445,7 +445,7 @@ namespace JPFITS
 			if (CANCELLED)
 				return;
 
-			BGWRKR.ReportProgress(0, "Solving for " + c + " point pair matches out of a possible " + N_POINTS);
+			BGWRKR.ReportProgress(0, "Solving for " + c + " point pair matches out of a possible " + N_SOLVE_PTS);
 			WCS.Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
 			BGWRKR.ReportProgress(0, "Solution:" + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "CRPIX1 = " + WCS.GetCRPIXn(1));
@@ -477,10 +477,9 @@ namespace JPFITS
 				return;
 			
 			BGWRKR.ReportProgress(0, "Refining solution...");
-			N_POINTS  = 2500;
 			NITERS = 0;
 			PSE = new JPFITS.PointSourceExtractor();
-			BGWRKR.ReportProgress(0, Environment.NewLine + "Searching '" + FITS_IMG.FileName + "' for " + N_POINTS + " point sources...");
+			BGWRKR.ReportProgress(0, Environment.NewLine + "Searching '" + FITS_IMG.FileName + "' for " + N_REFINE_PTS + " point sources...");
 			while (NITERS <= MAXITERS)
 			{
 				NITERS++;
@@ -489,41 +488,41 @@ namespace JPFITS
 
 				BGWRKR.ReportProgress(0, "Found " + PSE.N_Sources + " point sources on iteration " + NITERS);
 
-				if (PSE.N_Sources >= N_POINTS)
+				if (PSE.N_Sources >= N_REFINE_PTS)
 					break;
 
 				DIV *= 2;
 				PIXTHRESH = IMAMP / DIV + IMMED;
 			}
-			if (PSE.N_Sources > N_POINTS)
-				PSE.ClipToNBrightest(N_POINTS);
+			if (PSE.N_Sources > N_REFINE_PTS)
+				PSE.ClipToNBrightest(N_REFINE_PTS);
 			BGWRKR.ReportProgress(0, "Stopped searching on iteration " + NITERS + " with " + PSE.N_Sources + " point sources");
 
 			if (CANCELLED)
 				return;
 
-			if (N_POINTS > CAT_CVAL1s.Length)
-				N_POINTS = CAT_CVAL1s.Length;
+			if (N_REFINE_PTS > CAT_CVAL1s.Length)
+				N_REFINE_PTS = CAT_CVAL1s.Length;
 
 			//get the brightest catlaogue points
-			cval1 = new double[N_POINTS];
-			cval2 = new double[N_POINTS];
-			for (int i = 0; i < N_POINTS; i++)
+			cval1 = new double[N_REFINE_PTS];
+			cval2 = new double[N_REFINE_PTS];
+			for (int i = 0; i < N_REFINE_PTS; i++)
 			{
 				cval1[i] = CAT_CVAL1s[i];
 				cval2[i] = CAT_CVAL2s[i];
 			}
 
 			//get the catlaogue pixel locations
-			cpix1 = new double[N_POINTS];
-			cpix2 = new double[N_POINTS];
+			cpix1 = new double[N_REFINE_PTS];
+			cpix2 = new double[N_REFINE_PTS];
 			WCS.Get_Pixels(cval1, cval2, "TAN", out cpix1, out cpix2, true);
 
 			//check for catlaogue pixels which fall onto PSE pixels
 			int nmatches = 0;
-			bool[] match = new bool[N_POINTS];
-			int[] matchinds = new int[N_POINTS];
-			for (int i = 0; i < N_POINTS; i++)
+			bool[] match = new bool[N_REFINE_PTS];
+			int[] matchinds = new int[N_REFINE_PTS];
+			for (int i = 0; i < N_REFINE_PTS; i++)
 			{
 				int x = (int)Math.Round(cpix1[i]);
 				int y = (int)Math.Round(cpix2[i]);
@@ -537,7 +536,7 @@ namespace JPFITS
 			}
 
 			int n = 0;
-			for (int i = 0; i < N_POINTS; i++)
+			for (int i = 0; i < N_REFINE_PTS; i++)
 			{
 				if (!match[i])
 					continue;
@@ -558,7 +557,7 @@ namespace JPFITS
 
 			WorldCoordinateSolution.ClearWCS(FITS_IMG.Header);
 			WCS.Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
-			BGWRKR.ReportProgress(0, Environment.NewLine + nmatches + " sources of " + N_POINTS + " were able to be used for WCS refinement.");
+			BGWRKR.ReportProgress(0, Environment.NewLine + nmatches + " sources of " + N_REFINE_PTS + " were able to be used for WCS refinement.");
 			BGWRKR.ReportProgress(0, Environment.NewLine + "Refined solution:" + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "CRPIX1 = " + WCS.GetCRPIXn(1));
 			BGWRKR.ReportProgress(0, "CRPIX2 = " + WCS.GetCRPIXn(2));
@@ -572,8 +571,6 @@ namespace JPFITS
 			BGWRKR.ReportProgress(0, "CDELT2 = " + WCS.GetCDELTn(2));
 			BGWRKR.ReportProgress(0, "CROTA1 = " + WCS.GetCROTAn(1));
 			BGWRKR.ReportProgress(0, "CROTA2 = " + WCS.GetCROTAn(2));
-			BGWRKR.ReportProgress(0, "WCS Fit Residual Mean (pixels) = " + WCS.WCSFitResidual_MeanPix);
-			BGWRKR.ReportProgress(0, "WCS Fit Residual Stdv (pixels) = " + WCS.WCSFitResidual_StdvPix);
 			BGWRKR.ReportProgress(0, "WCS Fit Residual Mean (arcsec) = " + WCS.WCSFitResidual_MeanSky);
 			BGWRKR.ReportProgress(0, "WCS Fit Residual Stdv (arcsec) = " + WCS.WCSFitResidual_StdvSky + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "Finished..." + Environment.NewLine);
@@ -630,7 +627,7 @@ namespace JPFITS
 
 		/// <summary>Initializes the WCS_AutoSolver class including performing source extraction on a given FITS image.</summary>
 		/// <param name="WCS_type">The WCS transformation type. Solution only uses TAN at this time.</param>
-		/// <param name="Number_of_Points">The number of points N to use to compare image coordinates to catalogue coordinates. Suggest N equals 25 for good correspondence, N equals 50 for poor, N equals 100 for very poor.</param>
+		/// <param name="N_Solve_Points">The number of points N to use to compare image coordinates to catalogue coordinates. Suggest N equals 25 for good correspondence, N equals 50 for poor, N equals 100 for very poor.</param>
 		/// <param name="Fits_Img">The JPFITS.FITSImage containing the primary image data.</param>
 		/// <param name="Image_ROI">The region of interest of the FITS image to search for point sources, of identical size to the FITS image. Pass null or all true for entire image.</param>
 		/// <param name="Image_Saturation">The saturation level of the source image for mapping saturated sources. Pass zero if no saturated sources exist.</param>
@@ -642,8 +639,8 @@ namespace JPFITS
 		/// <param name="Catalogue_CVAL1_Name">The name of the entry inside the binary table which lists the CVAL1 (i.e. right ascension) coordinates.</param>
 		/// <param name="Catalogue_CVAL2_Name">The name of the entry inside the binary table which lists the CVAL2 (i.e. declination) coordinates.</param>
 		/// <param name="Catalogue_Magnitude_Name">The name of the entry inside the binary table which lists the source magnitudes.</param>
-		/// <param name="Refine">Option to automatically refine the solution further with additional points after the initial solution is found.</param>
-		public WCSAutoSolver(string WCS_type, int Number_of_Points, FITSImage Fits_Img, bool[,]? Image_ROI, double Image_Saturation, bool auto_background, int PSE_kernel_radius, int PSE_separation_radius, string Fits_Catalogue_BinTable_File, string Catalogue_Extension_Name, string Catalogue_CVAL1_Name, string Catalogue_CVAL2_Name, string Catalogue_Magnitude_Name, bool Refine)
+		/// <param name="N_Refine_Points">Number of points to use for refinement of the solution. Default is 300. Pass -1 for no refining after the initial solution.</param>
+		public WCSAutoSolver(string WCS_type, int N_Solve_Points, FITSImage Fits_Img, bool[,]? Image_ROI, double Image_Saturation, bool auto_background, int PSE_kernel_radius, int PSE_separation_radius, string Fits_Catalogue_BinTable_File, string Catalogue_Extension_Name, string Catalogue_CVAL1_Name, string Catalogue_CVAL2_Name, string Catalogue_Magnitude_Name, int N_Refine_Points = 300)
 		{
 			this.BGWRKR = new BackgroundWorker();
 			this.BGWRKR.WorkerReportsProgress = true;
@@ -653,7 +650,7 @@ namespace JPFITS
 			this.BGWRKR.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
 
 			WCS_TYPE = WCS_type;
-			N_POINTS = Number_of_Points;
+			N_SOLVE_PTS = N_Solve_Points;
 			FITS_IMG = Fits_Img;
 			IMAGE_ROI = Image_ROI;
 			PIX_SAT = Image_Saturation;
@@ -665,7 +662,8 @@ namespace JPFITS
 			CAT_CVAL1NAME = Catalogue_CVAL1_Name;
 			CAT_CVAL2NAME = Catalogue_CVAL2_Name;
 			CAT_MAGNAME = Catalogue_Magnitude_Name;
-			REFINE = Refine;
+			REFINE = N_Refine_Points != -1;
+			N_REFINE_PTS= N_Refine_Points;
 			DO_PSE = true;
 			CANCELLED = false;
 			PROGRESS = 0;
@@ -709,7 +707,7 @@ namespace JPFITS
 			CANCELLED = false;
 			PROGRESS = 0;
 			DO_PSE = false;
-			N_POINTS = pixels.Length;
+			N_SOLVE_PTS = pixels.Length;
 			SOLVED = false;
 			PSE = null;
 			WCS = new JPFITS.WorldCoordinateSolution();
@@ -868,7 +866,7 @@ namespace JPFITS
 
 				string fullcataloguepath = AstraCarta.Query(dRA, dDEC, scale, fitsImage.Width, fitsImage.Height, keys);//query will take a few moments
 
-				WCSAutoSolver wcsas = new WCSAutoSolver("TAN", 75, fitsImage, ROI, pixelSaturation, true, 2, 21, fullcataloguepath, "GaiaDR3", "ra", "dec", "phot_g_mean_mag", true);//instatiate a solver
+				WCSAutoSolver wcsas = new WCSAutoSolver("TAN", 75, fitsImage, ROI, pixelSaturation, true, 2, 21, fullcataloguepath, "GaiaDR3", "ra", "dec", "phot_g_mean_mag");//instatiate a solver
 				wcsas.SolveAsync(scale, scale / 1.05, scale * 1.05, 0, -180, 180, 0.25, 6, 25, true, false);//should solve quickly
 				if (wcsas.Solved)
 				{

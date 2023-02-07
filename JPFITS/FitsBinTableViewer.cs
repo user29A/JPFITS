@@ -332,7 +332,7 @@ namespace JPFITS
 
 			double[] y = (double[])FITSBINTABLE.GetTTYPEEntry(YDrop.SelectedItem.ToString(), out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 
-			Plotter plot = new Plotter();
+			Plotter plot = new Plotter("", false, false);
 
 			String xlabel;
 			if (!XDrop.Enabled)
@@ -345,7 +345,7 @@ namespace JPFITS
 			if (XDrop.Enabled)
 				title += " vs. " + xlabel;
 
-			plot.jpChart1.PlotXYData(x, y, title, xlabel, ylabel, JPChart.JPChart.SeriesType.FastPoint, title.Replace(" ", ""), null);
+			plot.ChartGraph.PlotXYData(x, y, title, xlabel, ylabel, JPChart.JPChartControl.SeriesType.FastPoint, title.Replace(" ", ""), null);
 			plot.Text = title;
 			plot.Show();
 		}

@@ -837,6 +837,33 @@ namespace JPFITS
 			get { return CENTROIDS_VOLUME; }
 		}
 
+		public double[] Centroids_Fit_Volume
+		{
+			get { return FITS_VOLUME; }
+		}
+
+		public double[] Centroids_Fit_FWHMX
+		{
+			get { return FITS_FWHM_X; }
+		}
+
+		public double[] Centroids_Fit_FWHMY
+		{
+			get { return FITS_FWHM_Y; }
+		}
+
+		public double[] Centroids_Fit_FWHM
+		{
+			get 
+			{
+				double[] fwhm = new double[FITS_FWHM_Y.Length];
+				for (int i = 0; i < fwhm.Length; i++)
+					fwhm[i] = Math.Sqrt(FITS_FWHM_Y[i] * FITS_FWHM_Y[i] + FITS_FWHM_X[i] * FITS_FWHM_X[i]);
+
+				return fwhm;
+			}
+		}
+
 		/// <summary>Gets the total number of extracted sources.</summary>
 		public int N_Sources
 		{
@@ -982,7 +1009,7 @@ namespace JPFITS
 		/// <param name="auto_background">Automatically determine the local background for potential sources.  Not required if background is known to be zeroed, but should have no effect if used in this case.</param>
 		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
 		/// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
-		/// <param name="show_waitbar">Show a cancellable wait bar.</param>
+		/// <param name="show_waitbar">Show a cancellable wait bar. False equates to a syncronous call.</param>
 		public void Extract_Sources(double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar)
 		{
 			IMAGE = image;
@@ -1330,6 +1357,14 @@ namespace JPFITS
 				dum = CENTROIDS_Y[i];
 				CENTROIDS_Y[i] = CENTROIDS_Y[indices[i]];
 				CENTROIDS_Y[indices[i]] = dum;
+
+				dum = CENTROIDS_X_PIXEL[i];
+				CENTROIDS_X_PIXEL[i] = CENTROIDS_X_PIXEL[indices[i]];
+				CENTROIDS_X_PIXEL[indices[i]] = (int)dum;
+
+				dum = CENTROIDS_Y_PIXEL[i];
+				CENTROIDS_Y_PIXEL[i] = CENTROIDS_Y_PIXEL[indices[i]];
+				CENTROIDS_Y_PIXEL[indices[i]] = (int)dum;
 
 				REMAP((int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i]), indices[i], i);
 				REMAP((int)Math.Round(CENTROIDS_X[indices[i]]), (int)Math.Round(CENTROIDS_Y[indices[i]]), i, indices[i]);
