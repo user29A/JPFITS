@@ -488,245 +488,6 @@ namespace JPFITS
 			}
 		}
 
-		/// <summary>Determines the non-linear least-squares fit parameters for a positively-oriented 2-d Gaussian surface G(x,y|p)
-		/// <br />G(x,y|p) = p(0) * exp(-((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2)) + p(4)
-		/// <br />or
-		/// <br />G(x,y|p) = p(0) * exp(-((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)
-		/// <br />The form of G(x,y|p) used is determined by the length of the parameter vector p</summary>
-		/// <param name="xdata">The x-data grid positions of the Gaussian data.</param>
-		/// <param name="ydata">The y-data grid positions of the Gaussian data.</param>
-		/// <param name="Gdata">The values of the data to be fitted to the Gaussian.</param>
-		/// <param name="p">The initial and return parameters of the Gaussian fit. The length of p determines which type of fit occurs. If p is only initialized and input with all zeros, initial estimates will automatically be computed. Options are:
-		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias
-		/// <br />or
-		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias.</param>
-		/// <param name="p_LB">The lower bound contraints on the fit parameters. Pass nullptr or an array of length 0 if not required.</param>
-		/// <param name="p_UB">The upper bound contraints on the fit parameters. Pass nullptr or an array of length 0 if not required.</param>
-		/// <param name="p_err">The return errors on the fitted parameters. Pass null or an array of length 0 if not required.</param>
-		/// <param name="fit_residuals">The return residuals of the fit: Gdata[x, y] - fit[x, y].  Pass null or an array of length 0 if not required.</param>
-		public static void Fit_Gaussian2d(int[] xdata, int[] ydata, double[,] Gdata, ref double[] p, double[]? p_LB, double[]? p_UB, ref double[]? p_err, ref double[,]? fit_residuals)
-		{
-			int N = Gdata.Length;
-			double[,] x = new double[N, 2];
-			double[] y = new double[N];
-			int xw = xdata.Length;
-			int yh = ydata.Length;
-
-			int i = 0;
-			for (int xaxis = 0; xaxis < xw; xaxis++)
-				for (int yaxis = 0; yaxis < yh; yaxis++)
-				{
-					x[i, 0] = (double)xdata[xaxis];
-					x[i, 1] = (double)ydata[yaxis];
-					y[i] = Gdata[xaxis, yaxis];
-					i++;
-				}
-
-			alglib.ndimensional_pfunc pf = new alglib.ndimensional_pfunc(alglib_Gauss_2d);
-			alglib.ndimensional_pgrad pg = new alglib.ndimensional_pgrad(alglib_Gauss_2d_grad);
-			//alglib.ndimensional_rep rep;
-			object obj = null;
-			double epsx = 0.000000001;
-			int maxits = 5000;//automatic stopping conditions w epsx & maxits = 0
-			double[] scale = new double[0];
-
-			double min = Min(Gdata, false);
-			double max = Max(Gdata, false);
-			double amp = max - min;
-			if (amp == 0)
-				amp = 1;
-			double x0 = (double)xdata[xw / 2];
-			if (x0 == 0)
-				x0 = 1;
-			double y0 = (double)ydata[yh / 2];
-			if (y0 == 0)
-				y0 = 1;
-			double bias = min;
-			if (bias == 0)
-				bias = 1;
-
-			if (p.Length == 5)
-			{
-				scale = new double[5] { amp, x0, y0, 2, bias };
-				if (p_LB == null || p_LB.Length == 0)
-					p_LB = new double[5] { 0, (double)xdata[0], (double)ydata[0], 0.01, min - amp };
-				if (p_UB == null || p_UB.Length == 0)
-					p_UB = new double[5] { 2 * amp, (double)xdata[xw - 1], (double)ydata[yh - 1], (double)xw * 5, max };
-				if (p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0)
-				{
-					p[0] = amp;
-					p[1] = x0;
-					p[2] = y0;
-					p[3] = 2;
-					p[4] = bias;
-				}
-			}
-
-			if (p.Length == 7)
-			{
-				scale = new double[7] { amp, x0, y0, 1, 2, 2, bias };
-				if (p_LB == null || p_LB.Length == 0)
-					p_LB = new double[7] { 0, (double)xdata[0], (double)ydata[0], -Math.PI, 0.01, 0.01, min - amp };
-				if (p_UB == null || p_UB.Length == 0)
-					p_UB = new double[7] { 2 * amp, (double)xdata[xw - 1], (double)ydata[yh - 1], Math.PI, (double)xw * 5, (double)yh * 5, max };
-				if (p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0 && p[5] == 0 && p[6] == 0)
-				{
-					p[0] = amp;
-					p[1] = x0;
-					p[2] = y0;
-					p[3] = 0;
-					p[4] = 2;
-					p[5] = 2;
-					p[6] = bias;
-				}
-			}
-
-			alglib.lsfitcreatefg(x, y, p, false, out alglib.lsfitstate state);
-			alglib.lsfitsetcond(state, epsx, maxits);
-			alglib.lsfitsetscale(state, scale);
-			alglib.lsfitsetbc(state, p_LB, p_UB);
-			alglib.lsfitfit(state, pf, pg, null, null);
-			alglib.lsfitresults(state, out int info, out p, out alglib.lsfitreport report);
-
-			if (p_err != null && p_err.Length != 0)
-				for (int j = 0; j < p_err.Length; j++)
-					p_err[j] = report.errpar[j];
-
-			if (fit_residuals != null && fit_residuals.Length != 0)
-			{
-				double val = 0;
-				double[] X = new double[2];
-				for (int xx = 0; xx < xw; xx++)
-					for (int yy = 0; yy < yh; yy++)
-					{
-						X[0] = (double)xdata[xx];
-						X[1] = (double)ydata[yy];
-						alglib_Moffat_2d(p, X, ref val, obj);
-						fit_residuals[xx, yy] = Gdata[xx, yy] - val;
-					}
-			}
-		}
-
-		/// <summary>Determines the non-linear least-squares fit parameters for a 2-d Moffat surface M(x,y|p)
-		/// <br />M(x,y|p) = p(0) * ( 1 + { (x - p(1))^2 + (y - p(2))^2 } / p(3)^2 )^(-p(4)) + p(5)
-		/// <br />or
-		/// <br />M(x,y|p) = p(0) * ( 1 + { ((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3)))^2 } / p(5)^2 )^(-p(6)) + p(7)
-		/// <br />The form of M(x,y|p) used is determined by the length of the parameter vector p</summary>
-		/// <param name="xdata">The x-data grid positions of the Moffat data.</param>
-		/// <param name="ydata">The y-data grid positions of the Moffat data.</param>
-		/// <param name="Mdata">The values of the data to be fitted to the Moffat.</param>
-		/// <param name="p">The initial and return parameters of the Moffat. If p is only initialized and input with all zeros, initial estimates will automatically be computed. Options are:
-		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias
-		/// <br />or
-		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias</param>
-		/// <param name="p_LB">The lower bound contraints on the fit parameters. Pass nullptr or an array of length 0 if not required.</param>
-		/// <param name="p_UB">The upper bound contraints on the fit parameters. Pass nullptr or an array of length 0 if not required.</param>
-		/// <param name="p_err">The return errors on the fitted parameters. Pass null or an array of length 0 if not required.</param>
-		/// <param name="fit_residuals">The return residuals of the fit: Mdata[x, y] - fit[x, y].  Pass null or an array of length 0 if not required.</param>
-		public static void Fit_Moffat2d(int[] xdata, int[] ydata, double[,] Mdata, ref double[] p, double[]? p_LB, double[]? p_UB, ref double[]? p_err, ref double[,]? fit_residuals)
-		{
-			int N = Mdata.Length;
-			double[,] x = new double[N, 2];
-			double[] y = new double[N];
-			int xw = Mdata.GetLength(0);
-			int yh = Mdata.GetLength(1);
-
-			int i = 0;
-			for (int xaxis = 0; xaxis < xw; xaxis++)
-				for (int yaxis = 0; yaxis < yh; yaxis++)
-				{
-					x[i, 0] = (double)xdata[xaxis];
-					x[i, 1] = (double)ydata[yaxis];
-					y[i] = Mdata[xaxis, yaxis];
-					i++;
-				}
-
-			alglib.ndimensional_pfunc pf = new alglib.ndimensional_pfunc(alglib_Moffat_2d);
-			alglib.ndimensional_pgrad pg = new alglib.ndimensional_pgrad(alglib_Moffat_2d_grad);
-			//alglib.ndimensional_rep rep;
-			object obj = null;
-			double epsx = 0.00001;
-			int maxits = 5000;//automatic stopping conditions w epsx & maxits = 0
-			double[] scale = new double[0];
-
-			double min = Min(Mdata, false);
-			double max = Max(Mdata, false);
-			double amp = max - min;
-			if (amp == 0)
-				amp = 1;
-			double x0 = (double)xdata[xw / 2];
-			if (x0 == 0)
-				x0 = 1;
-			double y0 = (double)ydata[yh / 2];
-			if (y0 == 0)
-				y0 = 1;
-			double bias = min;
-			if (bias == 0)
-				bias = 1;
-
-			if (p.Length == 6)
-			{
-				scale = new double[6] { amp, x0, y0, 2, 3, bias };
-				if (p_LB == null || p_LB.Length == 0)
-					p_LB = new double[6] { 0, (double)xdata[0], (double)ydata[0], (double)xw / 500, 1.01, min - amp };
-				if (p_UB == null || p_UB.Length == 0)
-					p_UB = new double[6] { 2 * amp, (double)xdata[xw - 1], (double)ydata[yh - 1], (double)xw * 5, (double)xw * 5, max };
-				if (p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0 && p[5] == 0)
-				{
-					p[0] = amp;
-					p[1] = x0;
-					p[2] = y0;
-					p[3] = 2;
-					p[4] = 4;
-					p[5] = bias;
-				}
-			}
-			if (p.Length == 8)
-			{
-				scale = new double[8] { amp, x0, y0, 1, 2, 2, 3, bias };
-				if (p_LB == null || p_LB.Length == 0)
-					p_LB = new double[8] { 0, (double)xdata[0], (double)ydata[0], -Math.PI, (double)xw / 500, (double)yh / 500, 1.01, min - amp };
-				if (p_UB == null || p_UB.Length == 0)
-					p_UB = new double[8] { 2 * amp, (double)xdata[xw - 1], (double)ydata[yh - 1], Math.PI, (double)xw * 5, (double)xw * 5, (double)xw * 5, max };
-				if (p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0 && p[4] == 0 && p[5] == 0 && p[6] == 0 && p[7] == 0)
-				{
-					p[0] = amp;
-					p[1] = x0;
-					p[2] = y0;
-					p[3] = 0;
-					p[4] = 2;
-					p[5] = 2;
-					p[6] = 4;
-					p[7] = bias;
-				}
-			}
-
-			alglib.lsfitcreatefg(x, y, p, false, out alglib.lsfitstate state);
-			alglib.lsfitsetcond(state, epsx, maxits);
-			alglib.lsfitsetscale(state, scale);
-			alglib.lsfitsetbc(state, p_LB, p_UB);
-			alglib.lsfitfit(state, pf, pg, null, null);
-			alglib.lsfitresults(state, out int info, out p, out alglib.lsfitreport report);
-
-			if (p_err != null && p_err.Length != 0)
-				for (int xx = 0; xx < p_err.Length; xx++)
-					p_err[xx] = report.errpar[xx];
-
-			if (fit_residuals != null && fit_residuals.Length != 0)
-			{
-				double val = 0;
-				double[] X = new double[2];
-				for (int xx = 0; xx < xw; xx++)
-					for (int yy = 0; yy < yh; yy++)
-					{
-						X[0] = (double)xdata[xx];
-						X[1] = (double)ydata[yy];
-						alglib_Moffat_2d(p, X, ref val, obj);
-						fit_residuals[xx, yy] = Mdata[xx, yy] - val;
-					}
-			}
-		}
-
 		/// <summary>Determines the non-linear least-squares fit parameters for a field of n positively-oriented 2-d Gaussian surfaces G(x,y|p_n)
 		/// <br />G(x,y|p_n) = Sum[p_n(0) * exp(-((x - p_n(1))^2 + (y - p_n(2))^2) / (2*p_n(3)^2))] + p(4)
 		/// <br />or
@@ -933,19 +694,81 @@ namespace JPFITS
 			}
 		}
 
-		public static void Fit_PointSource(string model_name, string minimization_type, int[] xdata, int[] ydata, double[,] source, ref double[] param, double[] params_LB, double[] params_UB, ref double[] p_err, ref double[,] fit_residuals, ref string termination_msg)
+		public enum FitMinimizationType
 		{
+			/// <summary>
+			/// 
+			/// </summary>
+			LeastSquares,
+
+			/// <summary>
+			/// 
+			/// </summary>
+			ChiSquared,
+
+			/// <summary>
+			/// 
+			/// </summary>
+			Robust,
+
+			/// <summary>
+			/// 
+			/// </summary>
+			CashStatistic
+		}
+
+		public enum PointSourceModel
+		{
+			/// <summary>
+			/// G(x,y|p) = p(0) * exp(-((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2)) + p(4)
+			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias 
+			/// </summary>
+			CircularGaussian,
+
+			/// <summary>
+			/// G(x,y|p) = p(0) * exp(-((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)
+			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias. 
+			/// </summary>
+			EllipticalGaussian,
+
+			/// <summary>
+			/// M(x,y|p) = p(0) * ( 1 + { (x - p(1))^2 + (y - p(2))^2 } / p(3)^2 )^(-p(4)) + p(5)
+			/// </summary>
+			CircularMoffat,
+
+			/// <summary>
+			/// M(x,y|p) = p(0) * ( 1 + { ((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3)))^2 } / p(5)^2 )^(-p(6)) + p(7)
+			/// </summary>
+			EllipticalMoffat
+		}
+
+		public static void Fit_PointSource(PointSourceModel model_name, FitMinimizationType minimization_type, int[]? xdata, int[]? ydata, double[,] source, ref double[] param, double[]? params_LB, double[]? params_UB, out double[] p_err, out double[,] fit_residuals, out double chi_sq_norm, out string termination_msg)
+		{
+			if (IsEven(source.GetLength(0)) || IsEven(source.GetLength(1)))
+				throw new Exception("double[,] source must be odd-size");
+			if (source.GetLength(0) != source.GetLength(1))
+				throw new Exception("double[,] source must be square");
+
 			alglib.ndimensional_grad grad;
 			double[] scale;
+			double[] XDATA = new double[source.GetLength(0)];
+			double[] YDATA = new double[source.GetLength(1)];
 
-			double[] XDATA = new double[xdata.Length];
-			double[] YDATA = new double[ydata.Length];
+			if (xdata == null)
+				for (int i = -source.GetLength(0)/2; i <= source.GetLength(0)/2; i++)
+					XDATA[i] = (double)i;
+			else
+				for (int i = 0; i < XDATA.Length; i++)
+					XDATA[i] = (double)xdata[i];
 
-			for (int i = 0; i < XDATA.Length; i++)
-				XDATA[i] = (double)(xdata[i]);
-			for (int i = 0; i < YDATA.Length; i++)
-				YDATA[i] = (double)(ydata[i]);
+			if (ydata == null)
+				for (int i = -source.GetLength(1) / 2; i <= source.GetLength(1) / 2; i++)
+					YDATA[i] = (double)i;
+			else
+				for (int i = 0; i < YDATA.Length; i++)
+					YDATA[i] = (double)ydata[i];
 
+			//make scale parameters to use below for different parameter lengths
 			double max = JPMath.Max(source, out int maxx, out int maxy, false);
 			double min = JPMath.Min(source, false);
 			double amp = max - min;
@@ -961,15 +784,18 @@ namespace JPFITS
 			if (bias < 1)
 				bias = 1;
 
-			if (model_name.ToLower().Contains("g"))// == "Gaussian")
+			if (model_name == PointSourceModel.CircularGaussian || model_name == PointSourceModel.EllipticalGaussian)
 			{
-				if (param.Length == 5)
+				if (param.Length == 5)//G(x,y|p) = p(0) * exp(-((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2)) + p(4)
 				{
+					if (model_name == PointSourceModel.EllipticalGaussian)
+						throw new Exception("Wrong number of parameters (5) for Elliptical Gaussian model_name.");
+
 					scale = new double[5] { amp, x0, y0, 2, bias };
-					if (params_LB == null || params_LB.Length == 0)
-						params_LB = new double[5] { amp / 3, XDATA[0], YDATA[0], 0.1, 0 };
-					if (params_UB == null || params_UB.Length == 0)
-						params_UB = new double[5] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], 10, max / 4 };
+					if (params_LB == null)
+						params_LB = new double[5] { amp / 2, XDATA[0], YDATA[0], 0.2, min - amp / 3 };
+					if (params_UB == null)
+						params_UB = new double[5] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], 10, min + amp / 3 };
 					if (param[0] == 0 && param[1] == 0 && param[2] == 0 && param[3] == 0 && param[4] == 0)
 					{
 						param[0] = amp;
@@ -979,13 +805,16 @@ namespace JPFITS
 						param[4] = bias;
 					}
 				}
-				else if (param.Length == 7)
+				else if (param.Length == 7)//G(x,y|p) = p(0) * exp(-((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)
 				{
+					if (model_name == PointSourceModel.CircularGaussian)
+						throw new Exception("Wrong number of parameters (7) for Circular Gaussian model_name.");
+
 					scale = new double[7] { amp, x0, y0, 1, 2, 2, bias };
-					if (params_LB == null || params_LB.Length == 0)
-						params_LB = new double[7] { amp / 3, XDATA[0], YDATA[0], -Math.PI, 0.1, 0.1, 0 };
-					if (params_UB == null || params_UB.Length == 0)
-						params_UB = new double[7] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], Math.PI, 10, 10, max / 4 };
+					if (params_LB == null)
+						params_LB = new double[7] { amp / 2, XDATA[0], YDATA[0], -Math.PI, 0.2, 0.2, min - amp / 3 };
+					if (params_UB == null)
+						params_UB = new double[7] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], Math.PI, 10, 10, min + amp / 3 };
 					if (param[0] == 0 && param[1] == 0 && param[2] == 0 && param[3] == 0 && param[4] == 0 && param[5] == 0 && param[6] == 0)
 					{
 						param[0] = amp;
@@ -998,32 +827,31 @@ namespace JPFITS
 					}
 				}
 				else
-				{
 					throw new Exception("Parameter length does not correspond to either circular (5 params) or elliptical (7 params) Gaussian; params length = " + param.Length);
-				}
 
-				if (minimization_type.ToLower() == "ls")
+				if (minimization_type == FitMinimizationType.LeastSquares)
 					grad = new alglib.ndimensional_grad(alglib_Gauss_2d_LM_LS_grad);
-				else if (minimization_type.ToLower() == "chisq")
+				else if (minimization_type == FitMinimizationType.ChiSquared)
 					grad = new alglib.ndimensional_grad(alglib_Gauss_2d_LM_LS_CHISQ_grad);
-				else if (minimization_type.ToLower() == "robust")
+				else if (minimization_type == FitMinimizationType.Robust)
 					grad = new alglib.ndimensional_grad(alglib_Gauss_2d_LM_LS_ROBUST_grad);
-				else if (minimization_type.ToLower() == "cstat")
+				else if (minimization_type == FitMinimizationType.CashStatistic)
 					grad = new alglib.ndimensional_grad(alglib_Gauss_2d_LM_LS_CSTAT_grad);
 				else
-				{
 					throw new Exception("Fit Type not recognized: '" + minimization_type);
-				}
 			}
-			else if (model_name.ToLower().Contains("m"))// == "Moffat")
+			else if (model_name == PointSourceModel.CircularMoffat || model_name == PointSourceModel.EllipticalMoffat)
 			{
-				if (param.Length == 6)
+				if (param.Length == 6)//M(x,y|p) = p(0) * ( 1 + { (x - p(1))^2 + (y - p(2))^2 } / p(3)^2 )^(-p(4)) + p(5)
 				{
+					if (model_name == PointSourceModel.EllipticalMoffat)
+						throw new Exception("Wrong number of parameters (6) for Elliptical Moffat model_name.");
+
 					scale = new double[6] { amp, x0, y0, 2, 2, bias };
-					if (params_LB == null || params_LB.Length == 0)
-						params_LB = new double[6] { amp / 3, XDATA[0], YDATA[0], 0.1, 1.000001, 0 };
+					if (params_LB == null)
+						params_LB = new double[6] { amp / 2, XDATA[0], YDATA[0], 0.2, 1.000001, min - amp / 3 };
 					if (params_UB == null || params_UB.Length == 0)
-						params_UB = new double[6] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], 10, 10, max / 4 };
+						params_UB = new double[6] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], 10, 10, min + amp / 3 };
 					if (param[0] == 0 && param[1] == 0 && param[2] == 0 && param[3] == 0 && param[4] == 0 && param[5] == 0)
 					{
 						param[0] = amp;
@@ -1034,13 +862,16 @@ namespace JPFITS
 						param[5] = bias;
 					}
 				}
-				else if (param.Length == 8)
+				else if (param.Length == 8)//M(x,y|p) = p(0) * ( 1 + { ((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3)))^2 } / p(5)^2 )^(-p(6)) + p(7)
 				{
+					if (model_name == PointSourceModel.CircularMoffat)
+						throw new Exception("Wrong number of parameters (8) for Circular Moffat model_name.");
+
 					scale = new double[8] { amp, x0, y0, 1, 2, 2, 2, bias };
-					if (params_LB == null || params_LB.Length == 0)
-						params_LB = new double[8] { amp / 3, XDATA[0], YDATA[0], -Math.PI, 0.1, 0.1, 1.000001, 0 };
-					if (params_UB == null || params_UB.Length == 0)
-						params_UB = new double[8] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], Math.PI, 10, 10, 10, max / 4 };
+					if (params_LB == null)
+						params_LB = new double[8] { amp / 2, XDATA[0], YDATA[0], -Math.PI, 0.2, 0.2, 1.000001, min - amp / 3 };
+					if (params_UB == null)
+						params_UB = new double[8] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], Math.PI, 10, 10, 10, min + amp / 3 };
 					if (param[0] == 0 && param[1] == 0 && param[2] == 0 && param[3] == 0 && param[4] == 0 && param[5] == 0 && param[6] == 0 && param[7] == 0)
 					{
 						param[0] = amp;
@@ -1054,32 +885,26 @@ namespace JPFITS
 					}
 				}
 				else
-				{
 					throw new Exception("Parameter length does not correspond to either circular (6 params) or elliptical (8 params) Moffat; params length = " + param.Length);
-				}
 
-				if (minimization_type.ToLower() == "ls")
+				if (minimization_type == FitMinimizationType.LeastSquares)
 					grad = new alglib.ndimensional_grad(alglib_Moffat_2d_LM_LS_grad);
-				else if (minimization_type.ToLower() == "chisq")
+				else if (minimization_type == FitMinimizationType.ChiSquared)
 					grad = new alglib.ndimensional_grad(alglib_Moffat_2d_LM_LS_CHISQ_grad);
-				else if (minimization_type.ToLower() == "robust")
+				else if (minimization_type == FitMinimizationType.Robust)
 					grad = new alglib.ndimensional_grad(alglib_Moffat_2d_LM_LS_ROBUST_grad);
-				else if (minimization_type.ToLower() == "cstat")
+				else if (minimization_type == FitMinimizationType.CashStatistic)
 					grad = new alglib.ndimensional_grad(alglib_Moffat_2d_LM_LS_CSTAT_grad);
 				else
-				{
 					throw new Exception("Fit Type not recognized: '" + minimization_type);
-				}
 			}
 			else
-			{
 				throw new Exception("Fit Model not recognized: '" + model_name);
-			}
 
-			double epsx = 1e-6;
+			double epsx = 1e-9;
 			double epsg = 0;
 			double epsf = 0;
-			int maxits = 1000;
+			int maxits = 0;
 			object[] arrays = new object[3];
 			arrays[0] = source;
 			arrays[1] = XDATA;
@@ -1089,7 +914,7 @@ namespace JPFITS
 			alglib.minbcsetcond(bcstate, epsg, epsf, epsx, maxits);
 			alglib.minbcsetbc(bcstate, params_LB, params_UB);
 			alglib.minbcsetscale(bcstate, scale);
-			alglib.minbcoptimize(bcstate, grad, null, arrays, alglib.parallel);
+			alglib.minbcoptimize(bcstate, grad, null, arrays);
 			alglib.minbcresults(bcstate, out param, out alglib.minbcreport report);
 
 			switch (report.terminationtype)
@@ -1134,31 +959,68 @@ namespace JPFITS
 					termination_msg = "Terminated by user.";
 					break;
 				}
+
+				default:
+				{
+					termination_msg = "";
+					break;
+				}
 			}
 
-			if (p_err.Length != 0)
-			{
-				if (model_name == "Gaussian")
-					p_err = Gauss_2D_param_err(param, XDATA, YDATA, source);
-				else
-					p_err = Moffat_2D_param_err(param, XDATA, YDATA, source);
-			}
+			if (model_name == PointSourceModel.EllipticalGaussian || model_name == PointSourceModel.CircularGaussian)
+				p_err = Gauss_2D_param_err(param, XDATA, YDATA, source);
+			else
+				p_err = Moffat_2D_param_err(param, XDATA, YDATA, source);
 
-			if (fit_residuals.Length != 0)
-			{
-				double[,] model;
-				if (model_name.ToLower().Contains("gaus"))
-					model = Gaussian2d(xdata, ydata, param, false);
-				else
-					model = Moffat2d(xdata, ydata, param, false);
+			double[,] model;
+			if (model_name == PointSourceModel.EllipticalGaussian || model_name == PointSourceModel.CircularGaussian)
+				model = Gaussian2d(xdata, ydata, param, false);
+			else
+				model = Moffat2d(xdata, ydata, param, false);
 
-				for (int i = 0; i < XDATA.Length; i++)
-					for (int j = 0; j < YDATA.Length; j++)
-						fit_residuals[i, j] = source[i, j] - model[i, j];
-			}
+			fit_residuals = new double[XDATA.Length, YDATA.Length];
+			for (int i = 0; i < XDATA.Length; i++)
+				for (int j = 0; j < YDATA.Length; j++)
+					fit_residuals[i, j] = source[i, j] - model[i, j];
+
+			chi_sq_norm = 0;
+			for (int i = 0; i < source.GetLength(0); i++)
+				for (int j = 0; j < source.GetLength(1); j++)
+				{
+					if (source[i, j] - param[param.Length - 1] == 0)
+						chi_sq_norm += fit_residuals[i, j] * fit_residuals[i, j];
+					else
+						chi_sq_norm += fit_residuals[i, j] * fit_residuals[i, j] / Math.Abs(source[i, j] - param[param.Length - 1]);
+				}
+			chi_sq_norm /= (source.Length - param.Length);
 		}
 
-		public static void Fit_PointSource_Compound(string model_name, string minimization_type, int[] xdata, int[] ydata, double[,] source, double[] xpositions, double[] ypositions, double position_radius, ref double[,] param, ref double[,] p_err, ref double[,] fit_residuals, ref string termination_msg)
+		public enum PointSourceCompoundModel
+		{
+			/// <summary>
+			/// G(x,y|p_n) = Sum[p_n(0) * exp(-((x - p_n(1))^2 + (y - p_n(2))^2) / (2*p_n(3)^2))] + p(4)
+			/// </summary>
+			CircularGaussian,
+
+			/// <summary>
+			/// G(x,y|p_n) =  Sum[p_n(0) * exp(-((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 / (2*p_n(4)^2) - (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3))).^2 / (2*p_n(5)^2) )] + p(6)
+			/// </summary>
+			EllipticalGaussian,
+
+			/// <summary>
+			/// M(x,y|p_n) = sum[p_n(0) * ( 1 + { (x - p_n(1))^2 + (y - p_n(2))^2 } / p_n(3)^2 )^(-p_n(4))] + p(5)
+			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias
+			/// </summary>
+			CircularMoffat,
+
+			/// <summary>
+			/// M(x,y|p_n) = sum[p_n(0) * ( 1 + { ((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 } / p_n(4)^2 + { (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3)))^2 } / p_n(5)^2 )^(-p_n(6))] + p_n(7)
+			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias
+			/// </summary>
+			EllipticalMoffat
+		}
+
+		public static void Fit_PointSource_Compound(PointSourceCompoundModel model_name, FitMinimizationType minimization_type, int[] xdata, int[] ydata, double[,] source, double[] xpositions, double[] ypositions, double position_radius, ref double[,] param, ref double[,] p_err, ref double[,] fit_residuals, out string termination_msg)
 		{
 			if (param.GetLength(1) != xpositions.Length)
 			{
@@ -1194,7 +1056,7 @@ namespace JPFITS
 				scale[P0I.Length - 1] = bias;//background
 
 				int funcindex;
-				if (model_name == "Gaussian")
+				if (model_name == PointSourceCompoundModel.CircularGaussian || model_name == PointSourceCompoundModel.EllipticalGaussian)
 				{
 					if (func == 5)
 					{
@@ -1276,21 +1138,18 @@ namespace JPFITS
 					}
 
 
-					if (minimization_type.ToLower() == "ls")
+					if (minimization_type == FitMinimizationType.LeastSquares)
 						grad = new alglib.ndimensional_grad(alglib_Gauss_2d_LM_LS_grad_compound);
-					else if (minimization_type.ToLower() == "chisq")
+					else if (minimization_type == FitMinimizationType.ChiSquared)
 						grad = new alglib.ndimensional_grad(alglib_Gauss_2d_LM_LS_CHISQ_grad_compound);
-					else if (minimization_type.ToLower() == "robust")
+					else if (minimization_type == FitMinimizationType.Robust)
 						grad = new alglib.ndimensional_grad(alglib_Gauss_2d_LM_LS_ROBUST_grad_compound);
-					else if (minimization_type.ToLower() == "cstat")
+					else if (minimization_type == FitMinimizationType.CashStatistic)
 						grad = new alglib.ndimensional_grad(alglib_Gauss_2d_LM_LS_CSTAT_grad_compound);
 					else
-					{
 						throw new Exception("Fit Type not recognized: '" + minimization_type);
-						//return;
-					}
 				}
-				else if (model_name == "Moffat")
+				else if (model_name == PointSourceCompoundModel.CircularMoffat || model_name == PointSourceCompoundModel.EllipticalMoffat)
 				{
 					if (func == 6)
 					{
@@ -1379,37 +1238,30 @@ namespace JPFITS
 						}
 					}
 					else
-					{
 						throw new Exception("Parameter length does not correspond to either circular (6 params) or elliptical (8 params) Moffat; params length = " + func);
-						//return;
-					}
 
-					if (minimization_type.ToLower() == "ls")
-						/*grad = new alglib.ndimensional_grad(alglib_Moffat_2d_LM_LS_compound_grad)*/
+					if (minimization_type == FitMinimizationType.LeastSquares)
+						//grad = new alglib.ndimensional_grad(alglib_Moffat_2d_LM_LS_compound_grad)
 						;
-					else if (minimization_type.ToLower() == "chisq")
+					else if (minimization_type == FitMinimizationType.ChiSquared)
 						/*grad = new alglib.ndimensional_grad(alglib_Moffat_2d_LM_LS_compound_CHISQ_grad)*/
 						;
-					else if (minimization_type.ToLower() == "robust")
+					else if (minimization_type == FitMinimizationType.Robust)
 						/*grad = new alglib.ndimensional_grad(alglib_Moffat_2d_LM_LS_compound_ROBUST_grad)*/
 						;
-					else if (minimization_type.ToLower() == "cstat")
+					else if (minimization_type == FitMinimizationType.CashStatistic)
 						/*grad = new alglib.ndimensional_grad(alglib_Moffat_2d_LM_LS_compound_CSTAT_grad)*/
 						;
 					else
-					{
 						throw new Exception("Fit Type not recognized: '" + minimization_type);
-					}
 				}
 				else
-				{
 					throw new Exception("Fit Model not recognized: '" + model_name);
-				}
 
-				double epsx = 1e-6;
+				double epsx = 1e-9;
 				double epsg = 0;
 				double epsf = 0;
-				int maxits = 2000;
+				int maxits = 0;
 				object[] arrays = new object[4];
 				arrays[0] = source;
 				arrays[1] = XDATA;
@@ -1465,6 +1317,11 @@ namespace JPFITS
 						termination_msg = "Terminated by user.";
 						break;
 					}
+					default:
+					{
+						termination_msg = "";
+						break;
+					}
 				}
 
 				for (int i = 0; i < count; i++)
@@ -1515,8 +1372,8 @@ namespace JPFITS
 		/// <param name="p_scale">The order of magnitude scale (positive) of the fit parameters.</param>
 		public static void Fit_WCSTransform2d(double[] x_intrmdt, double[] y_intrmdt, double[] x_pix, double[] y_pix, ref double[] p, double[] p_lbnd, double[] p_ubnd, double[] p_scale)
 		{
-			double epsx = 0.000000001;
-			int maxits = 1000;
+			double epsx = 1e-9;
+			int maxits = 0;
 			alglib.ndimensional_fvec fvec = new alglib.ndimensional_fvec(alglib_WCSTransform2d_fvec);
 			alglib.ndimensional_jac jac = new alglib.ndimensional_jac(alglib_WCSTransform2d_jac);
 			object[] objj = new object[4];
@@ -1548,7 +1405,7 @@ namespace JPFITS
 		/// <param name="p_scale">The order of magnitude scale (positive) of the fit parameters.</param>
 		public static void Fit_GeneralTransform2d(double[] x_ref, double[] y_ref, double[] x_tran, double[] y_tran, ref double[] p, double[] p_lbnd, double[] p_ubnd, double[] p_scale)
 		{
-			double epsx = 0.00000000001;
+			double epsx = 1e-9;
 			int maxits = 0;
 			alglib.ndimensional_fvec fvec = new alglib.ndimensional_fvec(alglib_GeneralTransform2d_fvec);
 			object[] objj = new object[4];
@@ -2222,44 +2079,60 @@ namespace JPFITS
 			return result;
 		}
 
+		public enum SmoothingMethod
+		{
+			/// <summary>
+			/// simple moving average
+			/// </summary>
+			Simple,
+
+			/// <summary>
+			/// centered moving average
+			/// </summary>
+			Centered,
+
+			/// <summary>
+			/// linear regresion moving average
+			/// </summary>
+			Linear,
+
+			/// <summary>
+			/// exponential moving average
+			/// </summary>
+			Exponential
+		}
+
 		/// <summary>Smooths a data series with optional methods.</summary>
 		/// <param name="data">The data to smooth.</param>
 		/// <param name="kernelsize">For simple or linear must be an integer; for centered must be an odd integer; for expoenential must be greater than zero and less than or equal to 1.</param>
 		/// <param name="do_parallel">Optionally perform array operations in parallel. False when parallelizing upstream.</param>
-		/// <param name="method">The mathematical method to use for smoothing:
-		/// <br /> &quot;simple&quot; - simple moving average
-		/// <br /> &quot;centered&quot; - centered moving average
-		/// <br /> &quot;linear&quot; - linear regresion moving average
-		/// <br /> &quot;exponential&quot; - exponential moving average</param>
-		public static double[] Smooth(double[] data, double kernelsize, bool do_parallel, string method)
+		/// <param name="method">The mathematical method to use for smoothing.</param>
+		public static double[] Smooth(double[] data, double kernelsize, bool do_parallel, SmoothingMethod method)
 		{
 			double[] result = new double[data.Length];
 
 			try
 			{
-				if (method != "linear" && method != "centered" && method != "exponential" && method != "simple")
-					throw new Exception("Specified smoothing method '" + method + "' not valid.");
-
-				if (method != "centered")
+				if (method != SmoothingMethod.Centered)
 				{
 					data.CopyTo(result, 0);
 					alglib.xparams param = new alglib.xparams(0);
 					if (do_parallel)
 						param = alglib.parallel;
 
-					if (method == "simple")
+					if (method == SmoothingMethod.Simple)
 					{
 						if (!IsInteger(kernelsize))
 							throw new Exception("Specified smoothing kernel size '" + kernelsize + "' not an integer.");
 						alglib.filtersma(ref result, (int)kernelsize, param);
 					}
-					else if (method == "linear")
+					else if (method == SmoothingMethod.Linear)
 					{
 						if (!IsInteger(kernelsize))
 							throw new Exception("Specified smoothing kernel size '" + kernelsize + "' not an integer.");
 						alglib.filterlrma(ref result, (int)kernelsize, param);
 					}
-					else if (method == "exponential")
+					else if (method == SmoothingMethod.Exponential)
 					{
 						if (kernelsize <= 0 || kernelsize > 1)
 							throw new Exception("Specified smoothing kernel '" + kernelsize + "' not a decimal value greater than zero and less than or equal to 1.");
@@ -2318,17 +2191,40 @@ namespace JPFITS
 			return result;
 		}
 
+		public enum InterpolationType
+		{
+			/// <summary>
+			/// linear interpolation
+			/// </summary>
+			Linear,
+
+			/// <summary>
+			/// cubic spline interpolation
+			/// </summary>
+			Cublic,
+
+			/// <summary>
+			/// monotone cubic spline which preserves monoticity of the data
+			/// </summary>
+			Monotone,
+
+			/// <summary>
+			/// default Catmull-Rom spline
+			/// </summary>
+			CatmullRom,
+
+			/// <summary>
+			/// Akima is a cubic spline which is stable to the outliers, avoiding the oscillations of a cubic spline
+			/// </summary>
+			Akima
+		}
+
 		/// <summary>Returns an interpolation of the specified data at the given interpolation points.</summary>
 		/// <param name="xdata">The x-positions of the ydata points to interpolate.</param>
 		/// <param name="ydata">The y-values of the data to interpolate.</param>
 		/// <param name="xinterp">The x-positions at which to interpolate y-values.</param>
-		/// <param name="style">The type of interpolation to compute:
-		/// <br /> &quot;linear&quot; - linear interpolation
-		/// <br /> &quot;cubic&quot;  - cubic spline interpolation
-		/// <br /> &quot;mono&quot;   - monotone cubic spline which preserves monoticity of the data
-		/// <br /> &quot;catmullrom&quot;   - default Catmull-Rom spline
-		/// <br /> &quot;akima&quot;  - Akima is a cubic spline which is stable to the outliers, avoiding the oscillations of a cubic spline</param>
-		public static double[] Interpolate1d(double[] xdata, double[] ydata, double[] xinterp, string style, bool do_parallel)
+		/// <param name="style">The type of interpolation to compute.</param>
+		public static double[] Interpolate1d(double[] xdata, double[] ydata, double[] xinterp, InterpolationType style, bool do_parallel)
 		{
 			double[] result = new double[xinterp.Length];
 
@@ -2339,18 +2235,16 @@ namespace JPFITS
 			//void *x = 0;
 			alglib.spline1dinterpolant sp = new alglib.spline1dinterpolant(/*x*/);
 
-			if (style == "linear")
+			if (style == InterpolationType.Linear)
 				alglib.spline1dbuildlinear(xdata, ydata, out sp, param);
-			else if (style == "cubic")
+			else if (style == InterpolationType.Cublic)
 				alglib.spline1dbuildcubic(xdata, ydata, out sp, param);
-			else if (style == "mono")
+			else if (style == InterpolationType.Monotone)
 				alglib.spline1dbuildmonotone(xdata, ydata, out sp, param);
-			else if (style == "akima")
-				alglib.spline1dbuildakima(xdata, ydata, out sp, param);
-			else if (style == "catmullrom")
+			else if (style == InterpolationType.CatmullRom)
 				alglib.spline1dbuildcatmullrom(xdata, ydata, out sp, param);
-			else
-				throw new Exception("Interpolation style '" + style + "' not recognized.");
+			else if (style == InterpolationType.Akima)
+				alglib.spline1dbuildakima(xdata, ydata, out sp, param);
 
 			ParallelOptions opts = new ParallelOptions();
 			if (do_parallel)

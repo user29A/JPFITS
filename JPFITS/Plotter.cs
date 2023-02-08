@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
 
-
-
 namespace JPFITS
 {
 	public partial class Plotter : Form

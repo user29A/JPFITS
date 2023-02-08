@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Drawing;
 using System.IO;
+using System.Xml.Serialization;
 #nullable enable
 
 namespace JPFITS
@@ -39,7 +40,6 @@ namespace JPFITS
 		private bool THRESHHOLDS_AS_SN;                 //interpret pixel value and total count thresholds as SN
 		private bool SEARCH_ROI;
 		private bool[,]? ROI_REGION;
-		private bool SHOWWAITBAR;
 		private int NGROUPS = 0;
 
 		private string? SAVE_PS_FILENAME;
@@ -84,6 +84,7 @@ namespace JPFITS
 		private double[]? UBND;
 		private double[]? PINI;
 
+		private bool SHOWWAITBAR;
 		private WaitBar WAITBAR;
 		private BackgroundWorker BGWRKR;
 		//private object BGWRKR_RESULT;
@@ -298,15 +299,8 @@ namespace JPFITS
 						{
 							if (SOURCE_BOOLEAN_MAP[(int)x, (int)y])
 								continue;
-
-							int[] xdata = new int[(KERNEL_WIDTH)];
-							int[] ydata = new int[(KERNEL_WIDTH)];
-							for (int i = -KERNEL_RADIUS; i <= KERNEL_RADIUS; i++)
-							{
-								xdata[i + KERNEL_RADIUS] = x + i;
-								ydata[i + KERNEL_RADIUS] = y + i;
-							}
-							double[,] kernel = JPMath.MatrixSubScalar(GetKernel(IMAGE, (int)x, (int)y, KERNEL_RADIUS), bg_est, false);
+							
+							double[,] kernel = JPMath.MatrixSubScalar(GetKernel(IMAGE, (int)x, (int)y, KERNEL_RADIUS, out int[] xdata, out int[] ydata), bg_est, false);
 							Centroid(xdata, ydata, kernel, out double x_centroid, out double y_centroid);						
 
 							for (int ii = x - KERNEL_RADIUS; ii <= x + KERNEL_RADIUS; ii++)
@@ -372,66 +366,64 @@ namespace JPFITS
 			}
 			//returned if after Source Extraction
 
-			double[] empty = new double[(0)];
-			if (LBND == null)
-				LBND = new double[(0)];
-			if (UBND == null)
-				UBND = new double[(0)];
 
+			//perform Fitting
 			int intprog = 0;
 			int np = N_SRC / Environment.ProcessorCount;
-
 			Parallel.For(0, N_SRC, (int k, ParallelLoopState state) =>
 			{
-				if (WAITBAR.DialogResult == DialogResult.Cancel)
+				if (SHOWWAITBAR)
 				{
-					state.Stop();// break;
+					if (WAITBAR.DialogResult == DialogResult.Cancel)
+						state.Stop();
+
+					if (k < np && k * 100 / np > intprog)//keep the update of progress bar to only one thread of the team...avoids locks
+					{
+						intprog = k * 100 / np;
+						BGWRKR.ReportProgress(intprog);
+					}
 				}
 
-				if (k < np && k * 100 / np > intprog)//keep the update of progress bar to only one thread of the team...avoids locks
-				{
-					intprog = k * 100 / np;
-					BGWRKR.ReportProgress(intprog);
-				}
+				double[,] kernel = GetKernel(IMAGE, CENTROIDS_X_PIXEL[k], CENTROIDS_Y_PIXEL[k], KERNEL_RADIUS, out int[] xcoords, out int[] ycoords);
+				double chisq_norm = 0;
 
-				double[,] kernel = GetKernel(IMAGE, (int)(CENTROIDS_X[k] + .5), (int)(CENTROIDS_Y[k] + .5), KERNEL_RADIUS);
-				int[] xcoords = new int[(KERNEL_WIDTH)];
-				int[] ycoords = new int[(KERNEL_WIDTH)];
-				for (int i = 0; i < KERNEL_WIDTH; i++)
+				double[] P0 = PINI;
+				double[] lb = LBND;
+				double[] ub = UBND;
+				if (PINI != null)
 				{
-					xcoords[i] = (int)(CENTROIDS_X[k] + .5) - KERNEL_RADIUS + i;
-					ycoords[i] = (int)(CENTROIDS_Y[k] + .5) - KERNEL_RADIUS + i;
-				}
-
-				double[,] fit_resid = new double[KERNEL_WIDTH, KERNEL_WIDTH];
-				double[] P0 = null;
-				double[] lb = new double[(LBND.Length)];
-				double[] ub = new double[(UBND.Length)];
-				if (LBND.Length > 0)//set bounds to make sense
+					P0[0] = CENTROIDS_AMPLITUDE[k];
+					P0[1] = CENTROIDS_X[k];
+					P0[2] = CENTROIDS_Y[k];
+					for (int i = 3; i < P0.Length - 1; i++)
+						P0[i] = PINI[i];
+					P0[P0.Length - 1] = CENTROIDS_BGESTIMATE[k];
+				}	
+				if (LBND != null)//set bounds to make sense
 				{
-					lb[0] = 0;
+					lb[0] = CENTROIDS_AMPLITUDE[k] / 2;
 					lb[1] = CENTROIDS_X[k] - KERNEL_RADIUS;
 					lb[2] = CENTROIDS_Y[k] - KERNEL_RADIUS;
-					for (int i = 3; i < LBND.Length; i++)
+					for (int i = 3; i < LBND.Length - 1; i++)
 						lb[i] = LBND[i];
+					lb[lb.Length - 1] = CENTROIDS_BGESTIMATE[k] - CENTROIDS_AMPLITUDE[k] / 3;
 				}
-				if (UBND.Length > 0)//set bounds to make sense
+				if (UBND != null)//set bounds to make sense
 				{
-					ub[0] = Math.Abs(CENTROIDS_AMPLITUDE[k] * 2);
+					ub[0] = CENTROIDS_AMPLITUDE[k] * 2;
 					ub[1] = CENTROIDS_X[k] + KERNEL_RADIUS;
 					ub[2] = CENTROIDS_Y[k] + KERNEL_RADIUS;
-					for (int i = 3; i < UBND.Length; i++)
+					for (int i = 3; i < UBND.Length - 1; i++)
 						ub[i] = UBND[i];
-				}
+					ub[ub.Length - 1] = CENTROIDS_BGESTIMATE[k] + CENTROIDS_AMPLITUDE[k] / 3;
+				}				
 
 				if (Convert.ToInt32(e.Argument) == 2)//Fit circular Gaussian
 				{
-					if (PINI != null)
-						P0 = new double[5] { Math.Abs(CENTROIDS_AMPLITUDE[k]), CENTROIDS_X[k], CENTROIDS_Y[k], PINI[3], PINI[4] };
-					else
-						P0 = new double[5] { Math.Abs(CENTROIDS_AMPLITUDE[k]), CENTROIDS_X[k], CENTROIDS_Y[k], 2, CENTROIDS_BGESTIMATE[k] };
+					if (P0 == null)
+						P0 = new double[5];
 
-					JPMath.Fit_Gaussian2d(xcoords, ycoords, kernel, ref P0, lb, ub, ref empty, ref fit_resid);
+					JPMath.Fit_PointSource(JPMath.PointSourceModel.CircularGaussian, JPMath.FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
 					FITS_VOLUME[k] = 2 * Math.PI * P0[0] * P0[3] * P0[3];
 					FITS_FWHM_X[k] = 2.355 * P0[3];
 					FITS_FWHM_Y[k] = FITS_FWHM_X[k];
@@ -441,12 +433,10 @@ namespace JPFITS
 
 				if (Convert.ToInt32(e.Argument) == 3)//Fit elliptical Gaussian
 				{
-					if (PINI != null)
-						P0 = new double[7] { Math.Abs(CENTROIDS_AMPLITUDE[k]), CENTROIDS_X[k], CENTROIDS_Y[k], PINI[3], PINI[4], PINI[5], PINI[6] };
-					else
-						P0 = new double[7] { Math.Abs(CENTROIDS_AMPLITUDE[k]), CENTROIDS_X[k], CENTROIDS_Y[k], 0, 2, 2, CENTROIDS_BGESTIMATE[k] };
+					if (P0 == null)
+						P0 = new double[7];
 
-					JPMath.Fit_Gaussian2d(xcoords, ycoords, kernel, ref P0, lb, ub, ref empty, ref fit_resid);
+					JPMath.Fit_PointSource(JPMath.PointSourceModel.EllipticalGaussian, JPMath.FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
 					FITS_VOLUME[k] = 2 * Math.PI * P0[0] * P0[4] * P0[5];
 					FITS_FWHM_X[k] = 2.355 * P0[4];
 					FITS_FWHM_Y[k] = 2.355 * P0[5];
@@ -457,12 +447,10 @@ namespace JPFITS
 
 				if (Convert.ToInt32(e.Argument) == 4)//Fit circular Moffat
 				{
-					if (PINI != null)
-						P0 = new double[6] { Math.Abs(CENTROIDS_AMPLITUDE[k]), CENTROIDS_X[k], CENTROIDS_Y[k], PINI[3], PINI[4], PINI[5] };
-					else
-						P0 = new double[6] { Math.Abs(CENTROIDS_AMPLITUDE[k]), CENTROIDS_X[k], CENTROIDS_Y[k], 2, 2, CENTROIDS_BGESTIMATE[k] };
+					if (P0 == null)
+						P0 = new double[6];
 
-					JPMath.Fit_Moffat2d(xcoords, ycoords, kernel, ref P0, lb, ub, ref empty, ref fit_resid);
+					JPMath.Fit_PointSource(JPMath.PointSourceModel.CircularMoffat, JPMath.FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
 					FITS_VOLUME[k] = Math.PI * P0[3] * P0[3] * P0[0] / (P0[4] - 1);
 					FITS_FWHM_X[k] = 2 * P0[3] * Math.Sqrt(Math.Pow(2, 1 / (P0[4])) - 1);
 					FITS_FWHM_Y[k] = FITS_FWHM_X[k];
@@ -472,12 +460,10 @@ namespace JPFITS
 
 				if (Convert.ToInt32(e.Argument) == 5)//Fit elliptical Moffat
 				{
-					if (PINI != null)
-						P0 = new double[(8)] { Math.Abs(CENTROIDS_AMPLITUDE[k]), CENTROIDS_X[k], CENTROIDS_Y[k], PINI[3], PINI[4], PINI[5], PINI[6], PINI[7] };
-					else
-						P0 = new double[(8)] { Math.Abs(CENTROIDS_AMPLITUDE[k]), CENTROIDS_X[k], CENTROIDS_Y[k], 0, 2, 2, 2, CENTROIDS_BGESTIMATE[k] };
+					if (P0 == null)
+						P0 = new double[8];
 
-					JPMath.Fit_Moffat2d(xcoords, ycoords, kernel, ref P0, lb, ub, ref empty, ref fit_resid);
+					JPMath.Fit_PointSource(JPMath.PointSourceModel.EllipticalMoffat, JPMath.FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
 					FITS_VOLUME[k] = Math.PI * P0[4] * P0[5] * P0[0] / (P0[6] - 1);
 					FITS_FWHM_X[k] = 2 * P0[4] * Math.Sqrt(Math.Pow(2, 1 / (P0[6])) - 1);
 					FITS_FWHM_Y[k] = 2 * P0[5] * Math.Sqrt(Math.Pow(2, 1 / (P0[6])) - 1);
@@ -490,17 +476,7 @@ namespace JPFITS
 				FITS_X[k] = P0[1];
 				FITS_Y[k] = P0[2];
 				FITS_BGESTIMATE[k] = P0[P0.Length - 1];
-
-				double chisq_norm = 0;
-				for (int i = 0; i < KERNEL_WIDTH; i++)
-					for (int j = 0; j < KERNEL_WIDTH; j++)
-					{
-						if (kernel[i, j] - P0[P0.Length - 1] == 0)
-							chisq_norm += fit_resid[i, j] * fit_resid[i, j];
-						else
-							chisq_norm += fit_resid[i, j] * fit_resid[i, j] / Math.Abs(kernel[i, j] - P0[P0.Length - 1]);
-					}
-				chisq_norm /= (kernel.Length - P0.Length);
+				
 				FITS_CHISQNORM[k] = chisq_norm;
 			});
 		}
@@ -1081,7 +1057,7 @@ namespace JPFITS
 
 			Parallel.For(0, N_SRC, i =>
 			{
-				double[,] kernel = GetKernel(image, (int)XCoords[i], (int)YCoords[i], KERNEL_RADIUS);
+				double[,] kernel = GetKernel(image, (int)XCoords[i], (int)YCoords[i], KERNEL_RADIUS, out int[] xrange, out int[] yrange);
 
 				double bg_est = 0;//default
 				if (AUTO_BG)
@@ -1090,20 +1066,12 @@ namespace JPFITS
 					kernel = JPMath.MatrixAddScalar(kernel, -bg_est, false);
 				}
 
-				double[] xcoords = new double[(KERNEL_WIDTH)];// x coords
-				double[] ycoords = new double[(KERNEL_WIDTH)];// y coords
-				for (int j = 0; j < KERNEL_WIDTH; j++)
-				{
-					xcoords[j] = (double)((int)XCoords[i] - KERNEL_RADIUS + j);
-					ycoords[j] = (double)((int)YCoords[i] - KERNEL_RADIUS + j);
-				}
-
 				double xweighted = 0, yweighted = 0;
 				for (int x = 0; x < KERNEL_WIDTH; x++)
 					for (int y = 0; y < KERNEL_WIDTH; y++)
 					{
-						xweighted += kernel[x, y] * xcoords[x];
-						yweighted += kernel[x, y] * ycoords[y];
+						xweighted += kernel[x, y] * xrange[x];
+						yweighted += kernel[x, y] * yrange[y];
 					}
 
 				//centroids
@@ -1166,114 +1134,131 @@ namespace JPFITS
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
 		/// <br />G(x,y|P) = P(0) * exp( -((x - P(1)).^2 + (y - P(2)).^2 ) / (2*P(3)^2)) + P(4).</summary>
-		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3) and P(4) are used, all other parameter initial estimates are determined locally.</param>
-		/// <param name="LBnds">Lower bounds for the fit parameters. Only LBnds(3) and LBnds(4) are used, all other parameter bound estimates are determined locally.</param>
-		/// <param name="UBnds">Upper bounds for the fit parameters. Only UBnds(3) and LBnds(4) are used, all other parameter bound estimates are determined locally.</param>
-		public void Fit_Sources_Gaussian_Circular(double[] Pinit, double[] LBnds, double[] UBnds)
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3) is used, all other parameter initial estimates are determined locally. Can pass null for auto-estimate.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
+		/// <param name="showwaitbar">Show a cancellable waitbar. False equates to a syncronous call.</param>
+		public void Fit_Sources_Gaussian_Circular(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
 		{
 			//G = P(0) * exp( -((X-P(1)).^2 + (Y-P(2)).^2 ) / (2*P(3)^2)) + P(4);
 
 			FITS_PARAMS = new double[5, N_SRC];
 			FITTED = true;
 			FIT_EQUATION = "Gaussian (Circular): P(0) * exp( -((X-P(1)).^2 + (Y-P(2)).^2 ) / (2*P(3)^2)) + P(4)";
-			//VIEWFITS = view;
-			//P_INIT = P0;
 			LBND = LBnds;
 			UBND = UBnds;
 			PINI = Pinit;
+			SHOWWAITBAR = showwaitbar;
 
-			WAITBAR = new WaitBar();
-			WAITBAR.ProgressBar.Maximum = 100;
-			WAITBAR.Text = "Fitting Sources...";
-			BGWRKR.RunWorkerAsync(2);
-			WAITBAR.ShowDialog();
+			if (showwaitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Fitting Sources...";
+				BGWRKR.RunWorkerAsync(2);
+				WAITBAR.ShowDialog();
 
-			if (WAITBAR.DialogResult == DialogResult.Cancel)
-				FITTED = false;
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+					FITTED = false;
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(2));
 		}
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
 		/// <br />G(x,y|P) = P(0) * exp( -((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))).^2 / (2*P(4)^2) - ( -(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))).^2 / (2*P(5)^2) ) + P(6).</summary>
-		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5) and P(6) are used, all other parameter initial estimates are determined locally.</param>
-		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as above.</param>
-		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as above.</param>
-		public void Fit_Sources_Gaussian_Elliptical(double[] Pinit, double[] LBnds, double[] UBnds)
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5) are used, all other parameter initial estimates are determined locally.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
+		public void Fit_Sources_Gaussian_Elliptical(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
 		{
 			//G = P(0) * exp( -((x-P(1))*cosd(P(3)) + (y-P(2))*sind(P(3))).^2 / (2*P(4)^2) - ( -(x-P(1))*sind(P(3)) + (y-P(2))*cosd(P(3))).^2 / (2*P(5)^2) ) + P(6);
 
 			FITS_PARAMS = new double[7, N_SRC];
 			FITTED = true;
 			FIT_EQUATION = "Gaussian (Elliptical): P(0) * exp( -((x-P(1))*cos(P(3)) + (y-P(2))*sin(P(3))).^2 / (2*P(4)^2) - ( -(x-P(1))*sin(P(3)) + (y-P(2))*cos(P(3))).^2 / (2*P(5)^2) ) + P(6)";
-			/*VIEWFITS = view;
-			P_INIT = P0;*/
 			LBND = LBnds;
 			UBND = UBnds;
 			PINI = Pinit;
+			SHOWWAITBAR = showwaitbar;
 
-			WAITBAR = new WaitBar();
-			WAITBAR.ProgressBar.Maximum = 100;
-			WAITBAR.Text = "Fitting Sources...";
-			BGWRKR.RunWorkerAsync(3);
-			WAITBAR.ShowDialog();
+			if (showwaitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Fitting Sources...";
+				BGWRKR.RunWorkerAsync(3);
+				WAITBAR.ShowDialog();
 
-			if (WAITBAR.DialogResult == DialogResult.Cancel)
-				FITTED = false;
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+					FITTED = false;
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(3));
 		}
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
 		/// <br />M(x,y|P) = P(0) * ( 1 + { (x - P(1))^2 + (y - P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5).</summary>
-		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5) are used, all other parameter initial estimates are determined locally.</param>
-		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as above.</param>
-		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as above.</param>
-		public void Fit_Sources_Moffat_Circular(double[] Pinit, double[] LBnds, double[] UBnds)
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4) are used, all other parameter initial estimates are determined locally.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
+		public void Fit_Sources_Moffat_Circular(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
 		{
 			// M = P(0) * ( 1 + { (X-P(1))^2 + (Y-P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5)
 
 			FITS_PARAMS = new double[6, N_SRC];
 			FITTED = true;
 			FIT_EQUATION = "Moffat (Circular): P(0) * ( 1 + { (X-P(1))^2 + (Y-P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5)";
-			/*VIEWFITS = view;
-			P_INIT = P0;*/
 			LBND = LBnds;
 			UBND = UBnds;
 			PINI = Pinit;
+			SHOWWAITBAR = showwaitbar;
 
-			WAITBAR = new WaitBar();
-			WAITBAR.ProgressBar.Maximum = 100;
-			WAITBAR.Text = "Fitting Sources...";
-			BGWRKR.RunWorkerAsync(4);
-			WAITBAR.ShowDialog();
+			if (showwaitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Fitting Sources...";
+				BGWRKR.RunWorkerAsync(4);
+				WAITBAR.ShowDialog();
 
-			if (WAITBAR.DialogResult == DialogResult.Cancel)
-				FITTED = false;
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+					FITTED = false;
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(4));
 		}
 
 		/// <summary>Performs a least-squares fit on all sources of the form:
 		/// <br />M(x,y|P) = P(0) * (1 + { ((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))) ^ 2 } / P(4) ^ 2 + { (-(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))) ^ 2 } / P(5) ^ 2) ^ (-P(6)) + P(7).</summary>
-		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5),  P(6) and P(7) are used, all other parameter initial estimates are determined locally.</param>
-		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as above.</param>
-		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as above.</param>
-		public void Fit_Sources_Moffat_Elliptical(double[] Pinit, double[] LBnds, double[] UBnds)
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5),  P(6) are used, all other parameter initial estimates are determined locally.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
+		public void Fit_Sources_Moffat_Elliptical(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
 		{
 			//M = P(0) * ( 1 + { ((X-P(1))*cosd(P(3)) + (Y-P(2))*sind(P(3)))^2 } / P(4)^2 + { (-(X-P(1))*sind(P(3)) + (Y-P(2))*cosd(P(3)))^2 } / P(5)^2 ) ^ (-P(6)) + P(7);
 
 			FITS_PARAMS = new double[8, N_SRC];
 			FITTED = true;
 			FIT_EQUATION = "Moffat (Elliptical): P(0) * ( 1 + { ((X-P(1))*cos(P(3)) + (Y-P(2))*sin(P(3)))^2 } / P(4)^2 + { (-(X-P(1))*sin(P(3)) + (Y-P(2))*cos(P(3)))^2 } / P(5)^2 ) ^ (-P(6)) + P(7)";
-			/*VIEWFITS = view;
-			P_INIT = P0;*/
 			LBND = LBnds;
 			UBND = UBnds;
 			PINI = Pinit;
+			SHOWWAITBAR = showwaitbar;
 
-			WAITBAR = new WaitBar();
-			WAITBAR.ProgressBar.Maximum = 100;
-			WAITBAR.Text = "Fitting Sources...";
-			BGWRKR.RunWorkerAsync(5);
-			WAITBAR.ShowDialog();
+			if (showwaitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Fitting Sources...";
+				BGWRKR.RunWorkerAsync(5);
+				WAITBAR.ShowDialog();
 
-			if (WAITBAR.DialogResult == DialogResult.Cancel)
-				FITTED = false;
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+					FITTED = false;
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(5));
 		}
 
 		/// <summary>Saves the metadata table of the extracted sources as a delimited text file.</summary>
@@ -1301,6 +1286,15 @@ namespace JPFITS
 				sw.WriteLine(line);
 			}
 			sw.Close();
+		}
+
+		public void View_Source_Table()
+		{			
+			string[,] table = this.Source_Table;
+
+			PSETableViewer PSETABLEVIEWER = new PSETableViewer(table);
+			PSETABLEVIEWER.Text = this.LSFit_Equation;
+			PSETABLEVIEWER.Show();
 		}
 
 		/// <summary>Generates RA and Dec coordinates for the sources in this instance, using the supplied World Coordinate System instance.</summary>
@@ -1567,16 +1561,21 @@ namespace JPFITS
 		/// <param name="x0">The center pixel of the kernel on the horizontal axis of the image.</param>
 		/// <param name="y0">The center pixel of the kernel on the vertical axis of the image.</param>
 		/// <param name="radius">The radius of the kernel.</param>
-		public static double[,] GetKernel(double[,] image, int x0, int y0, int radius)
+		public static double[,] GetKernel(double[,] image, int x0, int y0, int radius, out int[] xrange, out int[] yrange)
 		{
 			int width = radius * 2 + 1, kx = -1, x, y, xmin = x0 - radius, ymin = y0 - radius;
 			double[,] kernel = new double[width, width];
+			xrange = new int[width];
+			yrange = new int[width];
 
 			for (x = 0; x < width; x++)
 			{
 				kx = xmin + x;
 				for (y = 0; y < width; y++)
 					kernel[x, y] = image[kx, ymin + y];
+
+				xrange[x] = kx;
+				yrange[x] = ymin + x;
 			}
 
 			return kernel;
