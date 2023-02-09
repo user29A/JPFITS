@@ -999,11 +999,13 @@ namespace JPFITS
 		{
 			/// <summary>
 			/// G(x,y|p_n) = Sum[p_n(0) * exp(-((x - p_n(1))^2 + (y - p_n(2))^2) / (2*p_n(3)^2))] + p(4)
+			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias 
 			/// </summary>
 			CircularGaussian,
 
 			/// <summary>
 			/// G(x,y|p_n) =  Sum[p_n(0) * exp(-((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 / (2*p_n(4)^2) - (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3))).^2 / (2*p_n(5)^2) )] + p(6)
+			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias.  
 			/// </summary>
 			EllipticalGaussian,
 
@@ -1023,9 +1025,7 @@ namespace JPFITS
 		public static void Fit_PointSource_Compound(PointSourceCompoundModel model_name, FitMinimizationType minimization_type, int[] xdata, int[] ydata, double[,] source, double[] xpositions, double[] ypositions, double position_radius, ref double[,] param, ref double[,] p_err, ref double[,] fit_residuals, out string termination_msg)
 		{
 			if (param.GetLength(1) != xpositions.Length)
-			{
 				throw new Exception("Parameter array param not consistent with the number of source xpositions indicated.");
-			}
 
 			int func = param.GetLength(0);
 			int count = param.GetLength(1);
@@ -1050,9 +1050,9 @@ namespace JPFITS
 				double bias = min;
 				if (bias < 1)
 					bias = 1;
-				P0I[P0I.Length - 1] = bias;//background
-				PLB[P0I.Length - 1] = 0;//background
-				PUB[P0I.Length - 1] = max / 4;//background
+				P0I[P0I.Length - 1] = min;//background
+				PLB[P0I.Length - 1] = min - (max - min) / 3;//background
+				PUB[P0I.Length - 1] = min + (max - min) / 3;//background
 				scale[P0I.Length - 1] = bias;//background
 
 				int funcindex;
@@ -1066,25 +1066,25 @@ namespace JPFITS
 
 							//amplitude
 							P0I[funcindex] = source[(int)(xpositions[i] - XDATA[0] + 0.5), (int)(ypositions[i] - YDATA[0] + 0.5)] - bias;
-							PLB[funcindex] = P0I[funcindex] / 3;
+							PLB[funcindex] = P0I[funcindex] / 2;
 							PUB[funcindex] = 2 * P0I[funcindex];
 							scale[funcindex] = P0I[funcindex];
 
 							//x0
-							PLB[funcindex + 1] = xpositions[i] - position_radius;
 							P0I[funcindex + 1] = xpositions[i];
+							PLB[funcindex + 1] = xpositions[i] - position_radius;
 							PUB[funcindex + 1] = xpositions[i] + position_radius;
 							scale[funcindex + 1] = P0I[funcindex + 1];
 
 							//y0
-							PLB[funcindex + 2] = ypositions[i] - position_radius;
 							P0I[funcindex + 2] = ypositions[i];
+							PLB[funcindex + 2] = ypositions[i] - position_radius;
 							PUB[funcindex + 2] = ypositions[i] + position_radius;
 							scale[funcindex + 2] = P0I[funcindex + 2];
 
 							//sigma
-							PLB[funcindex + 3] = 1e-1;
 							P0I[funcindex + 3] = 2;
+							PLB[funcindex + 3] = 2e-1;
 							PUB[funcindex + 3] = 10;
 							scale[funcindex + 3] = P0I[funcindex + 3];
 						}
@@ -1097,45 +1097,43 @@ namespace JPFITS
 
 							//amplitude
 							P0I[funcindex] = source[(int)(xpositions[i] - XDATA[0]), (int)(ypositions[i] - YDATA[0])] - bias;
-							PLB[funcindex] = P0I[funcindex] / 3;
+							PLB[funcindex] = P0I[funcindex] / 2;
 							PUB[funcindex] = 2 * P0I[funcindex];
 							scale[funcindex] = P0I[funcindex];
 
 							//x0
-							PLB[funcindex + 1] = xpositions[i] - position_radius;
 							P0I[funcindex + 1] = xpositions[i];
+							PLB[funcindex + 1] = xpositions[i] - position_radius;
 							PUB[funcindex + 1] = xpositions[i] + position_radius;
 							scale[funcindex + 1] = P0I[funcindex + 1];
 
 							//y0
-							PLB[funcindex + 2] = ypositions[i] - position_radius;
 							P0I[funcindex + 2] = ypositions[i];
+							PLB[funcindex + 2] = ypositions[i] - position_radius;
 							PUB[funcindex + 2] = ypositions[i] + position_radius;
 							scale[funcindex + 2] = P0I[funcindex + 2];
 
 							//phi
-							PLB[funcindex + 3] = -Math.PI;
 							P0I[funcindex + 3] = 0;
+							PLB[funcindex + 3] = -Math.PI;
 							PUB[funcindex + 3] = Math.PI;
 							scale[funcindex + 3] = 1;
 
 							//sigmaX
-							PLB[funcindex + 4] = 1e-1;
 							P0I[funcindex + 4] = 2;
+							PLB[funcindex + 4] = 2e-1;
 							PUB[funcindex + 4] = 10;
 							scale[funcindex + 4] = P0I[funcindex + 4];
 
 							//sigmaY
-							PLB[funcindex + 5] = 1e-1;
 							P0I[funcindex + 5] = 2;
+							PLB[funcindex + 5] = 2e-1;
 							PUB[funcindex + 5] = 10;
 							scale[funcindex + 5] = P0I[funcindex + 5];
 						}
 					}
 					else
-					{
 						throw new Exception("Parameter length does not correspond to either circular (5 params) or elliptical (7 params) Gaussian; params length = " + func);
-					}
 
 
 					if (minimization_type == FitMinimizationType.LeastSquares)
@@ -1159,31 +1157,31 @@ namespace JPFITS
 
 							//amplitude
 							P0I[funcindex] = source[(int)(xpositions[i] - XDATA[0]), (int)(ypositions[i] - YDATA[0])] - bias;
-							PLB[funcindex] = P0I[funcindex] / 3;
+							PLB[funcindex] = P0I[funcindex] / 2;
 							PUB[funcindex] = 2 * P0I[funcindex];
 							scale[funcindex] = P0I[funcindex];
 
 							//x0
-							PLB[funcindex + 1] = xpositions[i] - position_radius;
 							P0I[funcindex + 1] = xpositions[i];
+							PLB[funcindex + 1] = xpositions[i] - position_radius;
 							PUB[funcindex + 1] = xpositions[i] + position_radius;
 							scale[funcindex + 1] = P0I[funcindex + 1];
 
 							//y0
-							PLB[funcindex + 2] = ypositions[i] - position_radius;
 							P0I[funcindex + 2] = ypositions[i];
+							PLB[funcindex + 2] = ypositions[i] - position_radius;
 							PUB[funcindex + 2] = ypositions[i] + position_radius;
 							scale[funcindex + 2] = P0I[funcindex + 2];
 
 							//alpha
-							PLB[funcindex + 3] = 1e-1;
 							P0I[funcindex + 3] = 2;
+							PLB[funcindex + 3] = 2e-1;
 							PUB[funcindex + 3] = 10;
 							scale[funcindex + 3] = P0I[funcindex + 3];
 
 							//beta
-							PLB[funcindex + 4] = 1 + 1e-6;
 							P0I[funcindex + 4] = 2;
+							PLB[funcindex + 4] = 1 + 1e-6;
 							PUB[funcindex + 4] = 10;
 							scale[funcindex + 4] = P0I[funcindex + 4];
 						}
@@ -1196,43 +1194,43 @@ namespace JPFITS
 
 							//amplitude
 							P0I[funcindex] = source[(int)(xpositions[i] - XDATA[0]), (int)(ypositions[i] - YDATA[0])] - bias;
-							PLB[funcindex] = P0I[funcindex] / 3;
+							PLB[funcindex] = P0I[funcindex] / 2;
 							PUB[funcindex] = 2 * P0I[funcindex];
 							scale[funcindex] = P0I[funcindex];
 
 							//x0
-							PLB[funcindex + 1] = xpositions[i] - position_radius;
 							P0I[funcindex + 1] = xpositions[i];
+							PLB[funcindex + 1] = xpositions[i] - position_radius;
 							PUB[funcindex + 1] = xpositions[i] + position_radius;
 							scale[funcindex + 1] = P0I[funcindex + 1];
 
 							//y0
-							PLB[funcindex + 2] = ypositions[i] - position_radius;
 							P0I[funcindex + 2] = ypositions[i];
+							PLB[funcindex + 2] = ypositions[i] - position_radius;
 							PUB[funcindex + 2] = ypositions[i] + position_radius;
 							scale[funcindex + 2] = P0I[funcindex + 2];
 
 							//phi
-							PLB[funcindex + 3] = -Math.PI;
 							P0I[funcindex + 3] = 0;
+							PLB[funcindex + 3] = -Math.PI;
 							PUB[funcindex + 3] = Math.PI;
 							scale[funcindex + 3] = 1;
 
 							//alphaX
-							PLB[funcindex + 4] = 1e-1;
 							P0I[funcindex + 4] = 2;
+							PLB[funcindex + 4] = 2e-1;
 							PUB[funcindex + 4] = 10;
 							scale[funcindex + 4] = P0I[funcindex + 4];
 
 							//alphaY
-							PLB[funcindex + 5] = 1e-1;
 							P0I[funcindex + 5] = 2;
+							PLB[funcindex + 5] = 2e-1;
 							PUB[funcindex + 5] = 10;
 							scale[funcindex + 5] = P0I[funcindex + 5];
 
 							//beta
-							PLB[funcindex + 6] = 1 + 1e-6;
 							P0I[funcindex + 6] = 2;
+							PLB[funcindex + 6] = 1 + 1e-6;
 							PUB[funcindex + 6] = 10;
 							scale[funcindex + 6] = P0I[funcindex + 6];
 						}

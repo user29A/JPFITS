@@ -53,12 +53,12 @@ namespace JPFITS
 		private JPMath.PointD[]? CENTROID_POINTS;
 		private double[]? CENTROIDS_X;               // x centroid positions of sources
 		private double[]? CENTROIDS_Y;               // y centroid positions of sources
-		private int[]? CENTROIDS_X_PIXEL;
-		private int[]? CENTROIDS_Y_PIXEL;
-		private double[]? CENTROIDS_RA_DEG;      // right ascension centroid positions of sources - if available
-		private string[]? CENTROIDS_RA_HMS;      // right ascension centroid positions of sources - if available
-		private double[]? CENTROIDS_DEC_DEG;     // declination centroid positions of sources - if available
-		private string[]? CENTROIDS_DEC_DMS;     // declination centroid positions of sources - if available
+		private int[]? CENTROIDS_PIXEL_X;
+		private int[]? CENTROIDS_PIXEL_Y;
+		private double[]? CENTROIDS_RADEG;      // right ascension centroid positions of sources - if available
+		private string[]? CENTROIDS_RAHMS;      // right ascension centroid positions of sources - if available
+		private double[]? CENTROIDS_DECDEG;     // declination centroid positions of sources - if available
+		private string[]? CENTROIDS_DECDMS;     // declination centroid positions of sources - if available
 		private double[]? CENTROIDS_AMPLITUDE;       // sources values (above fcmin)
 		private double[]? CENTROIDS_VOLUME;      // sources energies (above fcmin)
 		private double[]? CENTROIDS_BGESTIMATE;  // corner minimum - estimate of background
@@ -353,8 +353,8 @@ namespace JPFITS
 
 				for (int i = 0; i < N_SRC; i++)
 				{
-					CENTROIDS_X_PIXEL[i] = Convert.ToInt32(XPIXs[i]);
-					CENTROIDS_Y_PIXEL[i] = Convert.ToInt32(YPIXs[i]);
+					CENTROIDS_PIXEL_X[i] = Convert.ToInt32(XPIXs[i]);
+					CENTROIDS_PIXEL_Y[i] = Convert.ToInt32(YPIXs[i]);
 					CENTROIDS_X[i] = Convert.ToDouble(Xs[i]);
 					CENTROIDS_Y[i] = Convert.ToDouble(Ys[i]);
 					CENTROIDS_AMPLITUDE[i] = Convert.ToDouble(Ps[i]);
@@ -384,7 +384,7 @@ namespace JPFITS
 					}
 				}
 
-				double[,] kernel = GetKernel(IMAGE, CENTROIDS_X_PIXEL[k], CENTROIDS_Y_PIXEL[k], KERNEL_RADIUS, out int[] xcoords, out int[] ycoords);
+				double[,] kernel = GetKernel(IMAGE, CENTROIDS_PIXEL_X[k], CENTROIDS_PIXEL_Y[k], KERNEL_RADIUS, out int[] xcoords, out int[] ycoords);
 				double chisq_norm = 0;
 
 				double[] P0 = PINI;
@@ -557,10 +557,10 @@ namespace JPFITS
 				PSE_TABLE[c++, i + 1] = CENTROIDS_AMPLITUDE[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_VOLUME[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_BGESTIMATE[i].ToString();
-				PSE_TABLE[c++, i + 1] = CENTROIDS_RA_DEG[i].ToString();
-				PSE_TABLE[c++, i + 1] = CENTROIDS_DEC_DEG[i].ToString();
-				PSE_TABLE[c++, i + 1] = CENTROIDS_RA_HMS[i];
-				PSE_TABLE[c++, i + 1] = CENTROIDS_DEC_DMS[i];
+				PSE_TABLE[c++, i + 1] = CENTROIDS_RADEG[i].ToString();
+				PSE_TABLE[c++, i + 1] = CENTROIDS_DECDEG[i].ToString();
+				PSE_TABLE[c++, i + 1] = CENTROIDS_RAHMS[i];
+				PSE_TABLE[c++, i + 1] = CENTROIDS_DECDMS[i];
 
 				if (FITTED)
 				{
@@ -677,8 +677,8 @@ namespace JPFITS
 
 		private void INITARRAYS()
 		{
-			CENTROIDS_X_PIXEL = new int[N_SRC];
-			CENTROIDS_Y_PIXEL = new int[N_SRC];
+			CENTROIDS_PIXEL_X = new int[N_SRC];
+			CENTROIDS_PIXEL_Y = new int[N_SRC];
 			CENTROIDS_X = new double[N_SRC];
 			CENTROIDS_Y = new double[N_SRC];
 			FITS_X = new double[N_SRC];
@@ -687,10 +687,10 @@ namespace JPFITS
 			FITS_FWHM_Y = new double[N_SRC];
 			FITS_PHI = new double[N_SRC];
 			FITS_CHISQNORM = new double[N_SRC];
-			CENTROIDS_RA_DEG = new double[N_SRC];
-			CENTROIDS_RA_HMS = new string[N_SRC];
-			CENTROIDS_DEC_DEG = new double[N_SRC];
-			CENTROIDS_DEC_DMS = new string[N_SRC];
+			CENTROIDS_RADEG = new double[N_SRC];
+			CENTROIDS_RAHMS = new string[N_SRC];
+			CENTROIDS_DECDEG = new double[N_SRC];
+			CENTROIDS_DECDMS = new string[N_SRC];
 			CENTROIDS_AMPLITUDE = new double[N_SRC];
 			CENTROIDS_VOLUME = new double[N_SRC];
 			CENTROIDS_BGESTIMATE = new double[N_SRC];
@@ -770,13 +770,13 @@ namespace JPFITS
 		/// <summary>Gets the x-axis center kernel pixel of extracted sources.</summary>
 		public int[] Centroids_X_Pixel
 		{
-			get { return CENTROIDS_X_PIXEL; }
+			get { return CENTROIDS_PIXEL_X; }
 		}
 
 		/// <summary>Gets the y-axis center kernel pixel of extracted sources.</summary>
 		public int[] Centroids_Y_Pixel
 		{
-			get { return CENTROIDS_Y_PIXEL; }
+			get { return CENTROIDS_PIXEL_Y; }
 		}
 
 		/// <summary>Gets or Sets the x-axis centroids of extracted sources.</summary>
@@ -813,10 +813,32 @@ namespace JPFITS
 			get { return CENTROIDS_VOLUME; }
 		}
 
-		public double[] Centroids_Fit_Volume
+		public double[] Fit_Volumes
 		{
 			get { return FITS_VOLUME; }
 		}
+
+		public double[] Fit_RA_Deg
+		{
+			get { return FITS_RA_DEG; }
+		}
+
+		public double[] Fit_Dec_Deg
+		{
+			get { return FITS_DEC_DEG; }
+		}
+
+		public double[] Centroids_RA_Deg
+		{
+			get { return CENTROIDS_RADEG; }
+		}
+
+		public double[] Centroids_Dec_Deg
+		{
+			get { return CENTROIDS_DECDEG; }
+		}
+
+		//public double[] 
 
 		public double[] Centroids_Fit_FWHMX
 		{
@@ -1306,10 +1328,10 @@ namespace JPFITS
 
 				wcs.Get_Coordinate(CENTROIDS_X[i], CENTROIDS_Y[i], true, "TAN", out double a, out double d, out string RAhms, out string DECdamas);
 
-				CENTROIDS_RA_DEG[i] = a;
-				CENTROIDS_RA_HMS[i] = RAhms;
-				CENTROIDS_DEC_DEG[i] = d;
-				CENTROIDS_DEC_DMS[i] = DECdamas;
+				CENTROIDS_RADEG[i] = a;
+				CENTROIDS_RAHMS[i] = RAhms;
+				CENTROIDS_DECDEG[i] = d;
+				CENTROIDS_DECDMS[i] = DECdamas;
 
 				if (FITTED)
 				{
@@ -1352,13 +1374,13 @@ namespace JPFITS
 				CENTROIDS_Y[i] = CENTROIDS_Y[indices[i]];
 				CENTROIDS_Y[indices[i]] = dum;
 
-				dum = CENTROIDS_X_PIXEL[i];
-				CENTROIDS_X_PIXEL[i] = CENTROIDS_X_PIXEL[indices[i]];
-				CENTROIDS_X_PIXEL[indices[i]] = (int)dum;
+				dum = CENTROIDS_PIXEL_X[i];
+				CENTROIDS_PIXEL_X[i] = CENTROIDS_PIXEL_X[indices[i]];
+				CENTROIDS_PIXEL_X[indices[i]] = (int)dum;
 
-				dum = CENTROIDS_Y_PIXEL[i];
-				CENTROIDS_Y_PIXEL[i] = CENTROIDS_Y_PIXEL[indices[i]];
-				CENTROIDS_Y_PIXEL[indices[i]] = (int)dum;
+				dum = CENTROIDS_PIXEL_Y[i];
+				CENTROIDS_PIXEL_Y[i] = CENTROIDS_PIXEL_Y[indices[i]];
+				CENTROIDS_PIXEL_Y[indices[i]] = (int)dum;
 
 				REMAP((int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i]), indices[i], i);
 				REMAP((int)Math.Round(CENTROIDS_X[indices[i]]), (int)Math.Round(CENTROIDS_Y[indices[i]]), i, indices[i]);
@@ -1387,21 +1409,21 @@ namespace JPFITS
 				FITS_CHISQNORM[i] = FITS_CHISQNORM[indices[i]];
 				FITS_CHISQNORM[indices[i]] = dum;
 
-				dum = CENTROIDS_RA_DEG[i];
-				CENTROIDS_RA_DEG[i] = CENTROIDS_RA_DEG[indices[i]];
-				CENTROIDS_RA_DEG[indices[i]] = dum;
+				dum = CENTROIDS_RADEG[i];
+				CENTROIDS_RADEG[i] = CENTROIDS_RADEG[indices[i]];
+				CENTROIDS_RADEG[indices[i]] = dum;
 
-				dumstr = CENTROIDS_RA_HMS[i];
-				CENTROIDS_RA_HMS[i] = CENTROIDS_RA_HMS[indices[i]];
-				CENTROIDS_RA_HMS[indices[i]] = dumstr;
+				dumstr = CENTROIDS_RAHMS[i];
+				CENTROIDS_RAHMS[i] = CENTROIDS_RAHMS[indices[i]];
+				CENTROIDS_RAHMS[indices[i]] = dumstr;
 
-				dum = CENTROIDS_DEC_DEG[i];
-				CENTROIDS_DEC_DEG[i] = CENTROIDS_DEC_DEG[indices[i]];
-				CENTROIDS_DEC_DEG[indices[i]] = dum;
+				dum = CENTROIDS_DECDEG[i];
+				CENTROIDS_DECDEG[i] = CENTROIDS_DECDEG[indices[i]];
+				CENTROIDS_DECDEG[indices[i]] = dum;
 
-				dumstr = CENTROIDS_DEC_DMS[i];
-				CENTROIDS_DEC_DMS[i] = CENTROIDS_DEC_DMS[indices[i]];
-				CENTROIDS_DEC_DMS[indices[i]] = dumstr;
+				dumstr = CENTROIDS_DECDMS[i];
+				CENTROIDS_DECDMS[i] = CENTROIDS_DECDMS[indices[i]];
+				CENTROIDS_DECDMS[indices[i]] = dumstr;
 
 				dum = CENTROIDS_AMPLITUDE[i];
 				CENTROIDS_AMPLITUDE[i] = CENTROIDS_AMPLITUDE[indices[i]];
@@ -1455,10 +1477,10 @@ namespace JPFITS
 			Array.Resize(ref FITS_FWHM_Y, NBright);
 			Array.Resize(ref FITS_PHI, NBright);
 			Array.Resize(ref FITS_CHISQNORM, NBright);
-			Array.Resize(ref CENTROIDS_RA_DEG, NBright);
-			Array.Resize(ref CENTROIDS_RA_HMS, NBright);
-			Array.Resize(ref CENTROIDS_DEC_DEG, NBright);
-			Array.Resize(ref CENTROIDS_DEC_DMS, NBright);
+			Array.Resize(ref CENTROIDS_RADEG, NBright);
+			Array.Resize(ref CENTROIDS_RAHMS, NBright);
+			Array.Resize(ref CENTROIDS_DECDEG, NBright);
+			Array.Resize(ref CENTROIDS_DECDMS, NBright);
 			Array.Resize(ref CENTROIDS_AMPLITUDE, NBright);
 			Array.Resize(ref CENTROIDS_VOLUME, NBright);
 			Array.Resize(ref CENTROIDS_BGESTIMATE, NBright);
@@ -1762,13 +1784,13 @@ namespace JPFITS
 				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 
 			if (BinTablePSE.TTYPEEntryExists("PSE RA (deg)"))
-				CENTROIDS_RA_DEG = (double[])BinTablePSE.GetTTYPEEntry("PSE RA (deg)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+				CENTROIDS_RADEG = (double[])BinTablePSE.GetTTYPEEntry("PSE RA (deg)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 			if (BinTablePSE.TTYPEEntryExists("PSE Dec (deg)"))
-				CENTROIDS_DEC_DEG = (double[])BinTablePSE.GetTTYPEEntry("PSE Dec (deg)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+				CENTROIDS_DECDEG = (double[])BinTablePSE.GetTTYPEEntry("PSE Dec (deg)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 			if (BinTablePSE.TTYPEEntryExists("PSE RA (sxgsml)"))
-				CENTROIDS_RA_HMS = (string[])BinTablePSE.GetTTYPEEntry("PSE RA (sxgsml)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+				CENTROIDS_RAHMS = (string[])BinTablePSE.GetTTYPEEntry("PSE RA (sxgsml)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 			if (BinTablePSE.TTYPEEntryExists("PSE Dec (sxgsml)"))
-				CENTROIDS_DEC_DMS = (string[])BinTablePSE.GetTTYPEEntry("PSE Dec (sxgsml)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+				CENTROIDS_DECDMS = (string[])BinTablePSE.GetTTYPEEntry("PSE Dec (sxgsml)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 		}
 
 		#endregion

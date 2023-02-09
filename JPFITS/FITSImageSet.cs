@@ -31,13 +31,13 @@ namespace JPFITS
 		private void BGWRKR_DoWork(object sender, DoWorkEventArgs e)
 		{
 			object[] arg = (object[])e.Argument;
-			string op = arg[1].ToString();
+			string op = arg[0].ToString();
 
 			if (op == "save")
 			{
-				bool do_parallel = (bool)(arg[2]);
-				TypeCode precision = (TypeCode)arg[3];
-				string waitbar_message = (string)arg[4];
+				bool do_parallel = (bool)(arg[1]);
+				TypeCode precision = (TypeCode)arg[2];
+				string waitbar_message = (string)arg[3];
 				object countlock = new object();
 
 				ParallelOptions opts = new ParallelOptions();
@@ -79,7 +79,7 @@ namespace JPFITS
 
 			if (op == "load")
 			{
-				string[] files = (string[])arg[0];
+				string[] files = (string[])arg[1];
 				bool do_stats = (bool)(arg[2]);
 				bool do_parallel = (bool)(arg[3]);
 				int[] imgrange = (int[])arg[4];
@@ -130,7 +130,7 @@ namespace JPFITS
 
 			if (op.Equals("loadextensions"))
 			{
-				string file = (string)arg[0];
+				string file = (string)arg[1];
 				bool do_stats = (bool)(arg[2]);
 				int[] extensionIndexes = (int[])(arg[3]);
 				int[] imgrange = (int[])arg[4];
@@ -157,11 +157,10 @@ namespace JPFITS
 
 			if (op.Equals("Min"))
 			{
-				FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				double[,] img = new double[ImageSet[0].Width, ImageSet[0].Height];
+				double[,] img = new double[this[0].Width, this[0].Height];
 				int width = img.GetLength(0);
 				int height = img.GetLength(1);
-				int L = ImageSet.Count;
+				int L = this.Count;
 				double N = (double)L;
 				int prog = 0;
 				int n0 = width / Environment.ProcessorCount;
@@ -184,23 +183,22 @@ namespace JPFITS
 					{
 						double min = Double.MaxValue;
 						for (int k = 0; k < L; k++)
-							if (ImageSet[k][i, j] < min)
-								min = ImageSet[k][i, j];
+							if (this[k][i, j] < min)
+								min = this[k][i, j];
 						img[i, j] = min;
 					}
 				});
 
-				e.Result = img;
+				BGWRKR_RESULT = img;
 				return;
 			}
 
 			if (op.Equals("Max"))
 			{
-				FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				double[,] img = new double[ImageSet[0].Width, ImageSet[0].Height];
+				double[,] img = new double[this[0].Width, this[0].Height];
 				int width = img.GetLength(0);
 				int height = img.GetLength(1);
-				int L = ImageSet.Count;
+				int L = this.Count;
 				double N = (double)L;
 				int prog = 0;
 				int n0 = width / Environment.ProcessorCount;
@@ -223,23 +221,22 @@ namespace JPFITS
 					{
 						double max = Double.MinValue;
 						for (int k = 0; k < L; k++)
-							if (ImageSet[k][i, j] > max)
-								max = ImageSet[k][i, j];
+							if (this[k][i, j] > max)
+								max = this[k][i, j];
 						img[i, j] = max;
 					}
 				});
 
-				e.Result = img;
+				BGWRKR_RESULT = img;
 				return;
 			}
 
 			if (op.Equals("Mean"))
 			{
-				FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				double[,] img = new double[ImageSet[0].Width, ImageSet[0].Height];
+				double[,] img = new double[this[0].Width, this[0].Height];
 				int width = img.GetLength(0);
 				int height = img.GetLength(1);
-				int L = ImageSet.Count;
+				int L = this.Count;
 				double N = (double)L;
 				int prog = 0;
 				int n0 = width / Environment.ProcessorCount;
@@ -262,22 +259,21 @@ namespace JPFITS
 					{
 						double mean = 0;
 						for (int k = 0; k < L; k++)
-							mean = mean + ImageSet[k][i, j];
+							mean = mean + this[k][i, j];
 						img[i, j] = mean / N;
 					}
 				});
 
-				e.Result = img;
+				BGWRKR_RESULT = img;
 				return;
 			}
 
 			if (op.Equals("Sum"))
 			{
-				FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				double[,] img = new double[ImageSet[0].Width, ImageSet[0].Height];
+				double[,] img = new double[this[0].Width, this[0].Height];
 				int width = img.GetLength(0);
 				int height = img.GetLength(1);
-				int L = ImageSet.Count;
+				int L = this.Count;
 				double N = (double)L;
 				int prog = 0;
 				int n0 = width / Environment.ProcessorCount;
@@ -300,22 +296,21 @@ namespace JPFITS
 					{
 						double sum = 0;
 						for (int k = 0; k < L; k++)
-							sum = sum + ImageSet[k][i, j];
+							sum = sum + this[k][i, j];
 						img[i, j] = sum;
 					}
 				});
 
-				e.Result = img;
+				BGWRKR_RESULT = img;
 				return;
 			}
 
 			if (op.Equals("Quadrature"))
 			{
-				FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				double[,] img = new double[ImageSet[0].Width, ImageSet[0].Height];
+				double[,] img = new double[this[0].Width, this[0].Height];
 				int width = img.GetLength(0);
 				int height = img.GetLength(1);
-				int L = ImageSet.Count;
+				int L = this.Count;
 				double N = (double)L;
 				int prog = 0;
 				int n0 = width / Environment.ProcessorCount;
@@ -338,23 +333,22 @@ namespace JPFITS
 					{
 						double quadsum = 0;
 						for (int k = 0; k < L; k++)
-							quadsum += (ImageSet[k][i, j] * ImageSet[k][i, j]);
+							quadsum += (this[k][i, j] * this[k][i, j]);
 						img[i, j] = Math.Sqrt(quadsum);
 					}
 				});
 
-				e.Result = img;
+				BGWRKR_RESULT = img;
 				return;
 			}
 
 			if (op.Equals("Median"))
 			{
-				FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				string waitbar_message = (string)(arg[2]);
-				double[,] img = new double[ImageSet[0].Width, ImageSet[0].Height]; ;
+				string waitbar_message = (string)(arg[1]);
+				double[,] img = new double[this[0].Width, this[0].Height]; ;
 				int width = img.GetLength(0);
 				int height = img.GetLength(1);
-				int L = ImageSet.Count;
+				int L = this.Count;
 				double N = (double)L;
 				int prog = 0;
 				int n0 = width / Environment.ProcessorCount;
@@ -377,22 +371,21 @@ namespace JPFITS
 					{
 						double[] medarray = new double[L];
 						for (int k = 0; k < L; k++)
-							medarray[k] = ImageSet[k][i, j];
+							medarray[k] = this[k][i, j];
 						img[i, j] = JPMath.Median(medarray);
 					}
 				});
 
-				e.Result = img;
+				BGWRKR_RESULT = img;
 				return;
 			}
 
 			if (op.Equals("Stdv"))
 			{
-				FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				double[,] img = new double[ImageSet[0].Width, ImageSet[0].Height];
+				double[,] img = new double[this[0].Width, this[0].Height];
 				int width = img.GetLength(0);
 				int height = img.GetLength(1);
-				int L = ImageSet.Count;
+				int L = this.Count;
 				double N = (double)L;
 				int prog = 0;
 				int n0 = width / Environment.ProcessorCount;
@@ -416,34 +409,33 @@ namespace JPFITS
 						double std = 0;
 						double mean = 0;
 						for (int k = 0; k < L; k++)
-							mean = mean + ImageSet[k][i, j];
+							mean = mean + this[k][i, j];
 						mean = mean / N;
 						for (int q = 0; q < L; q++)
-							std = std + (ImageSet[q][i, j] - mean) * (ImageSet[q][i, j] - mean);
+							std = std + (this[q][i, j] - mean) * (this[q][i, j] - mean);
 						std = Math.Sqrt(std / (N - 1.0));
 						img[i, j] = std;
 					}
 				});
 
-				e.Result = img;
+				BGWRKR_RESULT = img;
 				return;
 			}
 
 			if (op.Equals("AutoReg"))
 			{
-				FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				double[,] img = new double[ImageSet[0].Width, ImageSet[0].Height];
+				double[,] img = new double[this[0].Width, this[0].Height];
 				int width = img.GetLength(0);
 				int height = img.GetLength(1);
-				int L = ImageSet.Count;
+				int L = this.Count;
 				double N = (double)L;
 
-				int RefImgIndex = (int)arg[2];
-				bool Do_Stats = (bool)arg[3];
-				string style = (string)arg[4];
+				int RefImgIndex = (int)arg[1];
+				bool Do_Stats = (bool)arg[2];
+				string style = (string)arg[3];
 
-				double[,] refim = new double[ImageSet[RefImgIndex].Width, ImageSet[RefImgIndex].Height];
-				Array.Copy(ImageSet[RefImgIndex].Image, refim, ImageSet[RefImgIndex].Image.LongLength);
+				double[,] refim = new double[this[RefImgIndex].Width, this[RefImgIndex].Height];
+				Array.Copy(this[RefImgIndex].Image, refim, this[RefImgIndex].Image.LongLength);
 
 				refim = JPMath.DeGradient(refim, 0, true);
 				refim = JPMath.DeGradient(refim, 1, true);
@@ -453,189 +445,82 @@ namespace JPFITS
 				Href = JPMath.VectorSubScalar(Href, JPMath.Mean(Href, false), true);
 				Vref = JPMath.VectorSubScalar(Vref, JPMath.Mean(Vref, false), true);
 
-				for (int c = 0; c < ImageSet.Count; c++)//create the array with the missing reference index
+				for (int c = 0; c < this.Count; c++)//create the array with the missing reference index
 				{
-					BGWRKR.ReportProgress(c * 100 / (ImageSet.Count - 1));
+					BGWRKR.ReportProgress(c * 100 / (this.Count - 1));
 
 					if (WAITBAR.DialogResult == DialogResult.Cancel)
 						continue;
 					if (c == RefImgIndex)
 						continue;//don't register to ones' self
 
-					JPMath.XCorrImageLagShifts(Href, Vref, ImageSet[c].Image, true, true, true, out double xshift, out double yshift, true);
+					JPMath.XCorrImageLagShifts(Href, Vref, this[c].Image, true, true, true, out double xshift, out double yshift, true);
 
-					ImageSet[c].SetImage(JPMath.RotateShiftArray(ImageSet[c].Image, 0, Double.MaxValue, Double.MaxValue, style, -xshift, -yshift, true), true, true);
+					this[c].SetImage(JPMath.RotateShiftArray(this[c].Image, 0, Double.MaxValue, Double.MaxValue, style, -xshift, -yshift, true), true, true);
                 }
 				return;
 			}
 
 			if (op.Equals("SCM"))
 			{
-				//FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				//double sigma = (double)arg[2];
-				//double[,] result = new double[ImageSet[0].Width, ImageSet[0].Height];
+				double sigma = (double)arg[1];
+				double[,] result = new double[this[0].Width, this[0].Height];
 
-				//ParallelOptions opts = new ParallelOptions();
-				//opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
+				ParallelOptions opts = new ParallelOptions();
+				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
 
-				//Parallel.For(0, ImageSet[0].Width, opts, (x, state) =>
-				//{
-				//	if (WAITBAR.DialogResult == DialogResult.Cancel)
-				//		state.Stop();
-
-				//	if (x < ImageSet[0].Width / Environment.ProcessorCount)
-				//	{
-				//		//BGWRKR.ReportProgress(waitbar_count + 1, String.Concat("Iteration: ", iteration_count + 1, ". # of Offending Points: ", xinds.Length));
-				//	}
-
-				//	double[] pixstack = new double[ImageSet.Count];
-				//	double stdv;
-
-				//	for (int y = 0; y < ImageSet[0].Height; y++)
-				//	{
-				//		for (int z = 0; z < ImageSet.Count; z++)
-				//			pixstack[z] = ImageSet[z][x, y];
-
-				//		while (true)
-				//		{
-				//			for (int z = 0; z < ImageSet.Count; z++)
-				//				result[x, y] += pixstack[z];
-
-				//			result[x, y] /= (double)ImageSet.Count;
-				//			stdv = JPMath.Stdv(pixstack, result[x, y], false);
-
-				//			int zoffind = -1;
-				//			double maxoffend = 0;
-
-				//			for (int z = 0; z < ImageSet.Count; z++)
-				//			{
-				//				double delta = Math.Abs(pixstack[z] - result[x, y]);
-				//				if (delta > sigma * stdv && delta > maxoffend)
-				//				{
-				//					zoffind = z;
-				//					maxoffend = delta;
-
-				//					//MessageBox.Show(x + " " + y + " " + stdv + " " + (sigma * stdv) + " " + pixstack[z] + " " + result[x, y] + " " + delta);
-				//				}
-				//			}
-
-				//			if (zoffind >= 0)
-				//				pixstack[zoffind] = JPMath.Median(pixstack);
-				//			else
-				//				break;
-
-				//			result[x, y] = 0;
-				//		}
-				//	}
-				//});
-
-				//e.Result = result;
-				//return;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-				FITSImageSet ImageSet = (FITSImageSet)arg[0];
-				double[,] meanimg = new double[ImageSet[0].Width, ImageSet[0].Height];
-				int width = meanimg.GetLength(0);
-				int height = meanimg.GetLength(1);
-				int L = ImageSet.Count;
-				double N = (double)L;
-
-				double sigma = (double)arg[2];
-				double[,] stdvimg = (double[,])arg[3];
-				meanimg = (double[,])arg[4];
-
-				int iteration_count = 0;
-				int waitbar_count = 0;
-
-				int nptsrepeat1 = 0;
-				int nptsrepeat2 = 0;
-
-				while (true)
+				Parallel.For(0, this[0].Width, opts, (x, state) =>
 				{
 					if (WAITBAR.DialogResult == DialogResult.Cancel)
-						break;
+						state.Stop();
 
-					double std = JPMath.Stdv(stdvimg, true);
-					double mean = JPMath.Mean(stdvimg, true);
-					JPMath.Find(stdvimg, mean + sigma * std, ">", true, out int[] xinds, out int[] yinds);//find pts > clip range
-
-					if (xinds.Length == 0)
-						break;
-
-					BGWRKR.ReportProgress(waitbar_count + 1, String.Concat("Iteration: ", iteration_count + 1, ". # of Offending Points: ", xinds.Length));
-
-					if (xinds.Length != 0)//then do some clippin!
+					if (x < this[0].Width / opts.MaxDegreeOfParallelism)
 					{
-						if (nptsrepeat1 != xinds.Length)
-							nptsrepeat1 = xinds.Length;
-						else
-							nptsrepeat2++;
+						BGWRKR.ReportProgress(x * 100 / (this[0].Width / opts.MaxDegreeOfParallelism), " Complete");
+					}
 
-						double med;
-						int count = 0;//breakout counter if too high
-						double[] clipvec = new double[L];
-						double max;
+					double[] pixstack = new double[this.Count];
+					double stdv;
+					double stackmed;
 
-						for (int c = 0; c < xinds.Length; c++)
+					for (int y = 0; y < this[0].Height; y++)
+					{
+						for (int z = 0; z < this.Count; z++)
+							pixstack[z] = this[z][x, y];
+
+						while (true)
 						{
-							for (int i = 0; i < L; i++)
-								clipvec[i] = ImageSet[i][xinds[c], yinds[c]];
+							for (int z = 0; z < this.Count; z++)
+								result[x, y] += pixstack[z];
 
-							while (true)
+							result[x, y] /= (double)this.Count;
+							stdv = JPMath.Stdv(pixstack, result[x, y], false);
+							stackmed = JPMath.Median(pixstack);
+
+							int zoffind = -1;
+							double maxoffend = 0;
+
+							for (int z = 0; z < this.Count; z++)
 							{
-								med = JPMath.Median(clipvec);
-								max = JPMath.Max(JPMath.Abs(JPMath.VectorSubScalar(clipvec, med, false), false), out int index, false);
-								if (max > sigma * std)
+								double delta = Math.Abs(pixstack[z] - stackmed);
+								if (delta > sigma * stdv && delta > maxoffend)
 								{
-									clipvec[index] = med;
-									meanimg[xinds[c], yinds[c]] = JPMath.Mean(clipvec, true);
-									stdvimg[xinds[c], yinds[c]] = JPMath.Stdv(clipvec, true);
-								}
-								else
-									break;
+									zoffind = z;
+									maxoffend = delta;
+								}									
+							}								
 
-								if (++count > 3 * xinds.Length)//?arbitrary? number of iterations limit
-									break;//and go to next point
-							}
+							if (zoffind >= 0)
+								pixstack[zoffind] = JPMath.Median(pixstack);
+							else
+								break;
+
+							result[x, y] = 0;
 						}
 					}
-					else
-						break;
+				});
 
-					if (++iteration_count > 2000 || nptsrepeat2 > 5)
-						break;
-
-					if (++waitbar_count >= 100)
-						waitbar_count = 0;
-				}
-
-				e.Result = meanimg;
+				BGWRKR_RESULT = result;
 				return;
 			}
 		}
@@ -645,27 +530,20 @@ namespace JPFITS
 			WAITBAR.ProgressBar.Value = e.ProgressPercentage;
 
 			if (e.UserState == null)
-			{
 				WAITBAR.TextMsg.Text = e.ProgressPercentage + "%";
-			}
 			else if (((string)e.UserState).Substring(0, 4) == "load")
-			{
 				WAITBAR.TextMsg.Text = e.ProgressPercentage + " " + ((string)e.UserState).Substring(4);
-			}
 			else if (((string)e.UserState).Substring(0, 4) == "save")
-			{
 				WAITBAR.TextMsg.Text = e.ProgressPercentage + " " + ((string)e.UserState).Substring(4);
-			}
 			else
-			{
 				WAITBAR.TextMsg.Text = e.ProgressPercentage + "% " + (string)e.UserState;
-			}
+
 			WAITBAR.Refresh();
 		}
 		
 		private void BGWRKR_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
 		{
-			BGWRKR_RESULT = e.Result;
+			//BGWRKR_RESULT = e.Result;
 			WAITBAR.DialogResult = DialogResult.OK;
 			WAITBAR.Close();
 		}
@@ -817,8 +695,8 @@ namespace JPFITS
 			WAITBAR.ProgressBar.Maximum = fullFileNames.Length;
 			WAITBAR.Text = "Loading Image Set: " + fullFileNames.Length + " files...";
 			object[] arg = new object[6];
-			arg[0] = fullFileNames;
-			arg[1] = "load";
+			arg[0] = "load";
+			arg[1] = fullFileNames;
 			arg[2] = doStats;
 			arg[3] = diskParallel;
 			arg[4] = range;
@@ -871,8 +749,8 @@ namespace JPFITS
 			WAITBAR.Text = "Loading Image Set from extensions: " + extensionIndexes.Length + " files...";
 			WAITBAR.TopMost = true;
 			object[] arg = new object[6];
-			arg[0] = fullFileName;
-			arg[1] = "loadextensions";
+			arg[0] = "loadextensions";
+			arg[1] = fullFileName;
 			arg[2] = doStats;
 			arg[3] = extensionIndexes;
 			arg[4] = range;
@@ -908,11 +786,10 @@ namespace JPFITS
 			WAITBAR.ProgressBar.Maximum = FITSLIST.Count;
 			WAITBAR.Text = "Saving Image Set: " + FITSLIST.Count + " files...";
 			object[] arg = new object[5];
-			arg[0] = "";
-			arg[1] = "save";
-			arg[2] = doParallel;
-			arg[3] = precision;
-			arg[4] = waitbarMessage;
+			arg[0] = "save";
+			arg[1] = doParallel;
+			arg[2] = precision;
+			arg[3] = waitbarMessage;
 			BGWRKR.RunWorkerAsync(arg);
 			WAITBAR.ShowDialog();
 			if (WAITBAR.DialogResult == DialogResult.Cancel)
@@ -1276,9 +1153,329 @@ namespace JPFITS
 				return 0;
 			}
 		}
+
+		/// <summary>Create a FITSImage object with primary image that is the pixel-wise mean of the FITSImageSet primary images.</summary>
+		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
+		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
+		public FITSImage Mean(bool doStats, bool waitbar)
+		{
+			if (this.CoDimensional == false)
+				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
+			if (this.Count <= 1)
+				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
+
+			object[] arg = new object[] { "Mean" };
+
+			if (waitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Computing Mean Data Stack Image";
+				BGWRKR.RunWorkerAsync(arg);
+				WAITBAR.ShowDialog();
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+				{
+					WAITBAR.Close();
+					return null;
+				}
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(arg));
+
+			return new FITSImage(Path.Combine(this.GetCommonDirectory(), "mean.fits"), (double[,])BGWRKR_RESULT, doStats, true);
+		}
+
+		/// <summary>Create a FITSImage object with primary image that is the pixel-wise sigma-clipped mean of the FITSImageSet primary images.</summary>
+		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
+		/// <param name="sigma">The maximum standard deviation allowed for each pixel column; values beyond sigma are clipped and replaced with the median of the pixel column.</param>
+		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
+		public FITSImage MeanClipped(bool doStats, double sigma, bool waitbar)
+		{
+			if (this.CoDimensional == false)
+				throw new Exception("Can Not Perform SCMean: Data Stack not Co-Dimensional");
+			if (this.Count <= 1)
+				throw new Exception("Can Not Perform SCMean: Data Stack Contains One or Fewer Images");
+
+			object[] arg = new object[] { "SCM", sigma };
+
+			if (waitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Computing Sigma Clipped Mean Data Stack Image";
+				BGWRKR.RunWorkerAsync(arg);
+				WAITBAR.ShowDialog();
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+				{
+					WAITBAR.Close();
+					return null;
+				}
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(arg));
+
+			return new FITSImage(Path.Combine(this.GetCommonDirectory(), "clippedmean.fits"), (double[,])BGWRKR_RESULT, doStats, true);
+		}
+
+		/// <summary>Create a FITSImage object with primary image that is the pixel-wise median of the FITSImageSet primary images.</summary>
+		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
+		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
+		/// <param name="waitbarMessage">Message to display on Waitbar progress if it is shown.</param>
+		public FITSImage Median(bool doStats, bool waitbar, string waitbarMessage)
+		{
+			if (this.CoDimensional == false)
+				throw new Exception("Can Not Perform Median: Data Stack not Co-Dimensional");
+			if (this.Count <= 1)
+				throw new Exception("Can Not Perform Median: Data Stack Contains One or Fewer Images");
+
+			object[] arg = new object[] { "Median", waitbarMessage };
+
+			if (waitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Computing Median Data Stack Image";
+				BGWRKR.RunWorkerAsync(arg);
+				WAITBAR.ShowDialog();
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+				{
+					WAITBAR.Close();
+					return null;
+				}
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(arg));
+
+			return new FITSImage(Path.Combine(this.GetCommonDirectory(), "median.fits"), (double[,])BGWRKR_RESULT, doStats, true);
+		}
+
+		/// <summary>Create a FITSImage object with primary image that is the pixel-wise sum of the FITSImageSet primary images.</summary>
+		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
+		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
+		public FITSImage Sum(bool doStats, bool waitbar)
+		{
+			if (this.CoDimensional == false)
+				throw new Exception("Can Not Perform Sum: Data Stack not Co-Dimensional");
+			if (this.Count <= 1)
+				throw new Exception("Can Not Perform Sum: Data Stack Contains One or Fewer Images");
+
+			object[] arg = new object[] { "Sum" };
+
+			if (waitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Computing Summed Data Stack Image";
+				BGWRKR.RunWorkerAsync(arg);
+				WAITBAR.ShowDialog();
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+				{
+					WAITBAR.Close();
+					return null;
+				}
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(arg));
+
+			return new FITSImage(Path.Combine(this.GetCommonDirectory(), "sum.fits"), (double[,])BGWRKR_RESULT, doStats, true);
+		}
+
+		/// <summary>Create a FITSImage object with primary image that is the pixel-wise quadrature sum of the FITSImageSet primary images.</summary>
+		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
+		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
+		public FITSImage Quadrature(bool doStats, bool waitbar)
+		{
+			if (this.CoDimensional == false)
+				throw new Exception("Can Not Perform Quadrature: Data Stack not Co-Dimensional");
+			if (this.Count <= 1)
+				throw new Exception("Can Not Perform Quadrature: Data Stack Contains One or Fewer Images");
+
+			object[] arg = new object[] { "Quadrature" };
+
+			if (waitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Computing Quadrature Summed Data Stack Image";
+				BGWRKR.RunWorkerAsync(arg);
+				WAITBAR.ShowDialog();
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+				{
+					WAITBAR.Close();
+					return null;
+				}
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(arg));
+
+			return new FITSImage(Path.Combine(this.GetCommonDirectory(), "quadrature.fits"), (double[,])BGWRKR_RESULT, doStats, true);
+		}
+
+		/// <summary>Create a FITSImage object with primary image that is the pixel-wise maximum of the FITSImageSet primary images.</summary>
+		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
+		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
+		public FITSImage Max(bool doStats, bool waitbar)
+		{
+			if (this.CoDimensional == false)
+				throw new Exception("Can Not Perform Max: Data Stack not Co-Dimensional");
+			if (this.Count <= 1)
+				throw new Exception("Can Not Perform Max: Data Stack Contains One or Fewer Images");
+
+			object[] arg = new object[] { "Max" };
+
+			if (waitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Computing Max Data Stack Image";
+				BGWRKR.RunWorkerAsync(arg);
+				WAITBAR.ShowDialog();
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+				{
+					WAITBAR.Close();
+					return null;
+				}
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(arg));
+
+			return new FITSImage(Path.Combine(this.GetCommonDirectory(), "max.fits"), (double[,])BGWRKR_RESULT, doStats, true);
+		}
+
+		/// <summary>Create a FITSImage object with primary image that is the pixel-wise minimum of the FITSImageSet primary images.</summary>
+		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
+		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
+		public FITSImage Min(bool doStats, bool waitbar)
+		{
+			if (this.CoDimensional == false)
+				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
+			if (this.Count <= 1)
+				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
+
+			object[] arg = new object[] { "Min" };
+
+			if (waitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Computing Min Data Stack Image";
+				BGWRKR.RunWorkerAsync(arg);
+				WAITBAR.ShowDialog();
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+				{
+					WAITBAR.Close();
+					return null;
+				}
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(arg));
+
+			return new FITSImage(Path.Combine(this.GetCommonDirectory(), "min.fits"), (double[,])BGWRKR_RESULT, doStats, true);
+		}
+
+		/// <summary>Create a FITSImage object with primary image that is the pixel-wise standard deviation of the FITSImageSet primary images.</summary>
+		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
+		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
+		public FITSImage Stdv(bool doStats, bool waitbar)
+		{
+			if (this.CoDimensional == false)
+				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
+			if (this.Count <= 1)
+				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
+
+			object[] arg = new object[] { "Stdv" };
+
+			if (waitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Computing Stdv Data Stack Image";
+				BGWRKR.RunWorkerAsync(arg);
+				WAITBAR.ShowDialog();
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+				{
+					WAITBAR.Close();
+					return null;
+				}
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(arg));
+
+			return new FITSImage(Path.Combine(this.GetCommonDirectory(), "stdv.fits"), (double[,])BGWRKR_RESULT, doStats, true);
+		}
+
+		/// <summary>Auto-register non-rotational primary images from the FITSImageSet. Only works when there is no field rotation in the image set, only translational shifts, and the shifts are less than half of the field.</summary>
+		/// <param name="refImgIndex">The index in the FitSet list of the reference image to register all the other images to.</param>
+		/// <param name="interpStyle">&quot;nearest&quot; - nearest-neighbor pixel, or, &quot;bilinear&quot; - for 2x2 interpolation, or, &quot;lanc_n&quot; - for Lanczos interpolation of order n = 3, 4, 5.</param>
+		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the registered images - saves time if you don't need those.</param>
+		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
+		public void Register(int refImgIndex, string interpStyle, bool doStats, bool waitbar)
+		{
+			object[] arg = new object[] { "AutoReg", refImgIndex, doStats, interpStyle };
+
+			if (waitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Auto-Registering Images";
+				BGWRKR.RunWorkerAsync(arg);
+				WAITBAR.ShowDialog();
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(arg));
+		}
+
+		/// <summary>Scans all primary FITS headers in the FITSImageSet for identical lines and copies such lines to the specified FITSImage destination primary header.
+		/// <br />Usage is that perhaps you form the mean of the FITSImageSet as a new FITSImage, and this new FITSImage should contain all the primary header
+		/// <br /> lines which are identical in the FITSImageSet.
+		/// <br /> The existing primary header of the FITS_destination is cleared before the operation, except for essential keywords.</summary>
+		public void GatherHeaders(FITSImage FITS_destination)
+		{
+			FITS_destination.Header.RemoveAllKeys(FITS_destination.Image);
+
+			bool skip = false;
+			for (int j = 0; j < this[0].Header.Length; j++)
+			{
+				skip = false;
+				string key = this[0].Header.GetKeyName(j);
+				string val = this[0].Header.GetKeyValue(j);
+				string com = this[0].Header.GetKeyComment(j);
+
+				if (!JPFITS.FITSHeader.ValidKeyEdit(key, false))
+					continue;
+
+				for (int i = 1; i < this.Count; i++)
+					if (this[i].Header.GetKeyIndex(key, val, com) == -1)
+					{
+						skip = true;
+						break;
+					}
+
+				if (!skip)
+					if (this[0].Header[j].IsCommentKey)
+						FITS_destination.Header.AddCommentKeyLine(com, -1);
+					else
+						FITS_destination.Header.AddKey(key, val, com, -1);
+			}
+		}
+
 		#endregion
 
 		#region STATIC MEMBERS
+
+		/// <summary>Scans all primary FITS headers from the file names for identical lines and copies such lines to the specified FITSImage destination primary header.
+		/// <br />Usage is that perhaps you form the mean of the FITSImageSet as a new FITSImage, and this new FITSImage should contain all the primary header
+		/// <br /> lines which are identical in the file names.
+		/// <br />The existing primary header of the FITSImage is cleared before the operation, except for essential keywords.</summary>
+		public static void GatherHeaders(string[] filenames, JPFITS.FITSImage FITS_destination)
+		{
+			FITSImageSet mergeset = new FITSImageSet();
+			for (int i = 0; i < filenames.Length; i++)
+				mergeset.Add(new JPFITS.FITSImage(filenames[i], null, true, false, false, false));
+
+			mergeset.GatherHeaders(FITS_destination);
+		}
+
 		/// <summary>Gets the common directory of a series of file names, based on their file paths.</summary>
 		public static string GetCommonDirectory(string[] filelist)
 		{
@@ -1299,456 +1496,8 @@ namespace JPFITS
 			if (!Directory.Exists(first))
 				first = first.Substring(0, first.LastIndexOf("\\"));
 
-			return first;// + "\\";
-		}
-
-		/// <summary>Create a FITSImage object with primary image that is the pixel-wise mean of the FITSImageSet primary images.</summary>
-		/// <param name="fitsImageSet">The FITSImageSet object.</param>
-		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
-		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null.</param>
-		public static FITSImage Mean(JPFITS.FITSImageSet fitsImageSet, bool doStats, bool waitbar)
-		{
-			if (fitsImageSet.CoDimensional == false)
-				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
-			if (fitsImageSet.Count <= 1)
-				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
-
-			if (waitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Computing Mean Data Stack Image";
-				object[] arg = new object[] { fitsImageSet, "Mean" };
-				BGWRKR.RunWorkerAsync(arg);
-				WAITBAR.ShowDialog();
-				if (WAITBAR.DialogResult == DialogResult.Cancel)
-				{
-					WAITBAR.Close();
-					return null;
-				}
-
-				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "mean.fits"), (double[,])BGWRKR_RESULT, doStats, true);
-			}
-			else
-			{
-				double[,] img = new double[fitsImageSet[0].Width, fitsImageSet[0].Height];
-				int width = img.GetLength(0);
-				int height = img.GetLength(1);
-				int L = fitsImageSet.Count;
-				double N = (double)L;
-
-				Parallel.For(0, width, i =>
-				{
-					for (int j = 0; j < height; j++)
-					{
-						double sum = 0;
-						for (int k = 0; k < L; k++)
-						{
-							sum = sum + fitsImageSet[k][i, j];
-						}
-						img[i, j] = sum / N;
-					}
-				});
-
-				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "mean.fits"), img, doStats, true);
-			}
-		}
-
-		/// <summary>Create a FITSImage object with primary image that is the pixel-wise sigma-clipped mean of the FITSImageSet primary images.
-		/// <br />The computation is iterative and may take a long time in some situations and so a cancellable WaitBar is mandatory.
-		/// <br />If the computation is cancelled the function will return with the most recent iteration of the sigma-clipped stack.</summary>
-		/// <param name="fitsImageSet">The FITSImageSet object.</param>
-		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
-		/// <param name="sigma">The maximum standard deviation allowed for each pixel column; values beyond sigma are clipped and replaced with the median of the pixel column.</param>
-		public static FITSImage MeanClipped(JPFITS.FITSImageSet fitsImageSet, bool doStats, double sigma)
-		{
-			if (fitsImageSet.CoDimensional == false)
-				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
-			if (fitsImageSet.Count <= 1)
-				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
-
-			FITSImage f = Stdv(fitsImageSet, false, true);
-			if (f == null)
-				return null;
-			double[,] simg = f.Image;
-			f = Mean(fitsImageSet, false, true);
-			if (f == null)
-				return null;
-			double[,] img = f.Image;
-
-			WAITBAR = new WaitBar();
-			WAITBAR.ProgressBar.Maximum = 100;
-			WAITBAR.Text = "Computing Sigma Clipped Mean Data Stack Image";
-			WAITBAR.CancelBtn.Text = "Stop Iterating (Max = 2000)";
-			object[] arg = new object[] { fitsImageSet, "SCM", sigma, simg, img };
-			BGWRKR.RunWorkerAsync(arg);
-			WAITBAR.ShowDialog();
-			return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "ClippedMean.fits"), (double[,])BGWRKR_RESULT, doStats, true);
-		}
-
-		/// <summary>Create a FITSImage object with primary image that is the pixel-wise median of the FITSImageSet primary images.</summary>
-		/// <param name="fitsImageSet">The FITSImageSet object.</param>
-		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
-		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null.</param>
-		/// <param name="waitbarMessage">Message to display on Waitbar progress if it is shown.</param>
-		public static FITSImage Median(JPFITS.FITSImageSet fitsImageSet, bool doStats, bool waitbar, string waitbarMessage)
-		{
-			if (fitsImageSet.CoDimensional == false)
-				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
-			if (fitsImageSet.Count <= 1)
-				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
-
-			if (waitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Computing Median Data Stack Image";
-				object[] arg = new object[] { fitsImageSet, "Median", waitbarMessage };
-				BGWRKR.RunWorkerAsync(arg);
-				WAITBAR.ShowDialog();
-				if (WAITBAR.DialogResult == DialogResult.OK)
-				{
-					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "median.fits"), (double[,])BGWRKR_RESULT, doStats, true);
-				}
-				else
-					return null;
-			}
-			else
-			{
-				double[,] img = new double[fitsImageSet[0].Width, fitsImageSet[0].Height];
-				int width = img.GetLength(0);
-				int height = img.GetLength(1);
-				int L = fitsImageSet.Count;
-
-				Parallel.For(0, width, i =>
-				{
-					for (int j = 0; j < height; j++)
-					{
-						double[] medarray = new double[L];
-						for (int k = 0; k < L; k++)
-							medarray[k] = fitsImageSet[k][i, j];
-						img[i, j] = JPMath.Median(medarray);
-					}
-				});
-
-				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "median.fits"), img, doStats, true);
-			}
-		}
-
-		/// <summary>Create a FITSImage object with primary image that is the pixel-wise sum of the FITSImageSet primary images.</summary>
-		/// <param name="fitsImageSet">The FITSImageSet object.</param>
-		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
-		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null.</param>
-		public static FITSImage Sum(JPFITS.FITSImageSet fitsImageSet, bool doStats, bool waitbar)
-		{
-			if (fitsImageSet.CoDimensional == false)
-				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
-			if (fitsImageSet.Count <= 1)
-				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
-
-			if (waitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Computing Summed Data Stack Image";
-				object[] arg = new object[] { fitsImageSet, "Sum" };
-				BGWRKR.RunWorkerAsync(arg);
-				WAITBAR.ShowDialog();
-				if (WAITBAR.DialogResult == DialogResult.OK)
-				{
-					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "sum.fits"), (double[,])BGWRKR_RESULT, doStats, true);
-				}
-				else
-					return null;
-			}
-			else
-			{
-				double[,] img = new double[fitsImageSet[0].Width, fitsImageSet[0].Height];
-				int width = img.GetLength(0);
-				int height = img.GetLength(1);
-				int L = fitsImageSet.Count;
-
-				Parallel.For(0, width, i =>
-				{
-					for (int j = 0; j < height; j++)
-					{
-						double sum = 0;
-						for (int k = 0; k < L; k++)
-							sum = sum + fitsImageSet[k][i, j];
-						img[i, j] = sum;
-					}
-				});
-
-				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "sum.fits"), img, doStats, true);
-			}
-		}
-
-		/// <summary>Create a FITSImage object with primary image that is the pixel-wise quadrature sum of the FITSImageSet primary images.</summary>
-		/// <param name="fitsImageSet">The FITSImageSet object.</param>
-		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
-		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null.</param>
-		public static FITSImage Quadrature(JPFITS.FITSImageSet fitsImageSet, bool doStats, bool waitbar)
-		{
-			if (fitsImageSet.CoDimensional == false)
-				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
-			if (fitsImageSet.Count <= 1)
-				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
-
-			if (waitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Computing Quadrature Summed Data Stack Image";
-				object[] arg = new object[] { fitsImageSet, "Quadrature" };
-				BGWRKR.RunWorkerAsync(arg);
-				WAITBAR.ShowDialog();
-				if (WAITBAR.DialogResult == DialogResult.OK)
-				{
-					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "quadrature.fits"), (double[,])BGWRKR_RESULT, doStats, true);
-				}
-				else
-					return null;
-			}
-			else
-			{
-				double[,] img = new double[fitsImageSet[0].Width, fitsImageSet[0].Height];
-				int width = img.GetLength(0);
-				int height = img.GetLength(1);
-				int L = fitsImageSet.Count;
-
-				Parallel.For(0, width, i =>
-				{
-					for (int j = 0; j < height; j++)
-					{
-						double quadsum = 0;
-						for (int k = 0; k < L; k++)
-							quadsum += (fitsImageSet[k][i, j] * fitsImageSet[k][i, j]);
-						img[i, j] = Math.Sqrt(quadsum);
-					}
-				});
-
-				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "quadrature.fits"), img, doStats, true);
-			}
-		}
-
-		/// <summary>Create a FITSImage object with primary image that is the pixel-wise maximum of the FITSImageSet primary images.</summary>
-		/// <param name="fitsImageSet">The FITSImageSet object.</param>
-		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
-		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null.</param>
-		public static FITSImage Max(JPFITS.FITSImageSet fitsImageSet, bool doStats, bool waitbar)
-		{
-			if (fitsImageSet.CoDimensional == false)
-				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
-			if (fitsImageSet.Count <= 1)
-				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
-
-			if (waitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Computing Max Data Stack Image";
-				object[] arg = new object[] { fitsImageSet, "Max" };
-				BGWRKR.RunWorkerAsync(arg);
-				WAITBAR.ShowDialog();
-				if (WAITBAR.DialogResult == DialogResult.OK)
-				{
-					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "max.fits"), (double[,])BGWRKR_RESULT, doStats, true);
-				}
-				else
-				{
-					WAITBAR.Close();
-					return null;
-				}
-			}
-			else
-			{
-				double[,] img = new double[fitsImageSet[0].Width, fitsImageSet[0].Height];
-				int width = img.GetLength(0);
-				int height = img.GetLength(1);
-				int L = fitsImageSet.Count;
-
-				Parallel.For(0, width, i =>
-				{
-					for (int j = 0; j < height; j++)
-					{
-						double max = Double.MinValue;
-						for (int k = 0; k < L; k++)
-							if (fitsImageSet[k][i, j] > max)
-								max = fitsImageSet[k][i, j];
-						img[i, j] = max;
-					}
-				});
-
-				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "max.fits"), img, doStats, true);
-			}
-		}
-
-		/// <summary>Create a FITSImage object with primary image that is the pixel-wise minimum of the FITSImageSet primary images.</summary>
-		/// <param name="fitsImageSet">The FITSImageSet object.</param>
-		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
-		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null.</param>
-		public static FITSImage Min(JPFITS.FITSImageSet fitsImageSet, bool doStats, bool waitbar)
-		{
-			if (fitsImageSet.CoDimensional == false)
-				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
-			if (fitsImageSet.Count <= 1)
-				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
-
-			if (waitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Computing Min Data Stack Image";
-				object[] arg = new object[] { fitsImageSet, "Min" };
-				BGWRKR.RunWorkerAsync(arg);
-				WAITBAR.ShowDialog();
-				if (WAITBAR.DialogResult == DialogResult.OK)
-				{
-					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "min.fits"), (double[,])BGWRKR_RESULT, doStats, true);
-				}
-				else
-				{
-					WAITBAR.Close();
-					return null;
-				}
-			}
-			else
-			{
-				double[,] img = new double[fitsImageSet[0].Width, fitsImageSet[0].Height];
-				int width = img.GetLength(0);
-				int height = img.GetLength(1);
-				int L = fitsImageSet.Count;
-
-				Parallel.For(0, width, i =>
-				{
-					for (int j = 0; j < height; j++)
-					{
-						double min = Double.MaxValue;
-						for (int k = 0; k < L; k++)
-							if (fitsImageSet[k][i, j] < min)
-								min = fitsImageSet[k][i, j];
-						img[i, j] = min;
-					}
-				});
-
-				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "min.fits"), img, doStats, true);
-			}
-		}
-
-		/// <summary>Create a FITSImage object with primary image that is the pixel-wise standard deviation of the FITSImageSet primary images.</summary>
-		/// <param name="fitsImageSet">The FITSImageSet object.</param>
-		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the FITSImage result - saves time if you don't need those.</param>
-		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null.</param>
-		public static FITSImage Stdv(JPFITS.FITSImageSet fitsImageSet, bool doStats, bool waitbar)
-		{
-			if (fitsImageSet.CoDimensional == false)
-				throw new Exception("Can Not Perform Mean: Data Stack not Co-Dimensional");
-			if (fitsImageSet.Count <= 1)
-				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
-
-			if (waitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Computing Stdv Data Stack Image";
-				object[] arg = new object[] { fitsImageSet, "Stdv" };
-				BGWRKR.RunWorkerAsync(arg);
-				WAITBAR.ShowDialog();
-				if (WAITBAR.DialogResult == DialogResult.OK)
-				{
-					return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "stdv.fits"), (double[,])BGWRKR_RESULT, doStats, true);
-				}
-				else
-					return null;
-			}
-			else
-			{
-				double[,] img = new double[fitsImageSet[0].Width, fitsImageSet[0].Height];
-				int width = img.GetLength(0);
-				int height = img.GetLength(1);
-				int L = fitsImageSet.Count;
-				double N = (double)L;
-
-				Parallel.For(0, width, i =>
-				{
-					for (int j = 0; j < height; j++)
-					{
-						double std = 0;
-						double mean = 0;
-						for (int k = 0; k < L; k++)
-							mean = mean + fitsImageSet[k][i, j];
-						mean = mean / N;
-						for (int q = 0; q < L; q++)
-							std = std + (fitsImageSet[q][i, j] - mean) * (fitsImageSet[q][i, j] - mean);
-						std = Math.Sqrt(std / (N - 1.0));
-						img[i, j] = std;
-					}
-				});
-				return new FITSImage(Path.Combine(fitsImageSet.GetCommonDirectory(), "stdv.fits"), img, doStats, true);
-			}
-		}
-
-        /// <summary>Auto-register non-rotational primary images from the FITSImageSet. Only works when there is no field rotation in the image set, only translational shifts, and the shifts are less than half of the field.</summary>
-        /// <param name="fitsImageSet">The FITSImageSet object.</param>
-        /// <param name="refImgIndex">The index in the FitSet list of the reference image to register all the other images to.</param>
-        /// <param name="interpStyle">&quot;nearest&quot; - nearest-neighbor pixel, or, &quot;bilinear&quot; - for 2x2 interpolation, or, &quot;lanc_n&quot; - for Lanczos interpolation of order n = 3, 4, 5.</param>
-        /// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the registered images - saves time if you don't need those.</param>
-        public static void Register(JPFITS.FITSImageSet fitsImageSet, int refImgIndex, string interpStyle, bool doStats)
-		{
-			WAITBAR = new WaitBar();
-			WAITBAR.ProgressBar.Maximum = 100;
-			WAITBAR.Text = "Auto-Registering Images";
-			object[] arg = new object[] { fitsImageSet, "AutoReg", refImgIndex, doStats, interpStyle };
-			BGWRKR.RunWorkerAsync(arg);
-			WAITBAR.ShowDialog();
-		}
-
-		/// <summary>Scans all primary FITS headers in the FITSImageSet for identical lines and copies such lines to the specified FITSImage destination primary header.
-		/// <br />Usage is that perhaps you form the mean of the FITSImageSet as a new FITSImage, and this new FITSImage should contain all the primary header
-		/// <br /> lines which are identical in the FITSImageSet.
-		/// <br /> The existing primary header of the FITS_destination is cleared before the operation, except for essential keywords.</summary>
-		public static void GatherHeaders(JPFITS.FITSImageSet fitsImageSet, FITSImage FITS_destination)
-		{
-			FITS_destination.Header.RemoveAllKeys(FITS_destination.Image);
-
-			bool skip = false;
-			for (int j = 0; j < fitsImageSet[0].Header.Length; j++)
-			{
-				skip = false;
-				string key = fitsImageSet[0].Header.GetKeyName(j);
-				string val = fitsImageSet[0].Header.GetKeyValue(j);
-				string com = fitsImageSet[0].Header.GetKeyComment(j);
-
-				if (!JPFITS.FITSHeader.ValidKeyEdit(key, false))
-					continue;
-
-				for (int i = 1; i < fitsImageSet.Count; i++)
-					if (fitsImageSet[i].Header.GetKeyIndex(key, val, com) == -1)
-					{
-						skip = true;
-						break;
-					}
-
-				if (!skip)
-					if (fitsImageSet[0].Header[j].IsCommentKey)
-						FITS_destination.Header.AddCommentKeyLine(com, -1);
-					else
-						FITS_destination.Header.AddKey(key, val, com, -1);
-			}
-		}
-
-		/// <summary>Scans all primary FITS headers from the file names for identical lines and copies such lines to the specified FITSImage destination primary header.
-		/// <br />Usage is that perhaps you form the mean of the FITSImageSet as a new FITSImage, and this new FITSImage should contain all the primary header
-		/// <br /> lines which are identical in the file names.
-		/// <br />The existing primary header of the FITSImage is cleared before the operation, except for essential keywords.</summary>
-		public static void GatherHeaders(string[] filenames, JPFITS.FITSImage FITS_destination)
-		{
-			JPFITS.FITSImageSet mergeset = new JPFITS.FITSImageSet();
-			for (int i = 0; i < filenames.Length; i++)
-				mergeset.Add(new JPFITS.FITSImage(filenames[i], null, true, false, false, false));
-
-			JPFITS.FITSImageSet.GatherHeaders(mergeset, FITS_destination);
-		}
+			return first;
+		}       
 
 		/// <summary></summary>
 		/// <param name="sourceFullFileName"></param>
