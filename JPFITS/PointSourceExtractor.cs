@@ -62,6 +62,7 @@ namespace JPFITS
 		private double[]? CENTROIDS_AMPLITUDE;       // sources values (above fcmin)
 		private double[]? CENTROIDS_VOLUME;      // sources energies (above fcmin)
 		private double[]? CENTROIDS_BGESTIMATE;  // corner minimum - estimate of background
+		private double[]? CENTROIDS_SNR;
 
 		private double[]? FITS_X;                    // x fitted positions of sources
 		private double[]? FITS_Y;                    // y fitted positions of sources
@@ -138,23 +139,25 @@ namespace JPFITS
 									Ymax++;
 								}
 
+								double bg_est = ESTIMATELOCALBACKGROUND((Xmin + Xmax) / 2, (Ymin + Ymax) / 2, SOURCE_SEPARATION);
+
 								double[,] kernel = new double[Xmax - Xmin + 1, Ymax - Ymin + 1];
-								double x_centroid = 0, y_centroid = 0, kernel_sum = 0, bg_est = 0;
+								double x_centroid = 0, y_centroid = 0, kernel_sum = 0;
 								for (int i = Xmin; i <= Xmax; i++)
 									for (int j = Ymin; j <= Ymax; j++)
 									{
 										kernel[i - Xmin, j - Ymin] = IMAGE[i, j];
-										x_centroid += (IMAGE[i, j] * (double)(i));
-										y_centroid += (IMAGE[i, j] * (double)(j));
-										kernel_sum += (IMAGE[i, j] - bg_est);
+										x_centroid += (IMAGE[i, j] - bg_est) * i;
+										y_centroid += (IMAGE[i, j] - bg_est) * j;
+										kernel_sum += IMAGE[i, j] - bg_est;
 									}
 								x_centroid /= kernel_sum;
 								y_centroid /= kernel_sum;
 
 								src_index++;
 								N_SATURATED++;
-								XPIXs.Add(x);
-								YPIXs.Add(y);
+								XPIXs.Add((Xmin + Xmax) / 2);
+								YPIXs.Add((Ymin + Ymax) / 2);
 								Xs.Add(x_centroid);
 								Ys.Add(y_centroid);
 								Ks.Add(kernel_sum);
@@ -513,9 +516,9 @@ namespace JPFITS
 		private void GENERATEPSETABLE()
 		{
 			if (!FITTED)
-				PSE_TABLE = new string[9, N_SRC + 1];
+				PSE_TABLE = new string[10, N_SRC + 1];
 			else
-				PSE_TABLE = new string[22 + FITS_PARAMS.GetLength(0), N_SRC + 1];
+				PSE_TABLE = new string[23 + FITS_PARAMS.GetLength(0), N_SRC + 1];
 
 			int c = 0;
 
@@ -524,6 +527,7 @@ namespace JPFITS
 			PSE_TABLE[c++, 0] = "PSE Amplitude";
 			PSE_TABLE[c++, 0] = "PSE Volume";
 			PSE_TABLE[c++, 0] = "PSE Background";
+			PSE_TABLE[c++, 0] = "PSE SNR";
 			PSE_TABLE[c++, 0] = "PSE RA (deg)";
 			PSE_TABLE[c++, 0] = "PSE Dec (deg)";
 			PSE_TABLE[c++, 0] = "PSE RA (sxgsml)";
@@ -557,6 +561,7 @@ namespace JPFITS
 				PSE_TABLE[c++, i + 1] = CENTROIDS_AMPLITUDE[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_VOLUME[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_BGESTIMATE[i].ToString();
+				PSE_TABLE[c++, i + 1] = CENTROIDS_SNR[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_RADEG[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_DECDEG[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_RAHMS[i];
@@ -694,6 +699,7 @@ namespace JPFITS
 			CENTROIDS_AMPLITUDE = new double[N_SRC];
 			CENTROIDS_VOLUME = new double[N_SRC];
 			CENTROIDS_BGESTIMATE = new double[N_SRC];
+			CENTROIDS_SNR = new double[N_SRC];
 			FITS_AMPLITUDE = new double[N_SRC];
 			FITS_VOLUME = new double[N_SRC];
 			FITS_BGESTIMATE = new double[N_SRC];
@@ -816,6 +822,11 @@ namespace JPFITS
 		public double[] Fit_Volumes
 		{
 			get { return FITS_VOLUME; }
+		}
+
+		public double[] Signal_to_Noise_SNR
+		{
+			get { return CENTROIDS_SNR; }
 		}
 
 		public double[] Fit_RA_Deg
@@ -1325,7 +1336,6 @@ namespace JPFITS
 		{
 			for (int i = 0; i < N_SRC; i++)
 			{
-
 				wcs.Get_Coordinate(CENTROIDS_X[i], CENTROIDS_Y[i], true, "TAN", out double a, out double d, out string RAhms, out string DECdamas);
 
 				CENTROIDS_RADEG[i] = a;
@@ -1345,6 +1355,22 @@ namespace JPFITS
 			}
 
 			//WCS_GENERATED = true;
+		}
+
+		/// <summary>
+		/// Generate signal to noise ratios for all sources
+		/// </summary>
+		/// <param name="sigma">The standard deviation of the image-sky background.</param>
+		public void Generate_SNR(double sigma)
+		{
+			double r = KERNEL_RADIUS;
+			if (r == 0)
+				r = 1;
+
+			double bg = r * r * sigma * sigma;
+
+			for (int i = 0; i < N_Sources; i++)
+				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
 		}
 
 		public void ClipToNBrightest(int NBright)
@@ -1433,6 +1459,10 @@ namespace JPFITS
 				CENTROIDS_BGESTIMATE[i] = CENTROIDS_BGESTIMATE[indices[i]];
 				CENTROIDS_BGESTIMATE[indices[i]] = dum;
 
+				dum = CENTROIDS_SNR[i];
+				CENTROIDS_SNR[i] = CENTROIDS_SNR[indices[i]];
+				CENTROIDS_SNR[indices[i]] = dum;
+
 				dum = FITS_AMPLITUDE[i];
 				FITS_AMPLITUDE[i] = FITS_AMPLITUDE[indices[i]];
 				FITS_AMPLITUDE[indices[i]] = dum;
@@ -1479,6 +1509,7 @@ namespace JPFITS
 			Array.Resize(ref FITS_CHISQNORM, NBright);
 			Array.Resize(ref CENTROIDS_RADEG, NBright);
 			Array.Resize(ref CENTROIDS_RAHMS, NBright);
+			Array.Resize(ref CENTROIDS_SNR, NBright);
 			Array.Resize(ref CENTROIDS_DECDEG, NBright);
 			Array.Resize(ref CENTROIDS_DECDMS, NBright);
 			Array.Resize(ref CENTROIDS_AMPLITUDE, NBright);
