@@ -364,6 +364,15 @@ namespace JPFITS
 					CENTROIDS_VOLUME[i] = Convert.ToDouble(Ks[i]);
 					CENTROIDS_BGESTIMATE[i] = Convert.ToDouble(Bs[i]);
 					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
+
+					int xmin = CENTROIDS_PIXEL_X[i] - KERNEL_RADIUS, xmax = CENTROIDS_PIXEL_X[i] + KERNEL_RADIUS, ymin = CENTROIDS_PIXEL_Y[i] - KERNEL_RADIUS, ymax = CENTROIDS_PIXEL_Y[i] + KERNEL_RADIUS;
+					double[] corners = new double[4] { IMAGE[xmin, ymin], IMAGE[xmin, ymax], IMAGE[xmax, ymin], IMAGE[xmax, ymax] };
+					double sigma = JPMath.Stdv(corners, false);
+					double r = KERNEL_RADIUS;
+					if (r == 0)
+						r = 1;
+					double bg = r * r * sigma * sigma;
+					CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
 				}
 				return;
 			}
@@ -478,8 +487,7 @@ namespace JPFITS
 				FITS_AMPLITUDE[k] = P0[0];
 				FITS_X[k] = P0[1];
 				FITS_Y[k] = P0[2];
-				FITS_BGESTIMATE[k] = P0[P0.Length - 1];
-				
+				FITS_BGESTIMATE[k] = P0[P0.Length - 1];				
 				FITS_CHISQNORM[k] = chisq_norm;
 			});
 		}
@@ -1355,23 +1363,7 @@ namespace JPFITS
 			}
 
 			//WCS_GENERATED = true;
-		}
-
-		/// <summary>
-		/// Generate signal to noise ratios for all sources
-		/// </summary>
-		/// <param name="sigma">The standard deviation of the image-sky background.</param>
-		public void Generate_SNR(double sigma)
-		{
-			double r = KERNEL_RADIUS;
-			if (r == 0)
-				r = 1;
-
-			double bg = r * r * sigma * sigma;
-
-			for (int i = 0; i < N_Sources; i++)
-				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
-		}
+		}		
 
 		public void ClipToNBrightest(int NBright)
 		{
