@@ -365,7 +365,7 @@ namespace JPFITS
 					CENTROIDS_BGESTIMATE[i] = Convert.ToDouble(Bs[i]);
 					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 
-					int xmin = CENTROIDS_PIXEL_X[i] - KERNEL_RADIUS, xmax = CENTROIDS_PIXEL_X[i] + KERNEL_RADIUS, ymin = CENTROIDS_PIXEL_Y[i] - KERNEL_RADIUS, ymax = CENTROIDS_PIXEL_Y[i] + KERNEL_RADIUS;
+					int xmin = CENTROIDS_PIXEL_X[i] - SOURCE_SEPARATION, xmax = CENTROIDS_PIXEL_X[i] + SOURCE_SEPARATION, ymin = CENTROIDS_PIXEL_Y[i] - SOURCE_SEPARATION, ymax = CENTROIDS_PIXEL_Y[i] + SOURCE_SEPARATION;
 					double[] corners = new double[4] { IMAGE[xmin, ymin], IMAGE[xmin, ymax], IMAGE[xmax, ymin], IMAGE[xmax, ymax] };
 					double sigma = JPMath.Stdv(corners, false);
 					double r = KERNEL_RADIUS;
