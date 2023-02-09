@@ -1363,7 +1363,23 @@ namespace JPFITS
 			}
 
 			//WCS_GENERATED = true;
-		}		
+		}
+
+		/// <summary>
+		/// Generate signal to noise ratios for all sources
+		/// </summary>
+		/// <param name="sigma">The standard deviation of the image-sky background. Pass -1 and a value will be estimated.</param>
+		public void Generate_SNR(double sigma)
+		{
+			double r = KERNEL_RADIUS;
+			if (r == 0)
+				r = 1;
+
+			double bg = r * r * sigma * sigma;
+
+			for (int i = 0; i < N_Sources; i++)
+				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
+		}
 
 		public void ClipToNBrightest(int NBright)
 		{
