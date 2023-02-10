@@ -382,8 +382,6 @@ namespace JPFITS
 				for (int i = 0; i < N_SRC; i++)
 					CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
 
-				MessageBox.Show(mediansigma + "");
-
 				return;
 			}
 			//returned if after Source Extraction
