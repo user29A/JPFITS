@@ -17,6 +17,7 @@ namespace JPFITS
 		private ArrayList FITSLIST;
 		private bool CODIMENSIONAL;
 		private static WaitBar? WAITBAR;
+		private bool SHOWWAITBAR = false;
 		private static BackgroundWorker? BGWRKR;
 		private static object? BGWRKR_RESULT;
 
@@ -167,16 +168,18 @@ namespace JPFITS
 
 				Parallel.For(0, width, (i, state) =>
 				{
-					if (WAITBAR.DialogResult == DialogResult.Cancel)
+					if (SHOWWAITBAR)
 					{
-						e.Result = null;
-						state.Stop();
-					}
-
-					if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
-					{
-						prog = i * 100 / n0;
-						BGWRKR.ReportProgress(prog);
+						if (WAITBAR.DialogResult == DialogResult.Cancel)
+						{
+							e.Result = null;
+							state.Stop();
+						}
+						if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
+						{
+							prog = i * 100 / n0;
+							BGWRKR.ReportProgress(prog);
+						}
 					}
 
 					for (int j = 0; j < height; j++)
@@ -205,16 +208,18 @@ namespace JPFITS
 
 				Parallel.For(0, width, (i, state) =>
 				{
-					if (WAITBAR.DialogResult == DialogResult.Cancel)
+					if (SHOWWAITBAR)
 					{
-						e.Result = null;
-						state.Stop();
-					}
-
-					if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
-					{
-						prog = i * 100 / n0;
-						BGWRKR.ReportProgress(prog);
+						if (WAITBAR.DialogResult == DialogResult.Cancel)
+						{
+							e.Result = null;
+							state.Stop();
+						}
+						if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
+						{
+							prog = i * 100 / n0;
+							BGWRKR.ReportProgress(prog);
+						}
 					}
 
 					for (int j = 0; j < height; j++)
@@ -243,16 +248,18 @@ namespace JPFITS
 
 				Parallel.For(0, width, (i, state) =>
 				{
-					if (WAITBAR.DialogResult == DialogResult.Cancel)
+					if (SHOWWAITBAR)
 					{
-						e.Result = null;
-						state.Stop();
-					}
-
-					if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
-					{
-						prog = i * 100 / n0;
-						BGWRKR.ReportProgress(prog);
+						if (WAITBAR.DialogResult == DialogResult.Cancel)
+						{
+							e.Result = null;
+							state.Stop();
+						}
+						if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
+						{
+							prog = i * 100 / n0;
+							BGWRKR.ReportProgress(prog);
+						}
 					}
 
 					for (int j = 0; j < height; j++)
@@ -280,16 +287,18 @@ namespace JPFITS
 
 				Parallel.For(0, width, (i, state) =>
 				{
-					if (WAITBAR.DialogResult == DialogResult.Cancel)
+					if (SHOWWAITBAR)
 					{
-						e.Result = null;
-						state.Stop();
-					}
-
-					if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
-					{
-						prog = i * 100 / n0;
-						BGWRKR.ReportProgress(prog);
+						if (WAITBAR.DialogResult == DialogResult.Cancel)
+						{
+							e.Result = null;
+							state.Stop();
+						}
+						if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
+						{
+							prog = i * 100 / n0;
+							BGWRKR.ReportProgress(prog);
+						}
 					}
 
 					for (int j = 0; j < height; j++)
@@ -317,16 +326,18 @@ namespace JPFITS
 
 				Parallel.For(0, width, (i, state) =>
 				{
-					if (WAITBAR.DialogResult == DialogResult.Cancel)
+					if (SHOWWAITBAR)
 					{
-						e.Result = null;
-						state.Stop();
-					}
-
-					if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
-					{
-						prog = i * 100 / n0;
-						BGWRKR.ReportProgress(prog);
+						if (WAITBAR.DialogResult == DialogResult.Cancel)
+						{
+							e.Result = null;
+							state.Stop();
+						}
+						if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
+						{
+							prog = i * 100 / n0;
+							BGWRKR.ReportProgress(prog);
+						}
 					}
 
 					for (int j = 0; j < height; j++)
@@ -355,16 +366,18 @@ namespace JPFITS
 
 				Parallel.For(0, width, (i, state) =>
 				{
-					if (WAITBAR.DialogResult == DialogResult.Cancel)
+					if (SHOWWAITBAR)
 					{
-						e.Result = null;
-						state.Stop();
-					}
-
-					if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
-					{
-						prog = i * 100 / n0;
-						BGWRKR.ReportProgress(prog);
+						if (WAITBAR.DialogResult == DialogResult.Cancel)
+						{
+							e.Result = null;
+							state.Stop();
+						}
+						if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
+						{
+							prog = i * 100 / n0;
+							BGWRKR.ReportProgress(prog);
+						}
 					}
 
 					for (int j = 0; j < height; j++)
@@ -392,16 +405,18 @@ namespace JPFITS
 
 				Parallel.For(0, width, (i, state) =>
 				{
-					if (WAITBAR.DialogResult == DialogResult.Cancel)
+					if (SHOWWAITBAR)
 					{
-						e.Result = null;
-						state.Stop();
-					}
-
-					if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
-					{
-						prog = i * 100 / n0;
-						BGWRKR.ReportProgress(prog);
+						if (WAITBAR.DialogResult == DialogResult.Cancel)
+						{
+							e.Result = null;
+							state.Stop();
+						}
+						if (i < n0 && i * 100 / n0 > prog)//keep the update of progress bar to only one thread of the team...avoids locks
+						{
+							prog = i * 100 / n0;
+							BGWRKR.ReportProgress(prog);
+						}
 					}
 
 					for (int j = 0; j < height; j++)
@@ -449,7 +464,7 @@ namespace JPFITS
 				{
 					BGWRKR.ReportProgress(c * 100 / (this.Count - 1));
 
-					if (WAITBAR.DialogResult == DialogResult.Cancel)
+					if (SHOWWAITBAR && WAITBAR.DialogResult == DialogResult.Cancel)
 						continue;
 					if (c == RefImgIndex)
 						continue;//don't register to ones' self
@@ -471,12 +486,13 @@ namespace JPFITS
 
 				Parallel.For(0, this[0].Width, opts, (x, state) =>
 				{
-					if (WAITBAR.DialogResult == DialogResult.Cancel)
-						state.Stop();
-
-					if (x < this[0].Width / opts.MaxDegreeOfParallelism)
+					if (SHOWWAITBAR)
 					{
-						BGWRKR.ReportProgress(x * 100 / (this[0].Width / opts.MaxDegreeOfParallelism), " Complete");
+						if (WAITBAR.DialogResult == DialogResult.Cancel)
+							state.Stop();
+
+						if (x < this[0].Width / opts.MaxDegreeOfParallelism)
+							BGWRKR.ReportProgress(x * 100 / (this[0].Width / opts.MaxDegreeOfParallelism), " Complete");
 					}
 
 					double[] pixstack = new double[this.Count];
@@ -691,6 +707,7 @@ namespace JPFITS
 		/// <param name="waitbarMessage">Message to display on Waitbar progress.</param>
 		public bool Load(string[] fullFileNames, int[]? range, bool doStats, bool diskParallel, string waitbarMessage)
 		{
+			SHOWWAITBAR = true;
 			WAITBAR = new WaitBar();
 			WAITBAR.ProgressBar.Maximum = fullFileNames.Length;
 			WAITBAR.Text = "Loading Image Set: " + fullFileNames.Length + " files...";
@@ -744,6 +761,7 @@ namespace JPFITS
 		/// <returns></returns>
 		public bool LoadExtensions(string fullFileName, int[] extensionIndexes, int[]? range, bool doStats, string waitbarMessage)
 		{
+			SHOWWAITBAR = true;
 			WAITBAR = new WaitBar();
 			WAITBAR.ProgressBar.Maximum = extensionIndexes.Length;
 			WAITBAR.Text = "Loading Image Set from extensions: " + extensionIndexes.Length + " files...";
@@ -781,7 +799,8 @@ namespace JPFITS
 		/// <param name="doParallel">Write the images with parallelism. In the past with platter drives this would have been impossible, but fast solid state drives can handle it. If there's only a few images then don't bother, but useful when writing hundreds.</param>
 		/// <param name="waitbarMessage">Message to display on Waitbar progress if it is shown.</param>
 		public bool Write(TypeCode precision, bool doParallel, string waitbarMessage)
-		{			
+		{
+			SHOWWAITBAR = true;
 			WAITBAR = new WaitBar();
 			WAITBAR.ProgressBar.Maximum = FITSLIST.Count;
 			WAITBAR.Text = "Saving Image Set: " + FITSLIST.Count + " files...";
@@ -1165,9 +1184,11 @@ namespace JPFITS
 				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
 
 			object[] arg = new object[] { "Mean" };
+			SHOWWAITBAR = false;
 
 			if (waitbar)
 			{
+				SHOWWAITBAR = true;
 				WAITBAR = new WaitBar();
 				WAITBAR.ProgressBar.Maximum = 100;
 				WAITBAR.Text = "Computing Mean Data Stack Image";
@@ -1197,9 +1218,11 @@ namespace JPFITS
 				throw new Exception("Can Not Perform SCMean: Data Stack Contains One or Fewer Images");
 
 			object[] arg = new object[] { "SCM", sigma };
+			SHOWWAITBAR = false;
 
 			if (waitbar)
 			{
+				SHOWWAITBAR = true;
 				WAITBAR = new WaitBar();
 				WAITBAR.ProgressBar.Maximum = 100;
 				WAITBAR.Text = "Computing Sigma Clipped Mean Data Stack Image";
@@ -1229,9 +1252,11 @@ namespace JPFITS
 				throw new Exception("Can Not Perform Median: Data Stack Contains One or Fewer Images");
 
 			object[] arg = new object[] { "Median", waitbarMessage };
+			SHOWWAITBAR = false;
 
 			if (waitbar)
 			{
+				SHOWWAITBAR = true;
 				WAITBAR = new WaitBar();
 				WAITBAR.ProgressBar.Maximum = 100;
 				WAITBAR.Text = "Computing Median Data Stack Image";
@@ -1260,9 +1285,11 @@ namespace JPFITS
 				throw new Exception("Can Not Perform Sum: Data Stack Contains One or Fewer Images");
 
 			object[] arg = new object[] { "Sum" };
+			SHOWWAITBAR = false;
 
 			if (waitbar)
 			{
+				SHOWWAITBAR = true;
 				WAITBAR = new WaitBar();
 				WAITBAR.ProgressBar.Maximum = 100;
 				WAITBAR.Text = "Computing Summed Data Stack Image";
@@ -1291,9 +1318,11 @@ namespace JPFITS
 				throw new Exception("Can Not Perform Quadrature: Data Stack Contains One or Fewer Images");
 
 			object[] arg = new object[] { "Quadrature" };
+			SHOWWAITBAR = false;
 
 			if (waitbar)
 			{
+				SHOWWAITBAR = true;
 				WAITBAR = new WaitBar();
 				WAITBAR.ProgressBar.Maximum = 100;
 				WAITBAR.Text = "Computing Quadrature Summed Data Stack Image";
@@ -1322,9 +1351,11 @@ namespace JPFITS
 				throw new Exception("Can Not Perform Max: Data Stack Contains One or Fewer Images");
 
 			object[] arg = new object[] { "Max" };
+			SHOWWAITBAR = false;
 
 			if (waitbar)
 			{
+				SHOWWAITBAR = true;
 				WAITBAR = new WaitBar();
 				WAITBAR.ProgressBar.Maximum = 100;
 				WAITBAR.Text = "Computing Max Data Stack Image";
@@ -1353,9 +1384,11 @@ namespace JPFITS
 				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
 
 			object[] arg = new object[] { "Min" };
+			SHOWWAITBAR = false;
 
 			if (waitbar)
 			{
+				SHOWWAITBAR = true;
 				WAITBAR = new WaitBar();
 				WAITBAR.ProgressBar.Maximum = 100;
 				WAITBAR.Text = "Computing Min Data Stack Image";
@@ -1384,9 +1417,11 @@ namespace JPFITS
 				throw new Exception("Can Not Perform Mean: Data Stack Contains One or Fewer Images");
 
 			object[] arg = new object[] { "Stdv" };
+			SHOWWAITBAR = false;
 
 			if (waitbar)
 			{
+				SHOWWAITBAR = true;
 				WAITBAR = new WaitBar();
 				WAITBAR.ProgressBar.Maximum = 100;
 				WAITBAR.Text = "Computing Stdv Data Stack Image";
@@ -1412,9 +1447,11 @@ namespace JPFITS
 		public void Register(int refImgIndex, string interpStyle, bool doStats, bool waitbar)
 		{
 			object[] arg = new object[] { "AutoReg", refImgIndex, doStats, interpStyle };
+			SHOWWAITBAR = false;
 
 			if (waitbar)
 			{
+				SHOWWAITBAR = true;
 				WAITBAR = new WaitBar();
 				WAITBAR.ProgressBar.Maximum = 100;
 				WAITBAR.Text = "Auto-Registering Images";
