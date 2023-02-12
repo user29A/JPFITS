@@ -446,7 +446,7 @@ namespace JPFITS
 				return;
 
 			BGWRKR.ReportProgress(0, "Solving for " + c + " point pair matches out of a possible " + N_SOLVE_PTS);
-			WCS.Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
+			WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
 			BGWRKR.ReportProgress(0, "Solution:" + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "CRPIX1 = " + WCS.GetCRPIXn(1));
 			BGWRKR.ReportProgress(0, "CRPIX2 = " + WCS.GetCRPIXn(2));
@@ -556,7 +556,7 @@ namespace JPFITS
 				return;
 
 			WorldCoordinateSolution.ClearWCS(FITS_IMG.Header);
-			WCS.Solve_WCS("TAN", cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
+			WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
 			BGWRKR.ReportProgress(0, Environment.NewLine + nmatches + " sources of " + N_REFINE_PTS + " were able to be used for WCS refinement.");
 			BGWRKR.ReportProgress(0, Environment.NewLine + "Refined solution:" + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "CRPIX1 = " + WCS.GetCRPIXn(1));

@@ -742,7 +742,7 @@ namespace JPFITS
 			EllipticalMoffat
 		}
 
-		public static void Fit_PointSource(PointSourceModel model_name, FitMinimizationType minimization_type, int[]? xdata, int[]? ydata, double[,] source, ref double[] param, double[]? params_LB, double[]? params_UB, out double[] p_err, out double[,] fit_residuals, out double chi_sq_norm, out string termination_msg)
+		public static void Fit_PointSource(PointSourceModel model_name, FitMinimizationType minimization_type, int[]? xdata, int[]? ydata, double[,] source, ref double[]? params_INIT, double[]? params_LB, double[]? params_UB, out double[] p_err, out double[,] fit_residuals, out double chi_sq_norm, out string termination_msg)
 		{
 			if (IsEven(source.GetLength(0)) || IsEven(source.GetLength(1)))
 				throw new Exception("double[,] source must be odd-size");
@@ -786,48 +786,52 @@ namespace JPFITS
 
 			if (model_name == PointSourceModel.CircularGaussian || model_name == PointSourceModel.EllipticalGaussian)
 			{
-				if (param.Length == 5)//G(x,y|p) = p(0) * exp(-((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2)) + p(4)
+				if (model_name == PointSourceModel.CircularGaussian)//G(x,y|p) = p(0) * exp(-((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2)) + p(4)
 				{
-					if (model_name == PointSourceModel.EllipticalGaussian)
-						throw new Exception("Wrong number of parameters (5) for Elliptical Gaussian model_name.");
+					if (params_INIT == null)
+						params_INIT = new double[5];
+					if (params_INIT.Length != 5)
+						throw new Exception(string.Format("Wrong number of parameters in param ({0}) for Circular Gaussian model_name.", params_INIT.Length));
 
 					scale = new double[5] { amp, x0, y0, 2, bias };
 					if (params_LB == null)
 						params_LB = new double[5] { amp / 2, XDATA[0], YDATA[0], 0.2, min - amp / 3 };
 					if (params_UB == null)
 						params_UB = new double[5] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], 10, min + amp / 3 };
-					if (param[0] == 0 && param[1] == 0 && param[2] == 0 && param[3] == 0 && param[4] == 0)
+					if (params_INIT[0] == 0 && params_INIT[1] == 0 && params_INIT[2] == 0 && params_INIT[3] == 0 && params_INIT[4] == 0)
 					{
-						param[0] = amp;
-						param[1] = x0;
-						param[2] = y0;
-						param[3] = 2;
-						param[4] = bias;
+						params_INIT[0] = amp;
+						params_INIT[1] = x0;
+						params_INIT[2] = y0;
+						params_INIT[3] = 2;
+						params_INIT[4] = bias;
 					}
 				}
-				else if (param.Length == 7)//G(x,y|p) = p(0) * exp(-((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)
+				else if (model_name == PointSourceModel.EllipticalGaussian)//G(x,y|p) = p(0) * exp(-((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)
 				{
-					if (model_name == PointSourceModel.CircularGaussian)
-						throw new Exception("Wrong number of parameters (7) for Circular Gaussian model_name.");
+					if (params_INIT == null)
+						params_INIT = new double[7];
+					if (params_INIT.Length != 7)
+						throw new Exception(string.Format("Wrong number of parameters in param ({0}) for Elliptical Gaussian model_name.", params_INIT.Length));
 
 					scale = new double[7] { amp, x0, y0, 1, 2, 2, bias };
 					if (params_LB == null)
 						params_LB = new double[7] { amp / 2, XDATA[0], YDATA[0], -Math.PI, 0.2, 0.2, min - amp / 3 };
 					if (params_UB == null)
 						params_UB = new double[7] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], Math.PI, 10, 10, min + amp / 3 };
-					if (param[0] == 0 && param[1] == 0 && param[2] == 0 && param[3] == 0 && param[4] == 0 && param[5] == 0 && param[6] == 0)
+					if (params_INIT[0] == 0 && params_INIT[1] == 0 && params_INIT[2] == 0 && params_INIT[3] == 0 && params_INIT[4] == 0 && params_INIT[5] == 0 && params_INIT[6] == 0)
 					{
-						param[0] = amp;
-						param[1] = x0;
-						param[2] = y0;
-						param[3] = 0;
-						param[4] = 2;
-						param[5] = 2;
-						param[6] = bias;
+						params_INIT[0] = amp;
+						params_INIT[1] = x0;
+						params_INIT[2] = y0;
+						params_INIT[3] = 0;
+						params_INIT[4] = 2;
+						params_INIT[5] = 2;
+						params_INIT[6] = bias;
 					}
 				}
 				else
-					throw new Exception("Parameter length does not correspond to either circular (5 params) or elliptical (7 params) Gaussian; params length = " + param.Length);
+					throw new Exception();
 
 				if (minimization_type == FitMinimizationType.LeastSquares)
 					grad = new alglib.ndimensional_grad(alglib_Gauss_2d_LM_LS_grad);
@@ -842,50 +846,54 @@ namespace JPFITS
 			}
 			else if (model_name == PointSourceModel.CircularMoffat || model_name == PointSourceModel.EllipticalMoffat)
 			{
-				if (param.Length == 6)//M(x,y|p) = p(0) * ( 1 + { (x - p(1))^2 + (y - p(2))^2 } / p(3)^2 )^(-p(4)) + p(5)
+				if (model_name == PointSourceModel.CircularMoffat)//M(x,y|p) = p(0) * ( 1 + { (x - p(1))^2 + (y - p(2))^2 } / p(3)^2 )^(-p(4)) + p(5)
 				{
-					if (model_name == PointSourceModel.EllipticalMoffat)
-						throw new Exception("Wrong number of parameters (6) for Elliptical Moffat model_name.");
+					if (params_INIT == null)
+						params_INIT = new double[6];
+					if (params_INIT.Length != 6)
+						throw new Exception(string.Format("Wrong number of parameters in param ({0}) for Circular Moffat model_name.", params_INIT.Length));
 
 					scale = new double[6] { amp, x0, y0, 2, 2, bias };
 					if (params_LB == null)
 						params_LB = new double[6] { amp / 2, XDATA[0], YDATA[0], 0.2, 1.000001, min - amp / 3 };
 					if (params_UB == null || params_UB.Length == 0)
 						params_UB = new double[6] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], 10, 10, min + amp / 3 };
-					if (param[0] == 0 && param[1] == 0 && param[2] == 0 && param[3] == 0 && param[4] == 0 && param[5] == 0)
+					if (params_INIT[0] == 0 && params_INIT[1] == 0 && params_INIT[2] == 0 && params_INIT[3] == 0 && params_INIT[4] == 0 && params_INIT[5] == 0)
 					{
-						param[0] = amp;
-						param[1] = x0;
-						param[2] = y0;
-						param[3] = 2;
-						param[4] = 2;
-						param[5] = bias;
+						params_INIT[0] = amp;
+						params_INIT[1] = x0;
+						params_INIT[2] = y0;
+						params_INIT[3] = 2;
+						params_INIT[4] = 2;
+						params_INIT[5] = bias;
 					}
 				}
-				else if (param.Length == 8)//M(x,y|p) = p(0) * ( 1 + { ((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3)))^2 } / p(5)^2 )^(-p(6)) + p(7)
+				else if (model_name == PointSourceModel.EllipticalMoffat)//M(x,y|p) = p(0) * ( 1 + { ((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3)))^2 } / p(5)^2 )^(-p(6)) + p(7)
 				{
-					if (model_name == PointSourceModel.CircularMoffat)
-						throw new Exception("Wrong number of parameters (8) for Circular Moffat model_name.");
+					if (params_INIT == null)
+						params_INIT = new double[8];
+					if (params_INIT.Length != 8)
+						throw new Exception(string.Format("Wrong number of parameters in param ({0}) for Elliptical Moffat model_name.", params_INIT.Length));
 
 					scale = new double[8] { amp, x0, y0, 1, 2, 2, 2, bias };
 					if (params_LB == null)
 						params_LB = new double[8] { amp / 2, XDATA[0], YDATA[0], -Math.PI, 0.2, 0.2, 1.000001, min - amp / 3 };
 					if (params_UB == null)
 						params_UB = new double[8] { 2 * amp, XDATA[XDATA.Length - 1], YDATA[YDATA.Length - 1], Math.PI, 10, 10, 10, min + amp / 3 };
-					if (param[0] == 0 && param[1] == 0 && param[2] == 0 && param[3] == 0 && param[4] == 0 && param[5] == 0 && param[6] == 0 && param[7] == 0)
+					if (params_INIT[0] == 0 && params_INIT[1] == 0 && params_INIT[2] == 0 && params_INIT[3] == 0 && params_INIT[4] == 0 && params_INIT[5] == 0 && params_INIT[6] == 0 && params_INIT[7] == 0)
 					{
-						param[0] = amp;
-						param[1] = x0;
-						param[2] = y0;
-						param[3] = 0;
-						param[4] = 2;
-						param[5] = 2;
-						param[6] = 2;
-						param[7] = bias;
+						params_INIT[0] = amp;
+						params_INIT[1] = x0;
+						params_INIT[2] = y0;
+						params_INIT[3] = 0;
+						params_INIT[4] = 2;
+						params_INIT[5] = 2;
+						params_INIT[6] = 2;
+						params_INIT[7] = bias;
 					}
 				}
 				else
-					throw new Exception("Parameter length does not correspond to either circular (6 params) or elliptical (8 params) Moffat; params length = " + param.Length);
+					throw new Exception();
 
 				if (minimization_type == FitMinimizationType.LeastSquares)
 					grad = new alglib.ndimensional_grad(alglib_Moffat_2d_LM_LS_grad);
@@ -910,12 +918,12 @@ namespace JPFITS
 			arrays[1] = XDATA;
 			arrays[2] = YDATA;
 
-			alglib.minbccreate(param, out alglib.minbcstate bcstate);
+			alglib.minbccreate(params_INIT, out alglib.minbcstate bcstate);
 			alglib.minbcsetcond(bcstate, epsg, epsf, epsx, maxits);
 			alglib.minbcsetbc(bcstate, params_LB, params_UB);
 			alglib.minbcsetscale(bcstate, scale);
 			alglib.minbcoptimize(bcstate, grad, null, arrays);
-			alglib.minbcresults(bcstate, out param, out alglib.minbcreport report);
+			alglib.minbcresults(bcstate, out params_INIT, out alglib.minbcreport report);
 
 			switch (report.terminationtype)
 			{
@@ -968,15 +976,15 @@ namespace JPFITS
 			}
 
 			if (model_name == PointSourceModel.EllipticalGaussian || model_name == PointSourceModel.CircularGaussian)
-				p_err = Gauss_2D_param_err(param, XDATA, YDATA, source);
+				p_err = Gauss_2D_param_err(params_INIT, XDATA, YDATA, source);
 			else
-				p_err = Moffat_2D_param_err(param, XDATA, YDATA, source);
+				p_err = Moffat_2D_param_err(params_INIT, XDATA, YDATA, source);
 
 			double[,] model;
 			if (model_name == PointSourceModel.EllipticalGaussian || model_name == PointSourceModel.CircularGaussian)
-				model = Gaussian2d(xdata, ydata, param, false);
+				model = Gaussian2d(xdata, ydata, params_INIT, false);
 			else
-				model = Moffat2d(xdata, ydata, param, false);
+				model = Moffat2d(xdata, ydata, params_INIT, false);
 
 			fit_residuals = new double[XDATA.Length, YDATA.Length];
 			for (int i = 0; i < XDATA.Length; i++)
@@ -987,12 +995,12 @@ namespace JPFITS
 			for (int i = 0; i < source.GetLength(0); i++)
 				for (int j = 0; j < source.GetLength(1); j++)
 				{
-					if (source[i, j] - param[param.Length - 1] == 0)
+					if (source[i, j] - params_INIT[params_INIT.Length - 1] == 0)
 						chi_sq_norm += fit_residuals[i, j] * fit_residuals[i, j];
 					else
-						chi_sq_norm += fit_residuals[i, j] * fit_residuals[i, j] / Math.Abs(source[i, j] - param[param.Length - 1]);
+						chi_sq_norm += fit_residuals[i, j] * fit_residuals[i, j] / Math.Abs(source[i, j] - params_INIT[params_INIT.Length - 1]);
 				}
-			chi_sq_norm /= (source.Length - param.Length);
+			chi_sq_norm /= (source.Length - params_INIT.Length);
 		}
 
 		public enum PointSourceCompoundModel
@@ -2222,7 +2230,7 @@ namespace JPFITS
 		/// <param name="ydata">The y-values of the data to interpolate.</param>
 		/// <param name="xinterp">The x-positions at which to interpolate y-values.</param>
 		/// <param name="style">The type of interpolation to compute.</param>
-		public static double[] Interpolate1d(double[] xdata, double[] ydata, double[] xinterp, InterpolationType style, bool do_parallel)
+		public static double[] Interpolate1d(double[] xdata, double[] ydata, double[] xinterp, InterpolationType style, bool do_parallel = false)
 		{
 			double[] result = new double[xinterp.Length];
 
@@ -2266,7 +2274,7 @@ namespace JPFITS
 		/// <param name="yinterpdelta_inv">The inverse of the interpolation delta.  That is, &quot;10&quot; means the grid will interpolated at 1/10th grid scale.</param>
 		/// <param name="xinterp">The returned interpolated xdata vector. Pass nullptr if not required. If required, must be initialized as an xdata->Length*xinterpdelta_inv length vector.</param>
 		/// <param name="yinterp">The returned interpolated ydata vector. Pass nullptr if not required. If required, must be initialized as an ydata->Length*yinterpdelta_inv length vector.</param>
-		public static double[,] Interpolate2d(double[] xdata, double[] ydata, double[,] surfdata, int xinterpdelta_inv, int yinterpdelta_inv, out double[] xinterp, out double[] yinterp, bool do_parallel)
+		public static double[,] Interpolate2d(double[] xdata, double[] ydata, double[,] surfdata, int xinterpdelta_inv, int yinterpdelta_inv, out double[] xinterp, out double[] yinterp, bool do_parallel = false)
 		{
 			int xw = surfdata.GetLength(0);
 			int yh = surfdata.GetLength(1);
@@ -4758,7 +4766,7 @@ namespace JPFITS
 		/// <param name="xcoords">The horizontal indexes of the values to be replaced.</param>
 		/// /// <param name="ycoords">The vertical indexes of the values to be replaced.</param>
 		/// <param name="val">The value with which to replace at the given indices.</param>
-		public static double[,] Replace(double[,] data, int[] xcoords, int[] ycoords, double val, bool do_parallel)
+		public static double[,] Replace(double[,] data, int[] xcoords, int[] ycoords, double val, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			Array.Copy(data, result, data.Length);
@@ -4793,7 +4801,7 @@ namespace JPFITS
 
 		#region ARRAY OPERATORS
 		
-		public static double[] VectorDivScalar(double[] vector, double scalar, bool do_parallel)
+		public static double[] VectorDivScalar(double[] vector, double scalar, bool do_parallel = false)
 		{
 			double[] result = new double[vector.Length];
 			ParallelOptions opts = new ParallelOptions();
@@ -4811,7 +4819,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[] VectorDivVector(double[] vector1, double[] vector2, bool do_parallel)
+		public static double[] VectorDivVector(double[] vector1, double[] vector2, bool do_parallel = false)
 		{
 			double[] result = new double[vector1.Length];
 			ParallelOptions opts = new ParallelOptions();
@@ -4828,7 +4836,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] MatrixDivScalar(double[,] matrix, double scalar, bool do_parallel)
+		public static double[,] MatrixDivScalar(double[,] matrix, double scalar, bool do_parallel = false)
 		{
 			double[,] result = new double[matrix.GetLength(0), matrix.GetLength(1)];
 			scalar = 1 / scalar;
@@ -4848,7 +4856,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] MatrixDivMatrix(double[,] matrix1, double[,] matrix2, bool do_parallel)
+		public static double[,] MatrixDivMatrix(double[,] matrix1, double[,] matrix2, bool do_parallel = false)
 		{
 			double[,] result = new double[matrix1.GetLength(0), matrix1.GetLength(1)];
 
@@ -4867,7 +4875,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[] VectorMultScalar(double[] vector, double scalar, bool do_parallel)
+		public static double[] VectorMultScalar(double[] vector, double scalar, bool do_parallel = false)
 		{
 			double[] result = new double[vector.Length];
 
@@ -4885,7 +4893,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[] VectorMultVector(double[] vector1, double[] vector2, bool do_parallel)
+		public static double[] VectorMultVector(double[] vector1, double[] vector2, bool do_parallel = false)
 		{
 			double[] result = new double[vector1.Length];
 
@@ -4903,7 +4911,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] MatrixMultScalar(double[,] matrix, double scalar, bool do_parallel)
+		public static double[,] MatrixMultScalar(double[,] matrix, double scalar, bool do_parallel = false)
 		{
 			double[,] result = new double[matrix.GetLength(0), matrix.GetLength(1)];
 
@@ -4922,7 +4930,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] MatrixMultMatrix(double[,] matrix1, double[,] matrix2, bool do_parallel)
+		public static double[,] MatrixMultMatrix(double[,] matrix1, double[,] matrix2, bool do_parallel = false)
 		{
 			double[,] result = new double[matrix1.GetLength(0), matrix1.GetLength(1)];
 
@@ -4941,7 +4949,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[] VectorAddScalar(double[] vector, double scalar, bool do_parallel)
+		public static double[] VectorAddScalar(double[] vector, double scalar, bool do_parallel = false)
 		{
 			double[] result = new double[vector.Length];
 
@@ -4959,7 +4967,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[] VectorAddVector(double[] vector1, double[] vector2, bool do_parallel)
+		public static double[] VectorAddVector(double[] vector1, double[] vector2, bool do_parallel = false)
 		{
 			double[] result = new double[vector1.Length];
 
@@ -4977,7 +4985,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] MatrixAddScalar(double[,] matrix, double scalar, bool do_parallel)
+		public static double[,] MatrixAddScalar(double[,] matrix, double scalar, bool do_parallel = false)
 		{
 			double[,] result = new double[matrix.GetLength(0), matrix.GetLength(1)];
 
@@ -4996,7 +5004,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] MatrixAddMatrix(double[,] matrix1, double[,] matrix2, bool do_parallel)
+		public static double[,] MatrixAddMatrix(double[,] matrix1, double[,] matrix2, bool do_parallel = false)
 		{
 			double[,] result = new double[matrix1.GetLength(0), matrix1.GetLength(1)];
 
@@ -5015,7 +5023,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[] VectorSubScalar(double[] vector, double scalar, bool do_parallel)
+		public static double[] VectorSubScalar(double[] vector, double scalar, bool do_parallel = false)
 		{
 			double[] result = new double[vector.Length];
 
@@ -5033,7 +5041,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[] VectorSubVector(double[] vector1, double[] vector2, bool do_parallel)
+		public static double[] VectorSubVector(double[] vector1, double[] vector2, bool do_parallel = false)
 		{
 			double[] result = new double[vector1.Length];
 
@@ -5051,7 +5059,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] MatrixSubScalar(double[,] matrix, double scalar, bool do_parallel)
+		public static double[,] MatrixSubScalar(double[,] matrix, double scalar, bool do_parallel = false)
 		{
 			double[,] result = new double[matrix.GetLength(0), matrix.GetLength(1)];
 
@@ -5070,7 +5078,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] MatrixSubMatrix(double[,] matrix1, double[,] matrix2, bool do_parallel)
+		public static double[,] MatrixSubMatrix(double[,] matrix1, double[,] matrix2, bool do_parallel = false)
 		{
 			double[,] result = new double[matrix1.GetLength(0), matrix1.GetLength(1)];
 
@@ -5174,7 +5182,7 @@ namespace JPFITS
 		/// <param name="xshift">The sub-integer x-shift of the comparison with respect to the reference, passed by reference.</param>
 		/// <param name="yshift">The sub-integer y-shift of the comparison with respect to the reference, passed by reference.</param>
 		/// <param name="do_parallel">Optionally perform all array operations in parallel. False when parallelizing upstream.</param>
-		public static void XCorrImageLagShifts(double[,] reference, double[,] COMPARISON, bool autoDeBias_refX, bool autoDeBias_refY, bool autoDeBias_COMX, bool autoDeBias_COMY, bool autoHanning_ref, bool autoHanning_COM, out double xshift, out double yshift, bool do_parallel)
+		public static void XCorrImageLagShifts(double[,] reference, double[,] COMPARISON, bool autoDeBias_refX, bool autoDeBias_refY, bool autoDeBias_COMX, bool autoDeBias_COMY, bool autoHanning_ref, bool autoHanning_COM, out double xshift, out double yshift, bool do_parallel = false)
 		{
 			double[,] refref = new double[reference.GetLength(0), reference.GetLength(1)];
 			double[,] COMCOM = new double[COMPARISON.GetLength(0), COMPARISON.GetLength(1)];
@@ -5231,7 +5239,7 @@ namespace JPFITS
 		/// <param name="xshift">The x-shift of the comparison with respect to the reference.</param>
 		/// <param name="yshift">The y-shift of the comparison with respect to the reference.</param>
 		/// <param name="do_parallel">Optionally perform all array operations in parallel.</param>
-		public static void XCorrImageLagShifts(double[] referenceX, double[] referenceY, double[,] COMPARISON, bool autoDeBias_COMX, bool autoDeBias_COMY, bool autoHanning_COM, out double xshift, out double yshift, bool do_parallel)
+		public static void XCorrImageLagShifts(double[] referenceX, double[] referenceY, double[,] COMPARISON, bool autoDeBias_COMX, bool autoDeBias_COMY, bool autoHanning_COM, out double xshift, out double yshift, bool do_parallel = false)
 		{
 			double[,] COMCOM = new double[COMPARISON.GetLength(0), COMPARISON.GetLength(1)];
 			Array.Copy(COMPARISON, COMCOM, COMCOM.LongLength);
@@ -5276,7 +5284,7 @@ namespace JPFITS
 		/// <summary>Returns the 2-D array with gradients removed from a specified dimension.</summary>
 		/// <param name="data">The data array to degradient.</param>
 		/// <param name="dim">The dimension to degradient: 0 = x, 1 = y.</param>
-		public static double[,] DeGradient(double[,] data, int dim, bool do_parallel)
+		public static double[,] DeGradient(double[,] data, int dim, bool do_parallel = false)
 		{
 			int width = data.GetLength(0);
 			int height = data.GetLength(1);
@@ -5324,7 +5332,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] MedianFilter(double[,] data, int kernelHalfWidth, bool do_parallel)
+		public static double[,] MedianFilter(double[,] data, int kernelHalfWidth, bool do_parallel = false)
 		{
 			int szx = data.GetLength(0);
 			int szy = data.GetLength(1);
@@ -5362,7 +5370,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] ShiftArrayInt(double[,] data, int xshift, int yshift, bool do_parallel)
+		public static double[,] ShiftArrayInt(double[,] data, int xshift, int yshift, bool do_parallel = false)
 		{
 			int width = data.GetLength(0);
 			int height = data.GetLength(1);
@@ -5508,7 +5516,7 @@ namespace JPFITS
 		/// <param name="xshift">The amount to shift the image on the x-axis.</param>
 		/// <param name="yshift">The amount to shift the image on the y-axis.</param>
 		/// <param name="do_parallel">Perform operation with parallelism.</param>
-		public static double[,] RotateShiftArray(double[,] data, double radians, double x_center, double y_center, string interp_style, double xshift, double yshift, bool do_parallel)
+		public static double[,] RotateShiftArray(double[,] data, double radians, double x_center, double y_center, string interp_style, double xshift, double yshift, bool do_parallel = false)
 		{
 			int width = data.GetLength(0);
 			int height = data.GetLength(1);
@@ -5595,7 +5603,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the dot-product of two equal-length vectors.</summary>
-		public static double VectorDotProdVector(double[] vector1, double[] vector2, bool do_parallel)
+		public static double VectorDotProdVector(double[] vector1, double[] vector2, bool do_parallel = false)
 		{
 			double[] result = new double[vector1.Length];
 			ParallelOptions opts = new ParallelOptions();
@@ -5619,7 +5627,7 @@ namespace JPFITS
 		/// <param name="reference">The reference data array against which to create the cross correlation.</param>
 		/// <param name="relative">The comparison data array with which to create the cross correlation.</param>
 		/// <param name="lags">An array passed (arrays pass by reference) to populate the cross correlation lags.</param>
-		public static double[] XCorr(double[] reference, double[] relative, out double[] lags, bool do_parallel)
+		public static double[] XCorr(double[] reference, double[] relative, out double[] lags, bool do_parallel = false)
 		{
 			if (reference.Length != relative.Length)
 				throw new Exception("Error in JPMath.XCorr, \"reference\" and \"relative\" must be equal length.");
@@ -5712,7 +5720,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] Bin(double[,] data, int Nx, int Ny, bool do_parallel)//remainders are dropped
+		public static double[,] Bin(double[,] data, int Nx, int Ny, bool do_parallel = false)//remainders are dropped
 		{
 			if (Nx > data.GetLength(0))
 				Nx = data.GetLength(0);
@@ -5746,7 +5754,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static uint[,] Bin(uint[,] data, int Nx, int Ny, bool do_parallel)//remainders are dropped
+		public static uint[,] Bin(uint[,] data, int Nx, int Ny, bool do_parallel = false)//remainders are dropped
 		{
 			if (Nx > data.GetLength(0))
 				Nx = data.GetLength(0);
@@ -5779,7 +5787,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] Pad(double[,] data, int[] padding, bool do_parallel)
+		public static double[,] Pad(double[,] data, int[] padding, bool do_parallel = false)
 		{
 			int width = data.GetLength(0), height = data.GetLength(1);
 			double[,] result = new double[width + padding[0] + padding[1], height + padding[2] + padding[3]];
@@ -5799,7 +5807,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] Crop(double[,] data, int[] cropping, bool do_parallel)
+		public static double[,] Crop(double[,] data, int[] cropping, bool do_parallel = false)
 		{
 			double[,] result = new double[cropping[1] - cropping[0] + 1, cropping[3] - cropping[2] + 1];
 			int width = result.GetLength(0), height = result.GetLength(1);
@@ -5827,7 +5835,7 @@ namespace JPFITS
 		/// <param name="X0">The coordinate of the center of the strip to be excised.</param>
 		/// <param name="halfWidth">A strip +- the halfWidth will be excised.</param>
 		/// <param name="do_parallel">Perform operation with parallelism over the array operations.</param>
-		public static double[,] Excise(double[,] data, bool column, int X0, int halfWidth, bool do_parallel)
+		public static double[,] Excise(double[,] data, bool column, int X0, int halfWidth, bool do_parallel = false)
 		{
 			double[,] result;
 			int[] xrange;
@@ -5881,7 +5889,7 @@ namespace JPFITS
 		/// <summary>Convolves a kernel array into a primary array.  The kernel must have a an odd-numbered with and height.</summary>
 		/// <param name="primary">The primary array into which the kernel is convolved.</param>
 		/// <param name="kernel">The kernel with which the primary array is convolved.</param>
-		public static double[,] MatrixConvolveMatrix(double[,] primary, double[,] kernel, bool do_parallel)
+		public static double[,] MatrixConvolveMatrix(double[,] primary, double[,] kernel, bool do_parallel = false)
 		{
 			int KFWX = kernel.GetLength(0);
 			int KFWY = kernel.GetLength(1);
@@ -5934,7 +5942,7 @@ namespace JPFITS
 
 		/// <summary>Returns the sum over all elements in the data array.</summary>
 		/// <param name="vectorOrArray">A vecor or 2-D array.</param>
-		public static double Sum(Array vectorOrArray, bool do_parallel)
+		public static double Sum(Array vectorOrArray, bool do_parallel = false)
 		{
 			TypeCode type = Type.GetTypeCode((vectorOrArray.GetType()).GetElementType());
 			int rank = vectorOrArray.Rank;
@@ -6210,7 +6218,7 @@ namespace JPFITS
 		/// <param name="dim">The dimension along which to sum.  
 		/// <br />0 (zero) sums along the horizontal axis, resulting in a vertical vector.
 		/// <br />1 (one) sums along the vertical axis, resulting in a horizontal vector.</param>
-		public static double[] Sum(double[,] data, int dim, bool do_parallel)
+		public static double[] Sum(double[,] data, int dim, bool do_parallel = false)
 		{
 			int d = 1;
 			if (dim == 1)
@@ -6256,7 +6264,7 @@ namespace JPFITS
 		/// <param name="dim">The dimension along which to sum.  
 		/// <br />0 (zero) sums along the horizontal axis, resulting in a vertical vector.
 		/// <br />1 (one) sums along the vertical axis, resulting in a horizontal vector.</param>
-		public static int[] Sum(int[,] data, int dim, bool do_parallel)
+		public static int[] Sum(int[,] data, int dim, bool do_parallel = false)
 		{
 			int d = 1;
 			if (dim == 1)
@@ -6304,7 +6312,7 @@ namespace JPFITS
 		/// <param name="dim">The dimension along which to average.  
 		/// <br />0 (zero) averages along the horizontal axis, resulting in a vertical vector.
 		/// <br />1 (one) averages along the vertical axis, resulting in a horizontal vector.</param>
-		public static double[] Mean(double[,] data, int dim, bool do_parallel)
+		public static double[] Mean(double[,] data, int dim, bool do_parallel = false)
 		{
 			int d = 1;
 			if (dim == 1)
@@ -6350,7 +6358,7 @@ namespace JPFITS
 
 		/// <summary>Returns the mean over all elements in the data array.</summary>
 		/// <param name="vectorOrArray">A vecor or 2-D array.</param>
-		public static double Mean(Array vectorOrArray, bool do_parallel)
+		public static double Mean(Array vectorOrArray, bool do_parallel = false)
 		{
 			return Sum(vectorOrArray, do_parallel) / (double)((vectorOrArray).Length);
 		}
@@ -6360,7 +6368,7 @@ namespace JPFITS
 		/// <param name="dim">The dimension along which to average.  
 		/// <br />0 (zero) averages along the horizontal axis, resulting in a vertical vector.
 		/// <br />1 (one) averages along the vertical axis, resulting in a horizontal vector.</param>
-		public static double[] Stdv(double[,] data, int dim, bool do_parallel)
+		public static double[] Stdv(double[,] data, int dim, bool do_parallel = false)
 		{
 			int d = 1;
 			if (dim == 1)
@@ -6410,7 +6418,7 @@ namespace JPFITS
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="dim">The dimension along which to reduce to minimums:  0 is x (rows), 1 is y (columns).</param>
 		/// <param name="indices">An array passed to populate the indices at which the minima appear along the dimension.</param>
-		public static double[] Min(double[,] data, int dim, out int[] indices, bool do_parallel)
+		public static double[] Min(double[,] data, int dim, out int[] indices, bool do_parallel = false)
 		{
 			int d = 1;
 			if (dim == 1)
@@ -6471,7 +6479,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the global minimum and its [x, y] index in the 2-D array data.</summary>
-		public static double Min(double[,] data, out int x, out int y, bool do_parallel)
+		public static double Min(double[,] data, out int x, out int y, bool do_parallel = false)
 		{
 			double min = System.Double.MaxValue;
 			int locx = -1, locy = -1;
@@ -6505,7 +6513,7 @@ namespace JPFITS
 			return min;
 		}
 
-		public static double Min(double[,] data, bool do_parallel)
+		public static double Min(double[,] data, bool do_parallel = false)
 		{
 			double min = System.Double.MaxValue;
 
@@ -6532,7 +6540,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the global minimum and its index in the 1-D array data.</summary>
-		public static double Min(double[] data, out int index, bool do_parallel)
+		public static double Min(double[] data, out int index, bool do_parallel = false)
 		{
 			double min = System.Double.MaxValue;
 			int locx = -1;
@@ -6563,7 +6571,7 @@ namespace JPFITS
 			return min;
 		}
 
-		public static double Min(double[] data, bool do_parallel)
+		public static double Min(double[] data, bool do_parallel = false)
 		{
 			double min = System.Double.MaxValue;
 
@@ -6590,7 +6598,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the global minimum and maximum of the 2-D array data.</summary>
-		public static void MinMax(double[,] data, out double min, out double max, bool do_parallel)
+		public static void MinMax(double[,] data, out double min, out double max, bool do_parallel = false)
 		{
 			double locmin = System.Double.MaxValue;
 			double locmax = System.Double.MinValue;
@@ -6630,7 +6638,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the global minimum and maximum of the 1-D array data.</summary>
-		public static void MinMax(double[] data, out double min, out double max, bool do_parallel)
+		public static void MinMax(double[] data, out double min, out double max, bool do_parallel = false)
 		{
 			double locmin = System.Double.MaxValue;
 			double locmax = System.Double.MinValue;
@@ -6672,7 +6680,7 @@ namespace JPFITS
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="dim">The dimension along which to reduce to maximums:  0 is x (rows), 1 is y (columns).</param>
 		/// <param name="indices">An array passed to populate the indices at which the maxima appear along the dimension.</param>
-		public static double[] Max(double[,] data, int dim, out int[] indices, bool do_parallel)
+		public static double[] Max(double[,] data, int dim, out int[] indices, bool do_parallel = false)
 		{
 			int d = 1;
 			if (dim == 1)
@@ -6734,7 +6742,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the global maximum and determines its [x, y] index in the 2-D array data.</summary>
-		public static double Max(double[,] data, out int x, out int y, bool do_parallel)
+		public static double Max(double[,] data, out int x, out int y, bool do_parallel = false)
 		{
 			double max = System.Double.MinValue;
 			int locx = -1, locy = -1;
@@ -6768,7 +6776,7 @@ namespace JPFITS
 			return max;
 		}
 
-		public static double Max(double[] data, bool do_parallel)
+		public static double Max(double[] data, bool do_parallel = false)
 		{
 			double max = System.Double.MinValue;
 
@@ -6794,7 +6802,7 @@ namespace JPFITS
 			return max;
 		}
 
-		public static double Max(double[,] data, bool do_parallel)
+		public static double Max(double[,] data, bool do_parallel = false)
 		{
 			double max = System.Double.MinValue;
 
@@ -6822,7 +6830,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the global maximum and its index in the 1-D array data.</summary>
-		public static double Max(double[] data, out int index, bool do_parallel)
+		public static double Max(double[] data, out int index, bool do_parallel = false)
 		{
 			double max = System.Double.MinValue;
 			int locx = -1;
@@ -6858,7 +6866,7 @@ namespace JPFITS
 		/// <param name="startIndex">The start index at which to begin checking for a maximum value.</param>
 		/// <param name="endIndex">The end index within which to check for a maximum value.</param>
 		/// <param name="maxIndex">The index in the array at which the maximum value occurs.</param>
-		public static double Max(double[] data, int startIndex, int endIndex, out int maxIndex, bool do_parallel)
+		public static double Max(double[] data, int startIndex, int endIndex, out int maxIndex, bool do_parallel = false)
 		{
 			if (startIndex < 0)
 				startIndex = 0;
@@ -6894,7 +6902,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the global maximum of the data array and its [x, y] indices.</summary>
-		public static uint Max(uint[,] data, out int x, out int y, bool do_parallel)
+		public static uint Max(uint[,] data, out int x, out int y, bool do_parallel = false)
 		{
 			uint max = System.UInt32.MinValue;
 			int locx = -1, locy = -1;
@@ -6933,7 +6941,7 @@ namespace JPFITS
 		/// <param name="startIndex">The start index at which to begin checking for a minimum value.</param>
 		/// <param name="endIndex">The end index within which to check for a minimum value.</param>
 		/// <param name="minIndex">The index in the array at which the minimum value occurs.</param>
-		public static double Min(double[] data, int startIndex, int endIndex, out int minIndex, bool do_parallel)
+		public static double Min(double[] data, int startIndex, int endIndex, out int minIndex, bool do_parallel = false)
 		{
 			if (startIndex < 0)
 				startIndex = 0;
@@ -6971,7 +6979,7 @@ namespace JPFITS
 		/// <summary>Returns the global maximum of the data array.</summary>
 		/// <param name="data">A 1-D int array.</param>
 		/// <param name="index">The index at which the maximum occurs in the array.</param>
-		public static int Max(int[] data, out int index, bool do_parallel)
+		public static int Max(int[] data, out int index, bool do_parallel = false)
 		{
 			int max = System.Int32.MinValue;
 			int locx = -1;
@@ -7002,7 +7010,7 @@ namespace JPFITS
 			return max;
 		}
 
-		public static int Max(int[] data, bool do_parallel)
+		public static int Max(int[] data, bool do_parallel = false)
 		{
 			int max = System.Int32.MinValue;
 
@@ -7031,7 +7039,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the standard deviation of all elements in the data array.</summary>
-		public static double Stdv(double[,] data, bool do_parallel)
+		public static double Stdv(double[,] data, bool do_parallel = false)
 		{
 			double SUM = 0, STD = 0;
 			object locker = new object();
@@ -7083,7 +7091,7 @@ namespace JPFITS
 		/// <summary>Returns the standard deviation of all elements in the data array.</summary>
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="known_mean">If the mean of the data is already known, then save compute time by not having to calculate it first before the stdv is calculated.</param>
-		public static double Stdv(double[,] data, double known_mean, bool do_parallel)
+		public static double Stdv(double[,] data, double known_mean, bool do_parallel = false)
 		{
 			double STD = 0;
 			object locker = new object();
@@ -7115,7 +7123,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the standard deviation of all elements in the data array.</summary>
-		public static double Stdv(double[] data, bool do_parallel)
+		public static double Stdv(double[] data, bool do_parallel = false)
 		{
 			double SUM = 0, STD = 0;
 			object locker = new object();
@@ -7163,7 +7171,7 @@ namespace JPFITS
 		/// <summary>Returns the standard deviation of all elements in the data array.</summary>
 		/// <param name="data">A 1-D double array.</param>
 		/// <param name="known_mean">If the mean of the data is already known, then save compute time by not having to calculate it first before the stdv is calculated.</param>
-		public static double Stdv(double[] data, double known_mean, bool do_parallel)
+		public static double Stdv(double[] data, double known_mean, bool do_parallel = false)
 		{
 			double STD = 0;
 			object locker = new object();
@@ -7546,7 +7554,7 @@ namespace JPFITS
 		#region ARRAY ELEMENT OPS
 
 		/// <summary>Returns the absolute values of all elements in the data array.</summary>
-		public static double[] Abs(double[] data, bool do_parallel)
+		public static double[] Abs(double[] data, bool do_parallel = false)
 		{
 			double[] result = new double[(data.Length)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7564,7 +7572,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the absolute values of all elements in the data array.</summary>
-		public static double[,] Abs(double[,] data, bool do_parallel)
+		public static double[,] Abs(double[,] data, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7585,7 +7593,7 @@ namespace JPFITS
 		/// <summary>Returns the rounded values of all elements in the data array.</summary>
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="digits">The number of digits to which to round the data values.</param>
-		public static double[,] Round(double[,] data, int digits, bool do_parallel)
+		public static double[,] Round(double[,] data, int digits, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7603,7 +7611,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] Floor(double[,] data, bool do_parallel)
+		public static double[,] Floor(double[,] data, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7624,7 +7632,7 @@ namespace JPFITS
 		/// <summary>Returns an array with all data values less than <i>clip_floor</i> replaced with <i>clip_floor</i>.</summary>
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="clip_floor">The value below which all data elements will be replaced with.</param>
-		public static double[,] Floor(double[,] data, double clip_floor, bool do_parallel)
+		public static double[,] Floor(double[,] data, double clip_floor, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7647,7 +7655,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] Ceil(double[,] data, bool do_parallel)
+		public static double[,] Ceil(double[,] data, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7665,7 +7673,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] Power(double[,] data, double exponent, bool do_parallel)
+		public static double[,] Power(double[,] data, double exponent, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7683,7 +7691,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] Sqrt(double[,] data, bool do_parallel)
+		public static double[,] Sqrt(double[,] data, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7701,7 +7709,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] Log(double[,] data, bool do_parallel)
+		public static double[,] Log(double[,] data, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7727,7 +7735,7 @@ namespace JPFITS
 		/// <summary>Return the custom-base logarithm of an array.</summary>
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="logbase">The base for the logarithm.</param>
-		public static double[,] Log(double[,] data, double logbase, bool do_parallel)
+		public static double[,] Log(double[,] data, double logbase, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7751,7 +7759,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Return the natural logarithm of an array.</summary>
-		public static double[,] Ln(double[,] data, bool do_parallel)
+		public static double[,] Ln(double[,] data, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7774,7 +7782,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] Exp(double[,] data, bool do_parallel)
+		public static double[,] Exp(double[,] data, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -7792,7 +7800,7 @@ namespace JPFITS
 			return result;
 		}
 
-		public static double[,] Exp(double[,] data, double logbase, bool do_parallel)
+		public static double[,] Exp(double[,] data, double logbase, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			ParallelOptions opts = new ParallelOptions();
@@ -8202,7 +8210,7 @@ namespace JPFITS
 		/// </summary>
 		/// <param name="data">The ipnut array.</param>
 		/// <param name="do_parallel">Perform array operations with parallelism.</param>
-		public static double[,] Hanning(double[,] data, bool do_parallel)
+		public static double[,] Hanning(double[,] data, bool do_parallel = false)
 		{
 			double[,] result = new double[data.GetLength(0), data.GetLength(1)];
 			double HL = (double)data.GetLength(0);
@@ -8253,7 +8261,7 @@ namespace JPFITS
 		/// <param name="Amplitude">The amplitude of the Gaussian.</param>
 		/// <param name="FWHM">The Full Width Half Maximum of the Gaussian.</param>
 		/// <param name="HalfWidth">The half-width or square-radius of the return array at which the Gaussian is calculated.</param>
-		public static double[,] Gaussian(double Amplitude, double FWHM, int HalfWidth, bool do_parallel)
+		public static double[,] Gaussian(double Amplitude, double FWHM, int HalfWidth, bool do_parallel = false)
 		{
 			double sig = FWHM / (2 * System.Math.Sqrt(2 * System.Math.Log(2)));
 			int width = HalfWidth * 2 + 1;
@@ -8348,7 +8356,7 @@ namespace JPFITS
 		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias
 		/// <br />or
 		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias</param>
-		public static double[,] Gaussian2d(int[] xdata, int[] ydata, double[] p, bool do_parallel)
+		public static double[,] Gaussian2d(int[] xdata, int[] ydata, double[] p, bool do_parallel = false)
 		{
 			double[,] G = new double[xdata.Length, ydata.Length];
 
@@ -8390,7 +8398,7 @@ namespace JPFITS
 		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias;
 		/// <br />or
 		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias;</param>
-		public static double[,] Moffat2d(int[] xdata, int[] ydata, double[] p, bool do_parallel)
+		public static double[,] Moffat2d(int[] xdata, int[] ydata, double[] p, bool do_parallel = false)
 		{
 			double[,] M = new double[xdata.Length, ydata.Length];
 

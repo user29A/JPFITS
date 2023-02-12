@@ -652,6 +652,14 @@ namespace JPFITS
 			return CTYPEN[coordinate_Axis - 1];
 		}
 
+		public enum WCSType
+		{
+			/// <summary>
+			/// Tangent-plane Gnomic projection.
+			/// </summary>
+			TAN
+		}
+
 		/// <summary>Solves the projection parameters for a given list of pixel and coordinate values. Pass nullptr for FITS if writing WCS parameters to a primary header not required.</summary>
 		/// <param name="WCS_Type">The world coordinate solution type. For example: TAN, for tangent-plane or Gnomic projection. Only TAN is currently supported.</param>
 		/// <param name="X_pix">An array of the image x-axis pixel locations.</param>
@@ -661,11 +669,13 @@ namespace JPFITS
 		/// <param name="cval2">An array of coordinate values in degrees on coordinate axis 2.</param>
 		/// <param name="header">An FITSImageHeader instance to write the solution into. Pass null if not required.</param>
 		/// <param name="verbose">Copy all WCS diagnostic data into the header in addition to essential WCS keywords.</param>
-		public void Solve_WCS(string WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, FITSHeader header, bool verbose = false)
+		public void Solve_WCS(WCSType WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, FITSHeader header, bool verbose = false/*, WorldCoordinateSolution? INIT = null*/)
 		{
 			//should first do a check of WCS type to make sure it is valid
-			if (WCS_Type != "TAN")
-				throw new Exception("Solution type: '" + WCS_Type + "' is invalid. Valid solution types are: 'TAN'");
+			//if (WCS_Type != "TAN")
+				//throw new Exception("Solution type: '" + WCS_Type + "' is invalid. Valid solution types are: 'TAN'");
+
+			VALIDWCSGRIDLINES = false;
 
 			CTYPEN = new string[2];
 			CTYPEN[0] = "RA---" + WCS_Type;
@@ -705,7 +715,7 @@ namespace JPFITS
 				d = CVAL2[i] * Math.PI / 180;//radians
 
 				//for tangent plane Gnomic
-				if (WCS_Type == "TAN")
+				if (WCS_Type == WCSType.TAN)
 				{
 					X_intrmdt[i] = Math.Cos(d) * Math.Sin(a - a0) / (Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0) + Math.Sin(d0) * Math.Sin(d));
 					Y_intrmdt[i] = (Math.Cos(d0) * Math.Sin(d) - Math.Cos(d) * Math.Sin(d0) * Math.Cos(a - a0)) / (Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0) + Math.Sin(d0) * Math.Sin(d));
@@ -715,7 +725,18 @@ namespace JPFITS
 			double[] P0 = new double[6] { 0, 0, 0, 0, CRPIXN[0], CRPIXN[1] };
 			double[] plb = new double[6] { -0.1, -0.1, -0.1, -0.1, JPMath.Min(CPIX1, false), JPMath.Min(CPIX2, false) };
 			double[] pub = new double[6] { 0.1, 0.1, 0.1, 0.1, JPMath.Max(CPIX1, false), JPMath.Max(CPIX2, false) };
-			double[] scale = new double[6] { 1e-6, 1e-6, 1e-6, 1e-6, JPMath.Mean(CPIX1, true), JPMath.Mean(CPIX2, true) };
+			double[] scale = new double[6] { 4e-6, 4e-6, 4e-6, 4e-6, CRPIXN[0], CRPIXN[1] };
+
+			//if (INIT != null)
+			//{
+			//	P0 = new double[6] { INIT.GetCDi_j(1, 1), INIT.GetCDi_j(1, 2), INIT.GetCDi_j(2, 1), INIT.GetCDi_j(2, 2), INIT.GetCRPIXn(1), INIT.GetCRPIXn(2) };
+			//	//plb = new double[6] { P0[0] - Math.Abs(P0[0]), P0[1] - Math.Abs(P0[1]), P0[2] - Math.Abs(P0[2]), P0[3] - Math.Abs(P0[3]), INIT.GetCRPIXn(1) - 5, INIT.GetCRPIXn(2) - 5};
+			//	//pub = new double[6] { P0[0] + Math.Abs(P0[0]), P0[1] + Math.Abs(P0[1]), P0[2] + Math.Abs(P0[2]), P0[3] + Math.Abs(P0[3]), INIT.GetCRPIXn(1) + 5, INIT.GetCRPIXn(2) + 5 };
+
+			//	CRVALN[0] = INIT.GetCRVALn(1);
+			//	CRVALN[1] = INIT.GetCRVALn(2);
+			//}
+
 			JPMath.Fit_WCSTransform2d(X_intrmdt, Y_intrmdt, CPIX1, CPIX2, ref P0, plb, pub, scale);
 
 			CDMATRIX = new double[2, 2];
@@ -1171,12 +1192,12 @@ namespace JPFITS
 		/// <summary>Generates arrays of PointF arrays which represent grid lines in Right Ascension and Declination.
 		/// <br />The lines are accessed via Grid_RightAscensionPoints and Grid_DeclinationPoints.
 		/// <br />The sexagesimal labels for each grid line are accessed via Grid_RightAscensionLabels and Grid_DeclinationLabels.</summary>
-		/// <param name="imagepixels_width">Image pixels width.</param>
-		/// <param name="imagepixels_height">Image pixels height.</param>
-		/// <param name="windowpixels_width">Window pixels width.</param>
-		/// <param name="windowpixels_height">Window pixels height.</param>
+		/// <param name="wcsImage_width">Image width, number of pixels.</param>
+		/// <param name="wcsImage_height">Image height, number of pixels.</param>
+		/// <param name="displayWindow_width">The display window width in display pixels.</param>
+		/// <param name="displayWindow_height">The display window height in display pixels.</param>
 		/// <param name="NapproximateIntervals">Approximate number of intervals in the grid. Suggest 7. Minimum 3.</param>
-		public void Grid_MakeWCSGrid(int imagepixels_width, int imagepixels_height, int windowpixels_width, int windowpixels_height, int NapproximateIntervals)
+		public void Grid_MakeWCSGrid(int wcsImage_width, int wcsImage_height, int displayWindow_width, int displayWindow_height, int NapproximateIntervals)
 		{
 			if (NapproximateIntervals < 3)
 				throw new Exception("Minimum number of grid intervals is 3...you passed: " + NapproximateIntervals);
@@ -1187,27 +1208,27 @@ namespace JPFITS
 
 			try
 			{
-				float xscale = (float)windowpixels_width / (float)imagepixels_width;
-				float yscale = (float)windowpixels_height / (float)imagepixels_height;
+				float xscale = (float)displayWindow_width / (float)wcsImage_width;
+				float yscale = (float)displayWindow_height / (float)wcsImage_height;
 				string sexx, sexy;
 
-				Get_Coordinate((double)imagepixels_width / 2, (double)imagepixels_height / 2, false, "TAN", out double fieldcenterRA, out double fieldcenterDEC);
+				Get_Coordinate((double)wcsImage_width / 2, (double)wcsImage_height / 2, false, "TAN", out double fieldcenterRA, out double fieldcenterDEC);
 
 				bool poleinsidepos = false;
 				bool poleinsideneg = false;
 				Get_Pixel(0, 90, "TAN", out double x, out double y, true);
-				if (x > 0 && y > 0 && x < imagepixels_width && y < imagepixels_height)
+				if (x > 0 && y > 0 && x < wcsImage_width && y < wcsImage_height)
 					poleinsidepos = true;
 				if (!poleinsidepos)
 				{
 					Get_Pixel(0, -90, "TAN", out x, out y, true);
-					if (x > 0 && y > 0 && x < imagepixels_width && y < imagepixels_height)
+					if (x > 0 && y > 0 && x < wcsImage_width && y < wcsImage_height)
 						poleinsideneg = true;
 				}
 
 				//top left, top middle, top right, middle left, middle right, bottom left, bottom middle, bottom right
-				double[] crosscornersX = new double[8] { 1, imagepixels_width / 2, imagepixels_width, 1, imagepixels_width, 1, imagepixels_width / 2, imagepixels_width };
-				double[] crosscornersY = new double[8] { 1, 1, 1, imagepixels_height / 2, imagepixels_height / 2, imagepixels_height, imagepixels_height, imagepixels_height };
+				double[] crosscornersX = new double[8] { 1, wcsImage_width / 2, wcsImage_width, 1, wcsImage_width, 1, wcsImage_width / 2, wcsImage_width };
+				double[] crosscornersY = new double[8] { 1, 1, 1, wcsImage_height / 2, wcsImage_height / 2, wcsImage_height, wcsImage_height, wcsImage_height };
 				Get_Coordinates(crosscornersX, crosscornersY, false, "TAN", out double[] crosscornersRA, out double[] crosscornersDE);
 
 				double despan = 0;
