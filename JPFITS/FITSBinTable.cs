@@ -2,8 +2,7 @@
 using System.Collections;
 using System.Threading.Tasks;
 using System.IO;
-using System.Runtime.CompilerServices;
-using JPFITS;
+using System.CodeDom;
 #nullable enable
 
 namespace JPFITS
@@ -84,47 +83,7 @@ namespace JPFITS
 		private string? EXTNAME;
 		FITSHeaderKey[]? EXTRAKEYS;
 		private byte[]? BINTABLE;//the table in raw byte format read from disk
-		private byte[]? HEAPDATA;//the table in raw byte format read from disk		
-
-		#region FITS bzero integer mapping
-
-		[MethodImpl(256)]/*256 = agressive inlining*/
-		private static long MapUlongToLong(ulong ulongValue)
-		{
-			return unchecked((long)ulongValue + long.MinValue);
-		}
-
-		[MethodImpl(256)]/*256 = agressive inlining*/
-		private static int MapUintToInt(uint uintValue)
-		{
-			return unchecked((int)uintValue + int.MinValue);
-		}
-
-		[MethodImpl(256)]/*256 = agressive inlining*/
-		private static short MapUshortToShort(ushort ushortValue)
-		{
-			return unchecked((short)((short)ushortValue + short.MinValue));
-		}
-
-		[MethodImpl(256)]/*256 = agressive inlining*/
-		private static ulong MapLongToUlong(long longValue)
-		{
-			return unchecked((ulong)(longValue - long.MinValue));
-		}
-
-		[MethodImpl(256)]/*256 = agressive inlining*/
-		private static uint MapIntToUint(int intValue)
-		{
-			return unchecked((uint)(intValue - int.MinValue));
-		}
-
-		[MethodImpl(256)]/*256 = agressive inlining*/
-		private static ushort MapShortToUshort(short shortValue)
-		{
-			return unchecked((ushort)(shortValue - short.MinValue));
-		}
-
-		#endregion
+		private byte[]? HEAPDATA;//the table in raw byte format read from disk			
 
 		private void MAKEBINTABLEBYTEARRAY(Array[] ExtensionEntryData)
 		{
@@ -263,7 +222,7 @@ namespace JPFITS
 							long val;
 							if (TREPEATS[j] == 1)
 							{
-								val = MapUlongToLong(((ulong[])ExtensionEntryData[j])[i]);
+								val = FITSFILEOPS.MapUlongToLong(((ulong[])ExtensionEntryData[j])[i]);
 								BINTABLE[cc] = (byte)((val >> 56) & 0xff);
 								BINTABLE[cc + 1] = (byte)((val >> 48) & 0xff);
 								BINTABLE[cc + 2] = (byte)((val >> 40) & 0xff);
@@ -276,7 +235,7 @@ namespace JPFITS
 							else
 								for (int ii = 0; ii < TREPEATS[j]; ii++)
 								{
-									val = MapUlongToLong(((ulong[,])ExtensionEntryData[j])[ii, i]);
+									val = FITSFILEOPS.MapUlongToLong(((ulong[,])ExtensionEntryData[j])[ii, i]);
 									BINTABLE[cc + ii * 8] = (byte)((val >> 56) & 0xff);
 									BINTABLE[cc + ii * 8 + 1] = (byte)((val >> 48) & 0xff);
 									BINTABLE[cc + ii * 8 + 2] = (byte)((val >> 40) & 0xff);
@@ -317,7 +276,7 @@ namespace JPFITS
 							int val;
 							if (TREPEATS[j] == 1)
 							{
-								val = MapUintToInt(((uint[])ExtensionEntryData[j])[i]);
+								val = FITSFILEOPS.MapUintToInt(((uint[])ExtensionEntryData[j])[i]);
 								BINTABLE[cc] = (byte)((val >> 24) & 0xff);
 								BINTABLE[cc + 1] = (byte)((val >> 16) & 0xff);
 								BINTABLE[cc + 2] = (byte)((val >> 8) & 0xff);
@@ -326,7 +285,7 @@ namespace JPFITS
 							else
 								for (int ii = 0; ii < TREPEATS[j]; ii++)
 								{
-									val = MapUintToInt(((uint[,])ExtensionEntryData[j])[ii, i]);
+									val = FITSFILEOPS.MapUintToInt(((uint[,])ExtensionEntryData[j])[ii, i]);
 									BINTABLE[cc + ii * 4] = (byte)((val >> 24) & 0xff);
 									BINTABLE[cc + ii * 4 + 1] = (byte)((val >> 16) & 0xff);
 									BINTABLE[cc + ii * 4 + 2] = (byte)((val >> 8) & 0xff);
@@ -359,14 +318,14 @@ namespace JPFITS
 							short val;
 							if (TREPEATS[j] == 1)
 							{
-								val = MapUshortToShort(((ushort[])ExtensionEntryData[j])[i]);
+								val = FITSFILEOPS.MapUshortToShort(((ushort[])ExtensionEntryData[j])[i]);
 								BINTABLE[cc] = (byte)((val >> 8) & 0xff);
 								BINTABLE[cc + 1] = (byte)(val & 0xff);
 							}
 							else
 								for (int ii = 0; ii < TREPEATS[j]; ii++)
 								{
-									val = MapUshortToShort(((ushort[,])ExtensionEntryData[j])[ii, i]);
+									val = FITSFILEOPS.MapUshortToShort(((ushort[,])ExtensionEntryData[j])[ii, i]);
 									BINTABLE[cc + ii * 2] = (byte)((val >> 8) & 0xff);
 									BINTABLE[cc + ii * 2 + 1] = (byte)(val & 0xff);
 								}
@@ -512,7 +471,7 @@ namespace JPFITS
 
 							for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 							{
-								val = MapUlongToLong(((ulong[])(((ulong[][])(ExtensionEntryData[i]))[y]))[x]);
+								val = FITSFILEOPS.MapUlongToLong(((ulong[])(((ulong[][])(ExtensionEntryData[i]))[y]))[x]);
 								HEAPDATA[pos] = (byte)((val >> 56) & 0xff);
 								HEAPDATA[pos + 1] = (byte)((val >> 48) & 0xff);
 								HEAPDATA[pos + 2] = (byte)((val >> 40) & 0xff);
@@ -556,7 +515,7 @@ namespace JPFITS
 
 							for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 							{
-								val = MapUintToInt(((uint[])(((uint[][])(ExtensionEntryData[i]))[y]))[x]);
+								val = FITSFILEOPS.MapUintToInt(((uint[])(((uint[][])(ExtensionEntryData[i]))[y]))[x]);
 								HEAPDATA[pos] = (byte)((val >> 24) & 0xff);
 								HEAPDATA[pos + 1] = (byte)((val >> 16) & 0xff);
 								HEAPDATA[pos + 2] = (byte)((val >> 8) & 0xff);
@@ -594,7 +553,7 @@ namespace JPFITS
 
 							for (int x = 0; x < TTYPEHEAPARRAYNELSPOS[i][0, y]; x++)
 							{
-								val = MapUshortToShort(((ushort[])(((ushort[][])(ExtensionEntryData[i]))[y]))[x]);
+								val = FITSFILEOPS.MapUshortToShort(((ushort[])(((ushort[][])(ExtensionEntryData[i]))[y]))[x]);
 								HEAPDATA[pos] = (byte)((val >> 8) & 0xff);
 								HEAPDATA[pos + 1] = (byte)(val & 0xff);
 								pos += 2;
@@ -1290,7 +1249,7 @@ namespace JPFITS
 								ui64[2] = HEAPDATA[pos + 5];
 								ui64[1] = HEAPDATA[pos + 6];
 								ui64[0] = HEAPDATA[pos + 7];
-								row[j] = (double)MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+								row[j] = (double)FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0));
 								pos += 8;
 							}
 							arrya[i] = row;
@@ -1336,7 +1295,7 @@ namespace JPFITS
 								uint32[2] = HEAPDATA[pos + 1];
 								uint32[1] = HEAPDATA[pos + 2];
 								uint32[0] = HEAPDATA[pos + 3];
-								row[j] = (double)MapIntToUint(BitConverter.ToInt32(uint32, 0));
+								row[j] = (double)FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0));
 								pos += 4;
 							}
 							arrya[i] = row;
@@ -1378,7 +1337,7 @@ namespace JPFITS
 							{
 								uint16[1] = HEAPDATA[pos];
 								uint16[0] = HEAPDATA[pos + 1];
-								row[j] = (double)MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+								row[j] = (double)FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0));
 								pos += 2;
 							}
 							arrya[i] = row;
@@ -1531,7 +1490,7 @@ namespace JPFITS
 								ui64[2] = HEAPDATA[pos + 5];
 								ui64[1] = HEAPDATA[pos + 6];
 								ui64[0] = HEAPDATA[pos + 7];
-								row[j] = MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
+								row[j] = FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
 								pos += 8;
 							}
 							arrya[i] = row;
@@ -1577,7 +1536,7 @@ namespace JPFITS
 								uint32[2] = HEAPDATA[pos + 1];
 								uint32[1] = HEAPDATA[pos + 2];
 								uint32[0] = HEAPDATA[pos + 3];
-								row[j] = MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString();
+								row[j] = FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString();
 								pos += 4;
 							}
 							arrya[i] = row;
@@ -1619,7 +1578,7 @@ namespace JPFITS
 							{
 								uint16[1] = HEAPDATA[pos];
 								uint16[0] = HEAPDATA[pos + 1];
-								row[j] = MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
+								row[j] = FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
 								pos += 2;
 							}
 							arrya[i] = row;
@@ -1687,7 +1646,7 @@ namespace JPFITS
 				}
 			}
 
-			else// returnType == TTYPEReturn.Native
+			else if (returnType == TTYPEReturn.Native)
 			{
 				switch (entryTypeCode)
 				{
@@ -1787,7 +1746,7 @@ namespace JPFITS
 								ui64[2] = HEAPDATA[pos + 5];
 								ui64[1] = HEAPDATA[pos + 6];
 								ui64[0] = HEAPDATA[pos + 7];
-								row[j] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+								row[j] = FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0));
 								pos += 8;
 							}
 							arrya[i] = row;
@@ -1833,7 +1792,7 @@ namespace JPFITS
 								uint32[2] = HEAPDATA[pos + 1];
 								uint32[1] = HEAPDATA[pos + 2];
 								uint32[0] = HEAPDATA[pos + 3];
-								row[j] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
+								row[j] = FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0));
 								pos += 4;
 							}
 							arrya[i] = row;
@@ -1875,7 +1834,7 @@ namespace JPFITS
 							{
 								uint16[1] = HEAPDATA[pos];
 								uint16[0] = HEAPDATA[pos + 1];
-								row[j] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+								row[j] = FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0));
 								pos += 2;
 							}
 							arrya[i] = row;
@@ -1942,6 +1901,8 @@ namespace JPFITS
 						throw new Exception("Unrecognized TypeCode: '" + entryTypeCode.ToString() + "'");
 				}
 			}
+
+			throw new Exception("Made it to end of GETHEAPTTYPE without returning any data.");
 		}
 
 		private int[,] GETHEAPTTYPENELSPOS(int ttypeindex)
@@ -2295,7 +2256,7 @@ namespace JPFITS
 								ui64[2] = BINTABLE[currentbyte + 5];
 								ui64[1] = BINTABLE[currentbyte + 6];
 								ui64[0] = BINTABLE[currentbyte + 7];
-								vector[i] = (double)MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+								vector[i] = (double)FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0));
 							});
 							return vector;
 						}
@@ -2316,7 +2277,7 @@ namespace JPFITS
 									ui64[2] = BINTABLE[currentbyte + 5];
 									ui64[1] = BINTABLE[currentbyte + 6];
 									ui64[0] = BINTABLE[currentbyte + 7];
-									arrya[j, i] = (double)MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+									arrya[j, i] = (double)FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0));
 									currentbyte += 8;
 								}
 							});
@@ -2337,7 +2298,7 @@ namespace JPFITS
 								uint32[2] = BINTABLE[currentbyte + 1];
 								uint32[1] = BINTABLE[currentbyte + 2];
 								uint32[0] = BINTABLE[currentbyte + 3];
-								vector[i] = (double)MapIntToUint(BitConverter.ToInt32(uint32, 0));
+								vector[i] = (double)FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0));
 							});
 							return vector;
 						}
@@ -2354,7 +2315,7 @@ namespace JPFITS
 									uint32[2] = BINTABLE[currentbyte + 1];
 									uint32[1] = BINTABLE[currentbyte + 2];
 									uint32[0] = BINTABLE[currentbyte + 3];
-									arrya[j, i] = (double)MapIntToUint(BitConverter.ToInt32(uint32, 0));
+									arrya[j, i] = (double)FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0));
 									currentbyte += 4;
 								}
 							});
@@ -2411,7 +2372,7 @@ namespace JPFITS
 								int currentbyte = byteoffset + i * NAXIS1;
 								uint16[1] = BINTABLE[currentbyte];
 								uint16[0] = BINTABLE[currentbyte + 1];
-								vector[i] = (double)MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+								vector[i] = (double)FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0));
 							});
 							return vector;
 						}
@@ -2426,7 +2387,7 @@ namespace JPFITS
 								{
 									uint16[1] = BINTABLE[currentbyte];
 									uint16[0] = BINTABLE[currentbyte + 1];
-									arrya[j, i] = (double)MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+									arrya[j, i] = (double)FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0));
 									currentbyte += 2;
 								}
 							});
@@ -2707,7 +2668,7 @@ namespace JPFITS
 								ui64[2] = BINTABLE[currentbyte + 5];
 								ui64[1] = BINTABLE[currentbyte + 6];
 								ui64[0] = BINTABLE[currentbyte + 7];
-								vector[i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
+								vector[i] = FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
 							});
 							return vector;
 						}
@@ -2728,7 +2689,7 @@ namespace JPFITS
 									ui64[2] = BINTABLE[currentbyte + 5];
 									ui64[1] = BINTABLE[currentbyte + 6];
 									ui64[0] = BINTABLE[currentbyte + 7];
-									arrya[j, i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
+									arrya[j, i] = FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
 									currentbyte += 8;
 								}
 							});
@@ -2749,7 +2710,7 @@ namespace JPFITS
 								uint32[2] = BINTABLE[currentbyte + 1];
 								uint32[1] = BINTABLE[currentbyte + 2];
 								uint32[0] = BINTABLE[currentbyte + 3];
-								vector[i] = MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString();
+								vector[i] = FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString();
 							});
 							return vector;
 						}
@@ -2766,7 +2727,7 @@ namespace JPFITS
 									uint32[2] = BINTABLE[currentbyte + 1];
 									uint32[1] = BINTABLE[currentbyte + 2];
 									uint32[0] = BINTABLE[currentbyte + 3];
-									arrya[j, i] = MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString();
+									arrya[j, i] = FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString();
 									currentbyte += 4;
 								}
 							});
@@ -2823,7 +2784,7 @@ namespace JPFITS
 								int currentbyte = byteoffset + i * NAXIS1;
 								uint16[1] = BINTABLE[currentbyte];
 								uint16[0] = BINTABLE[currentbyte + 1];
-								vector[i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
+								vector[i] = FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
 							});
 							return vector;
 						}
@@ -2838,7 +2799,7 @@ namespace JPFITS
 								{
 									uint16[1] = BINTABLE[currentbyte];
 									uint16[0] = BINTABLE[currentbyte + 1];
-									arrya[j, i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
+									arrya[j, i] = FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
 									currentbyte += 2;
 								}
 							});
@@ -2986,7 +2947,7 @@ namespace JPFITS
 				}
 			}
 
-			else //returnType == TTYPEReturn.Native
+			else if (returnType == TTYPEReturn.Native)
 			{
 				if (TTYPEISHEAPARRAYDESC[ttypeindex])//get from heap
 					return GETHEAPTTYPE(ttypeindex, out entryTypeCode, out entryNElements, returnType);
@@ -3154,7 +3115,7 @@ namespace JPFITS
 								ui64[2] = BINTABLE[currentbyte + 5];
 								ui64[1] = BINTABLE[currentbyte + 6];
 								ui64[0] = BINTABLE[currentbyte + 7];
-								vector[i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+								vector[i] = FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0));
 							});
 							return vector;
 						}
@@ -3175,7 +3136,7 @@ namespace JPFITS
 									ui64[2] = BINTABLE[currentbyte + 5];
 									ui64[1] = BINTABLE[currentbyte + 6];
 									ui64[0] = BINTABLE[currentbyte + 7];
-									arrya[j, i] = MapLongToUlong(BitConverter.ToInt64(ui64, 0));
+									arrya[j, i] = FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0));
 									currentbyte += 8;
 								}
 							});
@@ -3196,7 +3157,7 @@ namespace JPFITS
 								uint32[2] = BINTABLE[currentbyte + 1];
 								uint32[1] = BINTABLE[currentbyte + 2];
 								uint32[0] = BINTABLE[currentbyte + 3];
-								vector[i] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
+								vector[i] = FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0));
 							});
 							return vector;
 						}
@@ -3213,7 +3174,7 @@ namespace JPFITS
 									uint32[2] = BINTABLE[currentbyte + 1];
 									uint32[1] = BINTABLE[currentbyte + 2];
 									uint32[0] = BINTABLE[currentbyte + 3];
-									arrya[j, i] = MapIntToUint(BitConverter.ToInt32(uint32, 0));
+									arrya[j, i] = FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0));
 									currentbyte += 4;
 								}
 							});
@@ -3270,7 +3231,7 @@ namespace JPFITS
 								int currentbyte = byteoffset + i * NAXIS1;
 								uint16[1] = BINTABLE[currentbyte];
 								uint16[0] = BINTABLE[currentbyte + 1];
-								vector[i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+								vector[i] = FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0));
 							});
 							return vector;
 						}
@@ -3285,7 +3246,7 @@ namespace JPFITS
 								{
 									uint16[1] = BINTABLE[currentbyte];
 									uint16[0] = BINTABLE[currentbyte + 1];
-									arrya[j, i] = MapShortToUshort(BitConverter.ToInt16(uint16, 0));
+									arrya[j, i] = FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0));
 									currentbyte += 2;
 								}
 							});
@@ -3432,6 +3393,8 @@ namespace JPFITS
 						throw new Exception("Unrecognized TypeCode: '" + TCODES[ttypeindex].ToString() + "'");
 				}
 			}
+
+			throw new Exception("Made it to end of GetTTYPEEntry without returning an entry.");
 		}
 
 		/// <summary>Use this to access individual elements of the table with a string return of the value. Useful for looking at TTYPEs with multiple elements on a row, or, for extracting values for display purposes, etc.</summary>
@@ -3562,7 +3525,7 @@ namespace JPFITS
 							ui64[2] = BINTABLE[currentbyte + 5];
 							ui64[1] = BINTABLE[currentbyte + 6];
 							ui64[0] = BINTABLE[currentbyte + 7];
-							return MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
+							return FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString();
 						}
 						else
 						{
@@ -3577,7 +3540,7 @@ namespace JPFITS
 								ui64[2] = BINTABLE[currentbyte + 5];
 								ui64[1] = BINTABLE[currentbyte + 6];
 								ui64[0] = BINTABLE[currentbyte + 7];
-								str += (MapLongToUlong(BitConverter.ToInt64(ui64, 0))).ToString() + ", ";
+								str += (FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0))).ToString() + ", ";
 							}
 							return str.Substring(0, str.Length - 2);
 						}
@@ -3592,7 +3555,7 @@ namespace JPFITS
 							uint32[2] = BINTABLE[currentbyte + 1];
 							uint32[1] = BINTABLE[currentbyte + 2];
 							uint32[0] = BINTABLE[currentbyte + 3];
-							return (MapIntToUint(BitConverter.ToInt32(uint32, 0))).ToString();
+							return (FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0))).ToString();
 						}
 						else
 						{
@@ -3603,7 +3566,7 @@ namespace JPFITS
 								uint32[2] = BINTABLE[currentbyte + 1];
 								uint32[1] = BINTABLE[currentbyte + 2];
 								uint32[0] = BINTABLE[currentbyte + 3];
-								str += (MapIntToUint(BitConverter.ToInt32(uint32, 0))).ToString() + ", ";
+								str += (FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0))).ToString() + ", ";
 							}
 							return str.Substring(0, str.Length - 2);
 						}
@@ -3643,7 +3606,7 @@ namespace JPFITS
 						{
 							uint16[1] = BINTABLE[currentbyte];
 							uint16[0] = BINTABLE[currentbyte + 1];
-							return MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
+							return FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString();
 						}
 						else
 						{
@@ -3652,7 +3615,7 @@ namespace JPFITS
 								currentbyte = byteoffset + rowindex * NAXIS1 + j * 2;
 								uint16[1] = BINTABLE[currentbyte];
 								uint16[0] = BINTABLE[currentbyte + 1];
-								str += (MapShortToUshort(BitConverter.ToInt16(uint16, 0))).ToString() + ", ";
+								str += (FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0))).ToString() + ", ";
 							}
 							return str.Substring(0, str.Length - 2);
 						}
@@ -3814,7 +3777,7 @@ namespace JPFITS
 							ui64[2] = HEAPDATA[currentbyte + 5];
 							ui64[1] = HEAPDATA[currentbyte + 6];
 							ui64[0] = HEAPDATA[currentbyte + 7];
-							str += MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString() + ", ";
+							str += FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(ui64, 0)).ToString() + ", ";
 							currentbyte += 8;
 						}
 						return str.Substring(0, str.Length - 2);
@@ -3844,7 +3807,7 @@ namespace JPFITS
 							uint32[2] = HEAPDATA[currentbyte + 1];
 							uint32[1] = HEAPDATA[currentbyte + 2];
 							uint32[0] = HEAPDATA[currentbyte + 3];
-							str += MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString() + ", ";
+							str += FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(uint32, 0)).ToString() + ", ";
 							currentbyte += 4;
 						}
 						return str.Substring(0, str.Length - 2);
@@ -3870,7 +3833,7 @@ namespace JPFITS
 						{
 							uint16[1] = HEAPDATA[currentbyte];
 							uint16[0] = HEAPDATA[currentbyte + 1];
-							str += MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString() + ", ";
+							str += FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(uint16, 0)).ToString() + ", ";
 							currentbyte += 2;
 						}
 						return str.Substring(0, str.Length - 2);
@@ -4368,7 +4331,7 @@ namespace JPFITS
 				FITSHeaderKey[] newkeys = new FITSHeaderKey[EXTRAKEYS.Length + 1];
 
 				for (int i = 0; i < EXTRAKEYS.Length; i++)
-					newkeys[i] = new FITSHeaderKey(keyName, keyValue, keyComment);
+					newkeys[i] = EXTRAKEYS[i];
 
 				newkeys[EXTRAKEYS.Length] = new FITSHeaderKey(keyName, keyValue, keyComment);
 				EXTRAKEYS = newkeys;

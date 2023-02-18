@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
+using System.Runtime.CompilerServices;
 #nullable enable
 
 namespace JPFITS
@@ -9,8 +10,48 @@ namespace JPFITS
 	///<summary>FITSFILEOPS static class for facilitating interaction with FITS data on disk.</summary>
 	public class FITSFILEOPS
 	{
-		/// <summary>Array formatting options for the data unit returned by the READIMAGEDATAUNIT method.</summary>
-		public enum ImageDataUnitFormatting
+		#region FITS bzero integer mapping
+
+		[MethodImpl(256)]/*256 = agressive inlining*/
+		public static long MapUlongToLong(ulong ulongValue)
+		{
+			return unchecked((long)ulongValue + long.MinValue);
+		}
+
+		[MethodImpl(256)]/*256 = agressive inlining*/
+		public static int MapUintToInt(uint uintValue)
+		{
+			return unchecked((int)uintValue + int.MinValue);
+		}
+
+		[MethodImpl(256)]/*256 = agressive inlining*/
+		public static short MapUshortToShort(ushort ushortValue)
+		{
+			return unchecked((short)((short)ushortValue + short.MinValue));
+		}
+
+		[MethodImpl(256)]/*256 = agressive inlining*/
+		public static ulong MapLongToUlong(long longValue)
+		{
+			return unchecked((ulong)(longValue - long.MinValue));
+		}
+
+		[MethodImpl(256)]/*256 = agressive inlining*/
+		public static uint MapIntToUint(int intValue)
+		{
+			return unchecked((uint)(intValue - int.MinValue));
+		}
+
+		[MethodImpl(256)]/*256 = agressive inlining*/
+		public static ushort MapShortToUshort(short shortValue)
+		{
+			return unchecked((ushort)(shortValue - short.MinValue));
+		}
+
+		#endregion
+
+		/// <summary>Array formatting options for the data unit returned by the ReadImageDataUnit method.</summary>
+		public enum RankFormat
 		{
 			/// <summary>
 			/// The Array is returned as the rank indicated by the NAXIS keyword
@@ -31,6 +72,25 @@ namespace JPFITS
 			/// If the range dimensions indicate a vector when reading from a table or cube, or a table when reading from a cube, then return the Array formatted as the range rank.
 			/// </summary>
 			ArrayAsRangeRank
+		}
+
+		/// <summary>Array precision options for the data unit returned by the ReadImageDataUnit method.</summary>
+		public enum DataPrecision
+		{
+			/// <summary>
+			/// Return the array at its native on-disk precision
+			/// </summary>
+			Native,
+
+			/// <summary>
+			/// Return the array at double-precision regardless of its precision on-disk.
+			/// </summary>
+			Double,
+
+			/// <summary>
+			/// Return the array as a Boolean. The on-disk data ones are true, all else are false. The on-disk data must be as unsigned bytes.
+			/// </summary>
+			Boolean
 		}
 
 		/// <summary>Scans the primary unit of a FITS file. Returns false if the file is not a FITS file.</summary>
@@ -297,8 +357,9 @@ namespace JPFITS
 		/// <param name="naxisn">An array containing the values of the NAXISn keywords from the data unit header. Specifies the rank of the return Array, i.e., if naxisn.Length == 1, then it is a vector, if 2 then a table, if 3 then a cube. The value may change from the input given the ImageDataUnitFormatting options.</param>
 		/// <param name="bscale">The BSCALE keyword value of the data unit header.</param>
 		/// <param name="bzero">The BZERO keyword value of the data unit header.</param>
-		/// <param name="returnOptions">Options for formatting the return Array rank and dimensions.</param>
-		public static Array ReadImageDataUnit(FileStream fs, int[]? range, bool doParallel, int bitpix, ref int[] naxisn, double bscale, double bzero, ImageDataUnitFormatting returnOptions = ImageDataUnitFormatting.Default)
+		/// <param name="returnRankFormat">Options for formatting the return Array rank and dimensions.</param>
+		/// <param name="returnPrecision">Options for the precision type of the return Array.</param>
+		public static Array ReadImageDataUnit(FileStream fs, int[]? range, bool doParallel, int bitpix, ref int[] naxisn, double bscale, double bzero, RankFormat returnRankFormat = RankFormat.Default, DataPrecision returnPrecision = DataPrecision.Double)
 		{
 			if (range == null || range[0] == -1)//then it is a full frame read
 				if (naxisn.Length == 1)
@@ -339,503 +400,364 @@ namespace JPFITS
 			else
 				opts.MaxDegreeOfParallelism = 1;
 
-			if (naxisn.Length == 1)//then a vector return
+			if (returnPrecision == DataPrecision.Double)
 			{
-				switch (bitpix)
+				if (naxisn.Length == 1)//then a vector return
 				{
-					case 8:
+					switch (bitpix)
 					{
-						if (returnOptions == ImageDataUnitFormatting.Default)
+						case 8:
 						{
-							double[] dvector = new double[range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
+							if (returnRankFormat == RankFormat.Default)
 							{
-								dvector[i - range[0]] = ((double)arr[i]) * bscale + bzero;
-							});
-							return dvector;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
-						{
-							double[,] dtable = new double[range[1] - range[0] + 1, 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								dtable[i - range[0], 0] = ((double)arr[i]) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
-						{
-							double[,] dtable = new double[1, range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								dtable[0, i - range[0]] = ((double)arr[i]) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						break;
-					}
-
-					case 16:
-					{
-						if (returnOptions == ImageDataUnitFormatting.Default)
-						{
-							double[] dvector = new double[range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 2;
-								short val = (short)((arr[cc] << 8) | arr[cc + 1]);
-								dvector[i - range[0]] = ((double)val) * bscale + bzero;
-							});
-							return dvector;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
-						{
-							double[,] dtable = new double[range[1] - range[0] + 1, 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 2;
-								short val = (short)((arr[cc] << 8) | arr[cc + 1]);
-								dtable[i - range[0], 0] = ((double)val) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
-						{
-							double[,] dtable = new double[1, range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 2;
-								short val = (short)((arr[cc] << 8) | arr[cc + 1]);
-								dtable[0, i - range[0]] = ((double)val) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						break;
-					}
-
-					case 32:
-					{
-						if (returnOptions == ImageDataUnitFormatting.Default)
-						{
-							double[] dvector = new double[range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 4;
-								int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-								dvector[i - range[0]] = ((double)val) * bscale + bzero;
-							});
-							return dvector;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
-						{
-							double[,] dtable = new double[range[1] - range[0] + 1, 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 4;
-								int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-								dtable[i - range[0], 0] = ((double)val) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
-						{
-							double[,] dtable = new double[1, range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 4;
-								int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-								dtable[0, i - range[0]] = ((double)val) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						break;
-					}
-
-					case 64:
-					{
-						if (returnOptions == ImageDataUnitFormatting.Default)
-						{
-							double[] dvector = new double[range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 8;
-								byte[] dbl = new byte[8];
-								dbl[7] = arr[cc];
-								dbl[6] = arr[cc + 1];
-								dbl[5] = arr[cc + 2];
-								dbl[4] = arr[cc + 3];
-								dbl[3] = arr[cc + 4];
-								dbl[2] = arr[cc + 5];
-								dbl[1] = arr[cc + 6];
-								dbl[0] = arr[cc + 7];
-								dvector[i - range[0]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
-							});
-							return dvector;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
-						{
-							double[,] dtable = new double[range[1] - range[0] + 1, 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 8;
-								byte[] dbl = new byte[8];
-								dbl[7] = arr[cc];
-								dbl[6] = arr[cc + 1];
-								dbl[5] = arr[cc + 2];
-								dbl[4] = arr[cc + 3];
-								dbl[3] = arr[cc + 4];
-								dbl[2] = arr[cc + 5];
-								dbl[1] = arr[cc + 6];
-								dbl[0] = arr[cc + 7];
-								dtable[i - range[0], 0] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;								
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
-						{
-							double[,] dtable = new double[1, range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 8;
-								byte[] dbl = new byte[8];
-								dbl[7] = arr[cc];
-								dbl[6] = arr[cc + 1];
-								dbl[5] = arr[cc + 2];
-								dbl[4] = arr[cc + 3];
-								dbl[3] = arr[cc + 4];
-								dbl[2] = arr[cc + 5];
-								dbl[1] = arr[cc + 6];
-								dbl[0] = arr[cc + 7];
-								dtable[0, i - range[0]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						break;
-					}
-
-					case -32:
-					{
-						if (returnOptions == ImageDataUnitFormatting.Default)
-						{
-							double[] dvector = new double[range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 4;
-								byte[] flt = new byte[4];
-								flt[3] = arr[cc];
-								flt[2] = arr[cc + 1];
-								flt[1] = arr[cc + 2];
-								flt[0] = arr[cc + 3];
-								dvector[i - range[0]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
-							});
-							return dvector;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
-						{
-							double[,] dtable = new double[range[1] - range[0] + 1, 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 4;
-								byte[] flt = new byte[4];
-								flt[3] = arr[cc];
-								flt[2] = arr[cc + 1];
-								flt[1] = arr[cc + 2];
-								flt[0] = arr[cc + 3];
-								dtable[i - range[0], 0] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
-						{
-							double[,] dtable = new double[1, range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 4;
-								byte[] flt = new byte[4];
-								flt[3] = arr[cc];
-								flt[2] = arr[cc + 1];
-								flt[1] = arr[cc + 2];
-								flt[0] = arr[cc + 3];
-								dtable[0, i - range[0]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						break;
-					}
-
-					case -64:
-					{
-						if (returnOptions == ImageDataUnitFormatting.Default)
-						{
-							double[] dvector = new double[range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 8;
-								byte[] dbl = new byte[8];
-								dbl[7] = arr[cc];
-								dbl[6] = arr[cc + 1];
-								dbl[5] = arr[cc + 2];
-								dbl[4] = arr[cc + 3];
-								dbl[3] = arr[cc + 4];
-								dbl[2] = arr[cc + 5];
-								dbl[1] = arr[cc + 6];
-								dbl[0] = arr[cc + 7];
-								dvector[i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
-							});
-							return dvector;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
-						{
-							double[,] dtable = new double[range[1] - range[0] + 1, 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 8;
-								byte[] dbl = new byte[8];
-								dbl[7] = arr[cc];
-								dbl[6] = arr[cc + 1];
-								dbl[5] = arr[cc + 2];
-								dbl[4] = arr[cc + 3];
-								dbl[3] = arr[cc + 4];
-								dbl[2] = arr[cc + 5];
-								dbl[1] = arr[cc + 6];
-								dbl[0] = arr[cc + 7];
-								dtable[i - range[0], 0] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						else if (returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable)
-						{
-							double[,] dtable = new double[1, range[1] - range[0] + 1];
-							Parallel.For(range[0], range[1] + 1, opts, i =>
-							{
-								int cc = i * 8;
-								byte[] dbl = new byte[8];
-								dbl[7] = arr[cc];
-								dbl[6] = arr[cc + 1];
-								dbl[5] = arr[cc + 2];
-								dbl[4] = arr[cc + 3];
-								dbl[3] = arr[cc + 4];
-								dbl[2] = arr[cc + 5];
-								dbl[1] = arr[cc + 6];
-								dbl[0] = arr[cc + 7];
-								dtable[0, i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
-							});
-							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
-							return dtable;
-						}
-						break;
-					}
-				}
-			}
-
-			if (naxisn.Length == 2)//then a table or image return
-			{
-				double[,] dimage = new double[range[1] - range[0] + 1, range[3] - range[2] + 1];
-				int naxis0 = naxisn[0];
-
-				switch (bitpix)
-				{
-					case 8:
-					{
-						Parallel.For(range[2], range[3] + 1, opts, j =>
-						{
-							int cc = j * naxis0 + range[0];
-							for (int i = range[0]; i <= range[1]; i++)
-								dimage[i - range[0], j - range[2]] = ((double)arr[cc + i]) * bscale + bzero;
-						});
-						break;
-					}
-
-					case 16:
-					{
-						Parallel.For(range[2], range[3] + 1, opts, j =>
-						{
-							short val;
-							int cc = (j * naxis0 + range[0]) * 2;
-							for (int i = range[0]; i <= range[1]; i++)
-							{
-								val = (short)((arr[cc] << 8) | arr[cc + 1]);
-								dimage[i - range[0], j - range[2]] = ((double)val) * bscale + bzero;
-								cc += 2;
+								double[] dvector = new double[range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									dvector[i - range[0]] = ((double)arr[i]) * bscale + bzero;
+								});
+								return dvector;
 							}
-						});
-						break;
-					}
-
-					case 32:
-					{
-						Parallel.For(range[2], range[3] + 1, opts, j =>
-						{
-							int val;
-							int cc = (j * naxis0 + range[0]) * 4;
-							for (int i = range[0]; i <= range[1]; i++)
+							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 							{
-								val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-								dimage[i - range[0], j - range[2]] = ((double)val) * bscale + bzero;
-								cc += 4;
+								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									dtable[i - range[0], 0] = ((double)arr[i]) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
 							}
-						});
-						break;
-					}
-
-					case 64:
-					{
-						Parallel.For(range[2], range[3] + 1, opts, j =>
-						{
-							int cc = (j * naxis0 + range[0]) * 8;
-							byte[] dbl = new byte[8];
-							for (int i = range[0]; i <= range[1]; i++)
+							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 							{
-								dbl[7] = arr[cc];
-								dbl[6] = arr[cc + 1];
-								dbl[5] = arr[cc + 2];
-								dbl[4] = arr[cc + 3];
-								dbl[3] = arr[cc + 4];
-								dbl[2] = arr[cc + 5];
-								dbl[1] = arr[cc + 6];
-								dbl[0] = arr[cc + 7];
-								dimage[i - range[0], j - range[2]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
-								cc += 8;
+								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									dtable[0, i - range[0]] = ((double)arr[i]) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
 							}
-						});
-						break;
-					}
+							break;
+						}
 
-					case -32:
-					{
-						Parallel.For(range[2], range[3] + 1, opts, j =>
+						case 16:
 						{
-							int cc = (j * naxis0 + range[0]) * 4;
-							byte[] flt = new byte[4];
-							for (int i = range[0]; i <= range[1]; i++)
+							if (returnRankFormat == RankFormat.Default)
 							{
-								flt[3] = arr[cc];
-								flt[2] = arr[cc + 1];
-								flt[1] = arr[cc + 2];
-								flt[0] = arr[cc + 3];
-								dimage[i - range[0], j - range[2]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
-								cc += 4;
+								double[] dvector = new double[range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((arr[cc] << 8) | arr[cc + 1]);
+									dvector[i - range[0]] = ((double)val) * bscale + bzero;
+								});
+								return dvector;
 							}
-						});
-						break;
-					}
+							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+							{
+								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((arr[cc] << 8) | arr[cc + 1]);
+									dtable[i - range[0], 0] = ((double)val) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+							{
+								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((arr[cc] << 8) | arr[cc + 1]);
+									dtable[0, i - range[0]] = ((double)val) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
+							}
+							break;
+						}
 
-					case -64:
-					{
-						Parallel.For(range[2], range[3] + 1, opts, j =>
+						case 32:
 						{
-							int cc = (j * naxis0 + range[0]) * 8;
-							byte[] dbl = new byte[8];
-							for (int i = range[0]; i <= range[1]; i++)
+							if (returnRankFormat == RankFormat.Default)
 							{
-								dbl[7] = arr[cc];
-								dbl[6] = arr[cc + 1];
-								dbl[5] = arr[cc + 2];
-								dbl[4] = arr[cc + 3];
-								dbl[3] = arr[cc + 4];
-								dbl[2] = arr[cc + 5];
-								dbl[1] = arr[cc + 6];
-								dbl[0] = arr[cc + 7];
-								dimage[i - range[0], j - range[2]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
-								cc += 8;
+								double[] dvector = new double[range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 4;
+									int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
+									dvector[i - range[0]] = ((double)val) * bscale + bzero;
+								});
+								return dvector;
 							}
-						});
-						break;
+							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+							{
+								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 4;
+									int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
+									dtable[i - range[0], 0] = ((double)val) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+							{
+								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 4;
+									int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
+									dtable[0, i - range[0]] = ((double)val) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
+							}
+							break;
+						}
+
+						case 64:
+						{
+							if (returnRankFormat == RankFormat.Default)
+							{
+								double[] dvector = new double[range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = new byte[8];
+									dbl[7] = arr[cc];
+									dbl[6] = arr[cc + 1];
+									dbl[5] = arr[cc + 2];
+									dbl[4] = arr[cc + 3];
+									dbl[3] = arr[cc + 4];
+									dbl[2] = arr[cc + 5];
+									dbl[1] = arr[cc + 6];
+									dbl[0] = arr[cc + 7];
+									dvector[i - range[0]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
+								});
+								return dvector;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+							{
+								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = new byte[8];
+									dbl[7] = arr[cc];
+									dbl[6] = arr[cc + 1];
+									dbl[5] = arr[cc + 2];
+									dbl[4] = arr[cc + 3];
+									dbl[3] = arr[cc + 4];
+									dbl[2] = arr[cc + 5];
+									dbl[1] = arr[cc + 6];
+									dbl[0] = arr[cc + 7];
+									dtable[i - range[0], 0] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+							{
+								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = new byte[8];
+									dbl[7] = arr[cc];
+									dbl[6] = arr[cc + 1];
+									dbl[5] = arr[cc + 2];
+									dbl[4] = arr[cc + 3];
+									dbl[3] = arr[cc + 4];
+									dbl[2] = arr[cc + 5];
+									dbl[1] = arr[cc + 6];
+									dbl[0] = arr[cc + 7];
+									dtable[0, i - range[0]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
+							}
+							break;
+						}
+
+						case -32:
+						{
+							if (returnRankFormat == RankFormat.Default)
+							{
+								double[] dvector = new double[range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 4;
+									byte[] flt = new byte[4];
+									flt[3] = arr[cc];
+									flt[2] = arr[cc + 1];
+									flt[1] = arr[cc + 2];
+									flt[0] = arr[cc + 3];
+									dvector[i - range[0]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
+								});
+								return dvector;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+							{
+								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 4;
+									byte[] flt = new byte[4];
+									flt[3] = arr[cc];
+									flt[2] = arr[cc + 1];
+									flt[1] = arr[cc + 2];
+									flt[0] = arr[cc + 3];
+									dtable[i - range[0], 0] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+							{
+								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 4;
+									byte[] flt = new byte[4];
+									flt[3] = arr[cc];
+									flt[2] = arr[cc + 1];
+									flt[1] = arr[cc + 2];
+									flt[0] = arr[cc + 3];
+									dtable[0, i - range[0]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
+							}
+							break;
+						}
+
+						case -64:
+						{
+							if (returnRankFormat == RankFormat.Default)
+							{
+								double[] dvector = new double[range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = new byte[8];
+									dbl[7] = arr[cc];
+									dbl[6] = arr[cc + 1];
+									dbl[5] = arr[cc + 2];
+									dbl[4] = arr[cc + 3];
+									dbl[3] = arr[cc + 4];
+									dbl[2] = arr[cc + 5];
+									dbl[1] = arr[cc + 6];
+									dbl[0] = arr[cc + 7];
+									dvector[i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
+								});
+								return dvector;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+							{
+								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = new byte[8];
+									dbl[7] = arr[cc];
+									dbl[6] = arr[cc + 1];
+									dbl[5] = arr[cc + 2];
+									dbl[4] = arr[cc + 3];
+									dbl[3] = arr[cc + 4];
+									dbl[2] = arr[cc + 5];
+									dbl[1] = arr[cc + 6];
+									dbl[0] = arr[cc + 7];
+									dtable[i - range[0], 0] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+							{
+								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = new byte[8];
+									dbl[7] = arr[cc];
+									dbl[6] = arr[cc + 1];
+									dbl[5] = arr[cc + 2];
+									dbl[4] = arr[cc + 3];
+									dbl[3] = arr[cc + 4];
+									dbl[2] = arr[cc + 5];
+									dbl[1] = arr[cc + 6];
+									dbl[0] = arr[cc + 7];
+									dtable[0, i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
+								});
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+								return dtable;
+							}
+							break;
+						}
 					}
 				}
 
-				if (returnOptions == ImageDataUnitFormatting.Default || returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable || returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
-					return dimage;
-				else if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0)
-					return dimage;
-				else if (returnOptions == ImageDataUnitFormatting.ArrayAsRangeRank)
+				else if (naxisn.Length == 2)//then a table or image return
 				{
-					double[] dvector = new double[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
-					int cc = 0;
-					for (int i = 0; i < dimage.GetLength(0); i++)
-						for (int j = 0; j < dimage.GetLength(1); j++)
-							dvector[cc++] = dimage[i, j];
+					double[,] dimage = new double[range[1] - range[0] + 1, range[3] - range[2] + 1];
+					int naxis0 = naxisn[0];
 
-					naxisn = new int[1] { dvector.Length };
-					return dvector;
-				}
-			}
-
-			if (naxisn.Length == 3)//then a data cube
-			{
-				double[,,] dcube = new double[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
-				int naxis0 = naxisn[0], naxis1 = naxisn[1];
-
-				switch (bitpix)
-				{
-					case 8:
+					switch (bitpix)
 					{
-						Parallel.For(range[4], range[5] + 1, opts, k =>
+						case 8:
 						{
-							int cc = k * naxis0 * naxis1 + range[2] * naxis1 + range[0];
-
-							for (int j = range[2]; j <= range[3]; j++)
+							Parallel.For(range[2], range[3] + 1, opts, j =>
+							{
+								int cc = j * naxis0 + range[0];
 								for (int i = range[0]; i <= range[1]; i++)
-									dcube[i - range[0], j - range[2], k - range[4]] = ((double)arr[cc + i]) * bscale + bzero;
-						});
-						break;
-					}
+									dimage[i - range[0], j - range[2]] = ((double)arr[cc + i]) * bscale + bzero;
+							});
+							break;
+						}
 
-					case 16:
-					{
-						Parallel.For(range[4], range[5] + 1, opts, k =>
+						case 16:
 						{
-							short val;
-							int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 2;
-
-							for (int j = range[2]; j <= range[3]; j++)
+							Parallel.For(range[2], range[3] + 1, opts, j =>
+							{
+								short val;
+								int cc = (j * naxis0 + range[0]) * 2;
 								for (int i = range[0]; i <= range[1]; i++)
 								{
 									val = (short)((arr[cc] << 8) | arr[cc + 1]);
-									dcube[i - range[0], j - range[2], k - range[4]] = ((double)val) * bscale + bzero;
+									dimage[i - range[0], j - range[2]] = ((double)val) * bscale + bzero;
 									cc += 2;
 								}
-						});
-						break;
-					}
+							});
+							break;
+						}
 
-					case 32:
-					{
-						Parallel.For(range[4], range[5] + 1, opts, k =>
+						case 32:
 						{
-							int val;
-							int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 4;
-
-							for (int j = range[2]; j <= range[3]; j++)
+							Parallel.For(range[2], range[3] + 1, opts, j =>
+							{
+								int val;
+								int cc = (j * naxis0 + range[0]) * 4;
 								for (int i = range[0]; i <= range[1]; i++)
 								{
 									val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-									dcube[i - range[0], j - range[2], k - range[4]] = ((double)val) * bscale + bzero;
+									dimage[i - range[0], j - range[2]] = ((double)val) * bscale + bzero;
 									cc += 4;
 								}
-						});
-						break;
-					}
+							});
+							break;
+						}
 
-					case 64:
-					{
-						Parallel.For(range[4], range[5] + 1, opts, k =>
+						case 64:
 						{
-							int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 8;
-							byte[] dbl = new byte[8];
-
-							for (int j = range[2]; j <= range[3]; j++)
+							Parallel.For(range[2], range[3] + 1, opts, j =>
+							{
+								int cc = (j * naxis0 + range[0]) * 8;
+								byte[] dbl = new byte[8];
 								for (int i = range[0]; i <= range[1]; i++)
 								{
 									dbl[7] = arr[cc];
@@ -846,42 +768,38 @@ namespace JPFITS
 									dbl[2] = arr[cc + 5];
 									dbl[1] = arr[cc + 6];
 									dbl[0] = arr[cc + 7];
-									dcube[i - range[0], j - range[2], k - range[4]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
+									dimage[i - range[0], j - range[2]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
 									cc += 8;
 								}
-						});
-						break;
-					}
+							});
+							break;
+						}
 
-					case -32:
-					{
-						Parallel.For(range[4], range[5] + 1, opts, k =>
+						case -32:
 						{
-							int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 4;
-							byte[] flt = new byte[4];
-
-							for (int j = range[2]; j <= range[3]; j++)
+							Parallel.For(range[2], range[3] + 1, opts, j =>
+							{
+								int cc = (j * naxis0 + range[0]) * 4;
+								byte[] flt = new byte[4];
 								for (int i = range[0]; i <= range[1]; i++)
 								{
 									flt[3] = arr[cc];
 									flt[2] = arr[cc + 1];
 									flt[1] = arr[cc + 2];
 									flt[0] = arr[cc + 3];
-									dcube[i - range[0], j - range[2], k - range[4]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
+									dimage[i - range[0], j - range[2]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
 									cc += 4;
 								}
-						});
-						break;
-					}
+							});
+							break;
+						}
 
-					case -64:
-					{
-						Parallel.For(range[4], range[5] + 1, opts, k =>
+						case -64:
 						{
-							int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 8;
-							byte[] dbl = new byte[8];
-
-							for (int j = range[2]; j <= range[3]; j++)
+							Parallel.For(range[2], range[3] + 1, opts, j =>
+							{
+								int cc = (j * naxis0 + range[0]) * 8;
+								byte[] dbl = new byte[8];
 								for (int i = range[0]; i <= range[1]; i++)
 								{
 									dbl[7] = arr[cc];
@@ -892,67 +810,1894 @@ namespace JPFITS
 									dbl[2] = arr[cc + 5];
 									dbl[1] = arr[cc + 6];
 									dbl[0] = arr[cc + 7];
-									dcube[i - range[0], j - range[2], k - range[4]] = ((double)BitConverter.ToDouble(dbl, 0)) * bscale + bzero;
+									dimage[i - range[0], j - range[2]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
 									cc += 8;
 								}
-						});						
-						break;
+							});
+							break;
+						}
 					}
-				}
 
-				if (returnOptions == ImageDataUnitFormatting.Default || returnOptions == ImageDataUnitFormatting.VectorAsVerticalTable || returnOptions == ImageDataUnitFormatting.VectorAsHorizontalTable)
-					return dcube;
-				else if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0)
-					return dcube;
-				else if (returnOptions == ImageDataUnitFormatting.ArrayAsRangeRank)
-				{
-					//check if vector
-					if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+					if (returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+						return dimage;
+					else if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0)
+						return dimage;
+					else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 					{
-						double[] dvector = new double[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+						double[] dvector = new double[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+
+						//System.Buffer.BlockCopy(dimage, 0, dvector, 0, dvector.Length * 8);
+
 						int cc = 0;
-						for (int i = 0; i < dcube.GetLength(0); i++)
-							for (int j = 0; j < dcube.GetLength(1); j++)
-								for (int k = 0; k < dcube.GetLength(2); k++)
-									dvector[cc++] = dcube[i, j, k];
+						for (int i = 0; i < dimage.GetLength(0); i++)
+							for (int j = 0; j < dimage.GetLength(1); j++)
+								dvector[cc++] = dimage[i, j];
 
 						naxisn = new int[1] { dvector.Length };
 						return dvector;
 					}
-					else//must be 2d if gotten here
+				}
+
+				else if (naxisn.Length == 3)//then a data cube
+				{
+					double[,,] dcube = new double[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+					int naxis0 = naxisn[0], naxis1 = naxisn[1];
+
+					switch (bitpix)
 					{
-						double[,] dimage;
-						if ((range[1] - range[0]) == 0)
+						case 8:
 						{
-							dimage = new double[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
-							for (int i = 0; i < dimage.GetLength(0); i++)
-								for (int j = 0; j < dimage.GetLength(1); j++)
-									dimage[i, j] = dcube[0, i, j];
-						}
-						else if ((range[3] - range[2]) == 0)
-						{
-							dimage = new double[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
-							for (int i = 0; i < dimage.GetLength(0); i++)
-								for (int j = 0; j < dimage.GetLength(1); j++)
-									dimage[i, j] = dcube[i, 0, j];
-						}
-						else
-						{
-							dimage = new double[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
-							for (int i = 0; i < dimage.GetLength(0); i++)
-								for (int j = 0; j < dimage.GetLength(1); j++)
-									dimage[i, j] = dcube[i, j, 0];
+							Parallel.For(range[4], range[5] + 1, opts, k =>
+							{
+								int cc = k * naxis0 * naxis1 + range[2] * naxis1 + range[0];
+
+								for (int j = range[2]; j <= range[3]; j++)
+									for (int i = range[0]; i <= range[1]; i++)
+										dcube[i - range[0], j - range[2], k - range[4]] = ((double)arr[cc + i]) * bscale + bzero;
+							});
+							break;
 						}
 
-						naxisn = new int[2] { dimage.GetLength(0), dimage.GetLength(1) };
-						return dimage;
+						case 16:
+						{
+							Parallel.For(range[4], range[5] + 1, opts, k =>
+							{
+								short val;
+								int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 2;
+
+								for (int j = range[2]; j <= range[3]; j++)
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										val = (short)((arr[cc] << 8) | arr[cc + 1]);
+										dcube[i - range[0], j - range[2], k - range[4]] = ((double)val) * bscale + bzero;
+										cc += 2;
+									}
+							});
+							break;
+						}
+
+						case 32:
+						{
+							Parallel.For(range[4], range[5] + 1, opts, k =>
+							{
+								int val;
+								int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 4;
+
+								for (int j = range[2]; j <= range[3]; j++)
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
+										dcube[i - range[0], j - range[2], k - range[4]] = ((double)val) * bscale + bzero;
+										cc += 4;
+									}
+							});
+							break;
+						}
+
+						case 64:
+						{
+							Parallel.For(range[4], range[5] + 1, opts, k =>
+							{
+								int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 8;
+								byte[] dbl = new byte[8];
+
+								for (int j = range[2]; j <= range[3]; j++)
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										dbl[7] = arr[cc];
+										dbl[6] = arr[cc + 1];
+										dbl[5] = arr[cc + 2];
+										dbl[4] = arr[cc + 3];
+										dbl[3] = arr[cc + 4];
+										dbl[2] = arr[cc + 5];
+										dbl[1] = arr[cc + 6];
+										dbl[0] = arr[cc + 7];
+										dcube[i - range[0], j - range[2], k - range[4]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
+										cc += 8;
+									}
+							});
+							break;
+						}
+
+						case -32:
+						{
+							Parallel.For(range[4], range[5] + 1, opts, k =>
+							{
+								int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 4;
+								byte[] flt = new byte[4];
+
+								for (int j = range[2]; j <= range[3]; j++)
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										flt[3] = arr[cc];
+										flt[2] = arr[cc + 1];
+										flt[1] = arr[cc + 2];
+										flt[0] = arr[cc + 3];
+										dcube[i - range[0], j - range[2], k - range[4]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
+										cc += 4;
+									}
+							});
+							break;
+						}
+
+						case -64:
+						{
+							Parallel.For(range[4], range[5] + 1, opts, k =>
+							{
+								int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 8;
+								byte[] dbl = new byte[8];
+
+								for (int j = range[2]; j <= range[3]; j++)
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										dbl[7] = arr[cc];
+										dbl[6] = arr[cc + 1];
+										dbl[5] = arr[cc + 2];
+										dbl[4] = arr[cc + 3];
+										dbl[3] = arr[cc + 4];
+										dbl[2] = arr[cc + 5];
+										dbl[1] = arr[cc + 6];
+										dbl[0] = arr[cc + 7];
+										dcube[i - range[0], j - range[2], k - range[4]] = ((double)BitConverter.ToDouble(dbl, 0)) * bscale + bzero;
+										cc += 8;
+									}
+							});
+							break;
+						}
+					}
+
+					if (returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+						return dcube;
+					else if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0)
+						return dcube;
+					else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+					{
+						//check if vector
+						if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+						{
+							double[] dvector = new double[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+							int cc = 0;
+							for (int i = 0; i < dcube.GetLength(0); i++)
+								for (int j = 0; j < dcube.GetLength(1); j++)
+									for (int k = 0; k < dcube.GetLength(2); k++)
+										dvector[cc++] = dcube[i, j, k];
+
+							naxisn = new int[1] { dvector.Length };
+							return dvector;
+						}
+						else//must be 2d if gotten here
+						{
+							double[,] dimage;
+							if ((range[1] - range[0]) == 0)
+							{
+								dimage = new double[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+								for (int i = 0; i < dimage.GetLength(0); i++)
+									for (int j = 0; j < dimage.GetLength(1); j++)
+										dimage[i, j] = dcube[0, i, j];
+							}
+							else if ((range[3] - range[2]) == 0)
+							{
+								dimage = new double[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+								for (int i = 0; i < dimage.GetLength(0); i++)
+									for (int j = 0; j < dimage.GetLength(1); j++)
+										dimage[i, j] = dcube[i, 0, j];
+							}
+							else
+							{
+								dimage = new double[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+								for (int i = 0; i < dimage.GetLength(0); i++)
+									for (int j = 0; j < dimage.GetLength(1); j++)
+										dimage[i, j] = dcube[i, j, 0];
+							}
+
+							naxisn = new int[2] { dimage.GetLength(0), dimage.GetLength(1) };
+							return dimage;
+						}
+					}
+					else
+						throw new Exception("DataUnitReturn option DataUnitReturn.VectorAsTable is not valid for a 3D cube.");
+				}
+			}
+			else if (returnPrecision == DataPrecision.Native)
+			{
+				if (naxisn.Length == 1)//then a vector return
+				{
+					switch (bitpix)
+					{
+						case 8:
+						{
+							if (bzero == -128)//signed byte
+							{
+								if (returnRankFormat == RankFormat.Default)
+								{
+									sbyte[] vector = new sbyte[range[1] - range[0] + 1];
+
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										vector[i - range[0]] = (sbyte)((sbyte)arr[i] * bscale);
+									});
+									return vector;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								{
+									sbyte[,] table = new sbyte[range[1] - range[0] + 1, 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										table[i - range[0], 0] = (sbyte)((sbyte)arr[i] * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+								{
+									sbyte[,] table = new sbyte[1, range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										table[0, i - range[0]] = (sbyte)((sbyte)arr[i] * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+							}
+							else if (bzero == 0)//unsigned byte
+							{
+								if (returnRankFormat == RankFormat.Default)
+								{
+									byte[] vector = new byte[range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										vector[i - range[0]] = (byte)((byte)arr[i] * bscale);
+									});
+									return vector;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								{
+									byte[,] table = new byte[range[1] - range[0] + 1, 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										table[i - range[0], 0] = (byte)((byte)arr[i] * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+								{
+									byte[,] table = new byte[1, range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										table[0, i - range[0]] = (byte)((byte)arr[i] * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+							}
+
+							break;
+						}
+
+						case 16:
+						{
+							if (bzero == 0)//signed int16
+							{
+								if (returnRankFormat == RankFormat.Default)
+								{
+									short[] vector = new short[range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 2;
+										byte[] bytes = new byte[2];
+										bytes[1] = arr[cc];
+										bytes[0] = arr[cc + 1];
+										vector[i - range[0]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale);
+									});
+									return vector;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								{
+									short[,] table = new short[range[1] - range[0] + 1, 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 2;
+										byte[] bytes = new byte[2];
+										bytes[1] = arr[cc];
+										bytes[0] = arr[cc + 1];
+										table[i - range[0], 0] = (short)(BitConverter.ToInt16(bytes, 0) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+								{
+									short[,] table = new short[1, range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 2;
+										byte[] bytes = new byte[2];
+										bytes[1] = arr[cc];
+										bytes[0] = arr[cc + 1];
+										table[0, i - range[0]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+							}
+							else if (bzero == 32768)//unsigned uint16
+							{
+								if (returnRankFormat == RankFormat.Default)
+								{
+									ushort[] vector = new ushort[range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 2;
+										byte[] bytes = new byte[2];
+										bytes[1] = arr[cc];
+										bytes[0] = arr[cc + 1];
+										vector[i - range[0]] = (ushort)(FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(bytes, 0)) * bscale);
+									});
+									return vector;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								{
+									ushort[,] table = new ushort[range[1] - range[0] + 1, 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 2;
+										byte[] bytes = new byte[2];
+										bytes[1] = arr[cc];
+										bytes[0] = arr[cc + 1];
+										table[i - range[0], 0] = (ushort)(FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(bytes, 0)) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+								{
+									ushort[,] table = new ushort[1, range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 2;
+										byte[] bytes = new byte[2];
+										bytes[1] = arr[cc];
+										bytes[0] = arr[cc + 1];
+										table[0, i - range[0]] = (ushort)(FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(bytes, 0)) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+							}
+
+							break;
+						}
+
+						case 32:
+						{
+							if (bzero == 0)//signed int32
+							{
+								if (returnRankFormat == RankFormat.Default)
+								{
+									int[] vector = new int[range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 4;
+										byte[] bytes = new byte[4];
+										bytes[3] = arr[cc];
+										bytes[2] = arr[cc + 1];
+										bytes[1] = arr[cc + 2];
+										bytes[0] = arr[cc + 3];
+										vector[i - range[0]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale);
+									});
+									return vector;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								{
+									int[,] table = new int[range[1] - range[0] + 1, 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 4;
+										byte[] bytes = new byte[4];
+										bytes[3] = arr[cc];
+										bytes[2] = arr[cc + 1];
+										bytes[1] = arr[cc + 2];
+										bytes[0] = arr[cc + 3];
+										table[i - range[0], 0] = (int)(BitConverter.ToInt32(bytes, 0) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+								{
+									int[,] table = new int[1, range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 4;
+										byte[] bytes = new byte[4];
+										bytes[3] = arr[cc];
+										bytes[2] = arr[cc + 1];
+										bytes[1] = arr[cc + 2];
+										bytes[0] = arr[cc + 3];
+										table[0, i - range[0]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+							}
+							else if (bzero == 2147483648)//unsigned uint32
+							{
+								if (returnRankFormat == RankFormat.Default)
+								{
+									uint[] vector = new uint[range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 4;
+										byte[] bytes = new byte[4];
+										bytes[3] = arr[cc];
+										bytes[2] = arr[cc + 1];
+										bytes[1] = arr[cc + 2];
+										bytes[0] = arr[cc + 3];
+										vector[i - range[0]] = (uint)(FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(bytes, 0)) * bscale);
+									});
+									return vector;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								{
+									uint[,] table = new uint[range[1] - range[0] + 1, 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 4;
+										byte[] bytes = new byte[4];
+										bytes[3] = arr[cc];
+										bytes[2] = arr[cc + 1];
+										bytes[1] = arr[cc + 2];
+										bytes[0] = arr[cc + 3];
+										table[i - range[0], 0] = (uint)(FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(bytes, 0)) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+								{
+									uint[,] table = new uint[1, range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 4;
+										byte[] bytes = new byte[4];
+										bytes[3] = arr[cc];
+										bytes[2] = arr[cc + 1];
+										bytes[1] = arr[cc + 2];
+										bytes[0] = arr[cc + 3];
+										table[0, i - range[0]] = (uint)(FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(bytes, 0)) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+							}
+							
+							break;
+						}
+
+						case 64:
+						{
+							if (bzero == 0)//signed int64
+							{
+								if (returnRankFormat == RankFormat.Default)
+								{
+									long[] vector = new long[range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 8;
+										byte[] bytes = new byte[8];
+										bytes[7] = arr[cc];
+										bytes[6] = arr[cc + 1];
+										bytes[5] = arr[cc + 2];
+										bytes[4] = arr[cc + 3];
+										bytes[3] = arr[cc + 4];
+										bytes[2] = arr[cc + 5];
+										bytes[1] = arr[cc + 6];
+										bytes[0] = arr[cc + 7];
+										vector[i - range[0]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale);
+									});
+									return vector;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								{
+									long[,] table = new long[range[1] - range[0] + 1, 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 8;
+										byte[] bytes = new byte[8];
+										bytes[7] = arr[cc];
+										bytes[6] = arr[cc + 1];
+										bytes[5] = arr[cc + 2];
+										bytes[4] = arr[cc + 3];
+										bytes[3] = arr[cc + 4];
+										bytes[2] = arr[cc + 5];
+										bytes[1] = arr[cc + 6];
+										bytes[0] = arr[cc + 7];
+										table[i - range[0], 0] = (long)(BitConverter.ToInt64(bytes, 0) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+								{
+									long[,] table = new long[1, range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 8;
+										byte[] bytes = new byte[8];
+										bytes[7] = arr[cc];
+										bytes[6] = arr[cc + 1];
+										bytes[5] = arr[cc + 2];
+										bytes[4] = arr[cc + 3];
+										bytes[3] = arr[cc + 4];
+										bytes[2] = arr[cc + 5];
+										bytes[1] = arr[cc + 6];
+										bytes[0] = arr[cc + 7];
+										table[0, i - range[0]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+							}
+							else if (bzero == 9223372036854775808)//unsigned uint64
+							{
+								if (returnRankFormat == RankFormat.Default)
+								{
+									ulong[] vector = new ulong[range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 8;
+										byte[] bytes = new byte[8];
+										bytes[7] = arr[cc];
+										bytes[6] = arr[cc + 1];
+										bytes[5] = arr[cc + 2];
+										bytes[4] = arr[cc + 3];
+										bytes[3] = arr[cc + 4];
+										bytes[2] = arr[cc + 5];
+										bytes[1] = arr[cc + 6];
+										bytes[0] = arr[cc + 7];
+										vector[i - range[0]] = (ulong)(FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(bytes, 0)) * bscale);
+									});
+									return vector;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								{
+									ulong[,] table = new ulong[range[1] - range[0] + 1, 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 8;
+										byte[] bytes = new byte[8];
+										bytes[7] = arr[cc];
+										bytes[6] = arr[cc + 1];
+										bytes[5] = arr[cc + 2];
+										bytes[4] = arr[cc + 3];
+										bytes[3] = arr[cc + 4];
+										bytes[2] = arr[cc + 5];
+										bytes[1] = arr[cc + 6];
+										bytes[0] = arr[cc + 7];
+										table[i - range[0], 0] = (ulong)(FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(bytes, 0)) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+								{
+									ulong[,] table = new ulong[1, range[1] - range[0] + 1];
+									Parallel.For(range[0], range[1] + 1, opts, i =>
+									{
+										int cc = i * 8;
+										byte[] bytes = new byte[8];
+										bytes[7] = arr[cc];
+										bytes[6] = arr[cc + 1];
+										bytes[5] = arr[cc + 2];
+										bytes[4] = arr[cc + 3];
+										bytes[3] = arr[cc + 4];
+										bytes[2] = arr[cc + 5];
+										bytes[1] = arr[cc + 6];
+										bytes[0] = arr[cc + 7];
+										table[0, i - range[0]] = (ulong)(FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(bytes, 0)) * bscale);
+									});
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+							}
+							
+							break;
+						}
+
+						case -32://single precision float
+						{
+							if (returnRankFormat == RankFormat.Default)
+							{
+								float[] vector = new float[range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 4;
+									byte[] flt = new byte[4];
+									flt[3] = arr[cc];
+									flt[2] = arr[cc + 1];
+									flt[1] = arr[cc + 2];
+									flt[0] = arr[cc + 3];
+									vector[i - range[0]] = (float)(BitConverter.ToSingle(flt, 0) * bscale);
+								});
+								return vector;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+							{
+								float[,] table = new float[range[1] - range[0] + 1, 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 4;
+									byte[] flt = new byte[4];
+									flt[3] = arr[cc];
+									flt[2] = arr[cc + 1];
+									flt[1] = arr[cc + 2];
+									flt[0] = arr[cc + 3];
+									table[i - range[0], 0] = (float)(BitConverter.ToSingle(flt, 0) * bscale);
+								});
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+								return table;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+							{
+								float[,] table = new float[1, range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 4;
+									byte[] flt = new byte[4];
+									flt[3] = arr[cc];
+									flt[2] = arr[cc + 1];
+									flt[1] = arr[cc + 2];
+									flt[0] = arr[cc + 3];
+									table[0, i - range[0]] = (float)(BitConverter.ToSingle(flt, 0) * bscale);
+								});
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+								return table;
+							}
+							break;
+						}
+
+						case -64://double precision float
+						{
+							if (returnRankFormat == RankFormat.Default)
+							{
+								double[] vector = new double[range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = new byte[8];
+									dbl[7] = arr[cc];
+									dbl[6] = arr[cc + 1];
+									dbl[5] = arr[cc + 2];
+									dbl[4] = arr[cc + 3];
+									dbl[3] = arr[cc + 4];
+									dbl[2] = arr[cc + 5];
+									dbl[1] = arr[cc + 6];
+									dbl[0] = arr[cc + 7];
+									vector[i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale;
+								});
+								return vector;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+							{
+								double[,] table = new double[range[1] - range[0] + 1, 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = new byte[8];
+									dbl[7] = arr[cc];
+									dbl[6] = arr[cc + 1];
+									dbl[5] = arr[cc + 2];
+									dbl[4] = arr[cc + 3];
+									dbl[3] = arr[cc + 4];
+									dbl[2] = arr[cc + 5];
+									dbl[1] = arr[cc + 6];
+									dbl[0] = arr[cc + 7];
+									table[i - range[0], 0] = BitConverter.ToDouble(dbl, 0) * bscale;
+								});
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+								return table;
+							}
+							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+							{
+								double[,] table = new double[1, range[1] - range[0] + 1];
+								Parallel.For(range[0], range[1] + 1, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = new byte[8];
+									dbl[7] = arr[cc];
+									dbl[6] = arr[cc + 1];
+									dbl[5] = arr[cc + 2];
+									dbl[4] = arr[cc + 3];
+									dbl[3] = arr[cc + 4];
+									dbl[2] = arr[cc + 5];
+									dbl[1] = arr[cc + 6];
+									dbl[0] = arr[cc + 7];
+									table[0, i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale;
+								});
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+								return table;
+							}
+							break;
+						}
 					}
 				}
-				else
-					throw new Exception("DataUnitReturn option DataUnitReturn.VectorAsTable is not valid for a 3D cube.");
+
+				else if (naxisn.Length == 2)//then a table or image return
+				{
+					int naxis0 = naxisn[0];
+
+					switch (bitpix)
+					{
+						case 8:
+						{
+							if (bzero == -128)//signed byte
+							{
+								sbyte[,] table = new sbyte[range[1] - range[0] + 1, range[3] - range[2] + 1];
+
+								Parallel.For(range[2], range[3] + 1, opts, j =>
+								{
+									int cc = j * naxis0 + range[0];
+									for (int i = range[0]; i <= range[1]; i++)
+										table[i - range[0], j - range[2]] = (sbyte)((sbyte)arr[cc + i] * bscale);
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+									return table;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+								{
+									sbyte[] vector = new sbyte[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+									System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 1);
+									naxisn = new int[1] { vector.Length };
+									return vector;
+								}
+							}
+							else if (bzero == 0)//unsigned byte
+							{
+								byte[,] table = new byte[range[1] - range[0] + 1, range[3] - range[2] + 1];
+
+								Parallel.For(range[2], range[3] + 1, opts, j =>
+								{
+									int cc = j * naxis0 + range[0];
+									for (int i = range[0]; i <= range[1]; i++)
+										table[i - range[0], j - range[2]] = (byte)((byte)arr[cc + i] * bscale);
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+									return table;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+								{
+									byte[] vector = new byte[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+									System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 1);
+									naxisn = new int[1] { vector.Length };
+									return vector;
+								}
+							}
+							break;
+						}
+
+						case 16:
+						{
+							if (bzero == 0)//signed int16
+							{
+								short[,] table = new short[range[1] - range[0] + 1, 1];
+
+								Parallel.For(range[2], range[3] + 1, opts, j =>
+								{
+									int cc = (j * naxis0 + range[0]) * 2;
+									byte[] bytes = new byte[2];
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										bytes[1] = arr[cc];
+										bytes[0] = arr[cc + 1];
+										table[i - range[0], j - range[2]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale);
+										cc += 2;
+									}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+									return table;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+								{
+									short[] vector = new short[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+									System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 2);
+									naxisn = new int[1] { vector.Length };
+									return vector;
+								}
+							}
+							else if (bzero == 32768)//unsigned uint16
+							{
+								ushort[,] table = new ushort[range[1] - range[0] + 1, 1];
+
+								Parallel.For(range[2], range[3] + 1, opts, j =>
+								{
+									int cc = (j * naxis0 + range[0]) * 2;
+									byte[] bytes = new byte[2];
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										bytes[1] = arr[cc];
+										bytes[0] = arr[cc + 1];
+										table[i - range[0], j - range[2]] = (ushort)(FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(bytes, 0)) * bscale);
+										cc += 2;
+									}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+									return table;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+								{
+									ushort[] vector = new ushort[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+									System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 2);
+									naxisn = new int[1] { vector.Length };
+									return vector;
+								}
+							}
+							
+							break;
+						}
+
+						case 32:
+						{
+							if (bzero == 0)//signed int32
+							{
+								int[,] table = new int[range[1] - range[0] + 1, 1];
+
+								Parallel.For(range[2], range[3] + 1, opts, j =>
+								{
+									int cc = (j * naxis0 + range[0]) * 4;
+									byte[] bytes = new byte[4];
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										bytes[3] = arr[cc];
+										bytes[2] = arr[cc + 1];
+										bytes[1] = arr[cc + 2];
+										bytes[0] = arr[cc + 3];
+										table[i - range[0], j - range[2]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale);
+										cc += 4;
+									}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+									return table;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+								{
+									int[] vector = new int[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+									System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 4);
+									naxisn = new int[1] { vector.Length };
+									return vector;
+								}
+							}
+							else if (bzero == 2147483648)//unsigned uint32
+							{
+								uint[,] table = new uint[range[1] - range[0] + 1, 1];
+
+								Parallel.For(range[2], range[3] + 1, opts, j =>
+								{
+									int cc = (j * naxis0 + range[0]) * 4;
+									byte[] bytes = new byte[4];
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										bytes[3] = arr[cc];
+										bytes[2] = arr[cc + 1];
+										bytes[1] = arr[cc + 2];
+										bytes[0] = arr[cc + 3];
+										table[i - range[0], j - range[2]] = (uint)(FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(bytes, 0)) * bscale);
+										cc += 4;
+									}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+									return table;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+								{
+									uint[] vector = new uint[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+									System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 4);
+									naxisn = new int[1] { vector.Length };
+									return vector;
+								}
+							}
+
+							break;
+						}
+
+						case 64:
+						{
+							if (bzero == 0)//signed int64
+							{
+								long[,] table = new long[range[1] - range[0] + 1, 1];
+
+								Parallel.For(range[2], range[3] + 1, opts, j =>
+								{
+									int cc = (j * naxis0 + range[0]) * 8;
+									byte[] bytes = new byte[8];
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										bytes[7] = arr[cc];
+										bytes[6] = arr[cc + 1];
+										bytes[5] = arr[cc + 2];
+										bytes[4] = arr[cc + 3];
+										bytes[3] = arr[cc + 4];
+										bytes[2] = arr[cc + 5];
+										bytes[1] = arr[cc + 6];
+										bytes[0] = arr[cc + 7];
+										table[i - range[0], j - range[2]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale);
+										cc += 8;
+									}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+									return table;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+								{
+									long[] vector = new long[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+									System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 8);
+									naxisn = new int[1] { vector.Length };
+									return vector;
+								}
+							}
+							else if (bzero == 9223372036854775808)//unsigned uint64
+							{
+								ulong[,] table = new ulong[range[1] - range[0] + 1, 1];
+
+								Parallel.For(range[2], range[3] + 1, opts, j =>
+								{
+									int cc = (j * naxis0 + range[0]) * 8;
+									byte[] bytes = new byte[8];
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										bytes[7] = arr[cc];
+										bytes[6] = arr[cc + 1];
+										bytes[5] = arr[cc + 2];
+										bytes[4] = arr[cc + 3];
+										bytes[3] = arr[cc + 4];
+										bytes[2] = arr[cc + 5];
+										bytes[1] = arr[cc + 6];
+										bytes[0] = arr[cc + 7];
+										table[i - range[0], j - range[2]] = (ulong)(FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(bytes, 0)) * bscale);
+										cc += 8;
+									}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+									return table;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+								{
+									long[] vector = new long[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+									System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 8);
+									naxisn = new int[1] { vector.Length };
+									return vector;
+								}
+							}
+
+							break;
+						}
+
+						case -32:
+						{
+							float[,] table = new float[range[1] - range[0] + 1, 1];
+
+							Parallel.For(range[2], range[3] + 1, opts, j =>
+							{
+								int cc = (j * naxis0 + range[0]) * 4;
+								byte[] bytes = new byte[4];
+								for (int i = range[0]; i <= range[1]; i++)
+								{
+									bytes[3] = arr[cc];
+									bytes[2] = arr[cc + 1];
+									bytes[1] = arr[cc + 2];
+									bytes[0] = arr[cc + 3];
+									table[i - range[0], j - range[2]] = (float)(BitConverter.ToSingle(bytes, 0) * bscale);
+									cc += 4;
+								}
+							});
+
+							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+								return table;
+							else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+							{
+								float[] vector = new float[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+								System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 4);
+								naxisn = new int[1] { vector.Length };
+								return vector;
+							}
+
+							break;
+						}
+
+						case -64:
+						{
+							double[,] table = new double[range[1] - range[0] + 1, 1];
+
+							Parallel.For(range[2], range[3] + 1, opts, j =>
+							{
+								int cc = (j * naxis0 + range[0]) * 8;
+								byte[] bytes = new byte[8];
+								for (int i = range[0]; i <= range[1]; i++)
+								{
+									bytes[7] = arr[cc];
+									bytes[6] = arr[cc + 1];
+									bytes[5] = arr[cc + 2];
+									bytes[4] = arr[cc + 3];
+									bytes[3] = arr[cc + 4];
+									bytes[2] = arr[cc + 5];
+									bytes[1] = arr[cc + 6];
+									bytes[0] = arr[cc + 7];
+									table[i - range[0], j - range[2]] = BitConverter.ToDouble(bytes, 0) * bscale;
+									cc += 8;
+								}
+							});
+
+							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+								return table;
+							else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+							{
+								double[] vector = new double[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+								System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 8);
+								naxisn = new int[1] { vector.Length };
+								return vector;
+							}
+
+							break;
+						}
+					}
+				}
+
+				else if (naxisn.Length == 3)//then a data cube
+				{
+					int naxis0 = naxisn[0], naxis1 = naxisn[1];
+
+					switch (bitpix)
+					{
+						case 8:
+						{
+							if (bzero == -128)//signed byte
+							{
+								sbyte[,,] cube = new sbyte[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+								Parallel.For(range[4], range[5] + 1, opts, k =>
+								{
+									int cc = k * naxis0 * naxis1 + range[2] * naxis1 + range[0];
+
+									for (int j = range[2]; j <= range[3]; j++)
+										for (int i = range[0]; i <= range[1]; i++)
+											cube[i - range[0], j - range[2], k - range[4]] = (sbyte)((sbyte)arr[cc + i] * bscale);
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+									return cube;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+								{
+									//check if vector
+									if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+									{
+										sbyte[] vector = new sbyte[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+										int cc = 0;
+										for (int i = 0; i < cube.GetLength(0); i++)
+											for (int j = 0; j < cube.GetLength(1); j++)
+												for (int k = 0; k < cube.GetLength(2); k++)
+													vector[cc++] = cube[i, j, k];
+
+										naxisn = new int[1] { vector.Length };
+										return vector;
+									}
+									else//must be 2d if gotten here
+									{
+										sbyte[,] table = null;
+										if ((range[1] - range[0]) == 0)
+										{
+											table = new sbyte[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[0, i, j];
+										}
+										else if ((range[3] - range[2]) == 0)
+										{
+											table = new sbyte[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, 0, j];
+										}
+										else if ((range[5] - range[4]) == 0)
+										{
+											table = new sbyte[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, j, 0];
+										}
+
+										naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+										return table;
+									}
+								}
+							}
+							else if (bzero == 0)//unsigned byte
+							{
+								byte[,,] cube = new byte[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+								Parallel.For(range[4], range[5] + 1, opts, k =>
+								{
+									int cc = k * naxis0 * naxis1 + range[2] * naxis1 + range[0];
+
+									for (int j = range[2]; j <= range[3]; j++)
+										for (int i = range[0]; i <= range[1]; i++)
+											cube[i - range[0], j - range[2], k - range[4]] = (byte)((byte)arr[cc + i] * bscale);
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+									return cube;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+								{
+									//check if vector
+									if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+									{
+										byte[] vector = new byte[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+										int cc = 0;
+										for (int i = 0; i < cube.GetLength(0); i++)
+											for (int j = 0; j < cube.GetLength(1); j++)
+												for (int k = 0; k < cube.GetLength(2); k++)
+													vector[cc++] = cube[i, j, k];
+
+										naxisn = new int[1] { vector.Length };
+										return vector;
+									}
+									else//must be 2d if gotten here
+									{
+										byte[,] table = null;
+										if ((range[1] - range[0]) == 0)
+										{
+											table = new byte[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[0, i, j];
+										}
+										else if ((range[3] - range[2]) == 0)
+										{
+											table = new byte[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, 0, j];
+										}
+										else if ((range[5] - range[4]) == 0)
+										{
+											table = new byte[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, j, 0];
+										}
+
+										naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+										return table;
+									}
+								}
+							}
+
+							break;
+						}
+
+						case 16:
+						{
+							if (bzero == 0)//signed int16
+							{
+								short[,,] cube = new short[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+								Parallel.For(range[4], range[5] + 1, opts, k =>
+								{
+									int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 2;
+									byte[] bytes = new byte[2];
+									for (int j = range[2]; j <= range[3]; j++)
+										for (int i = range[0]; i <= range[1]; i++)
+										{
+											bytes[1] = arr[cc];
+											bytes[0] = arr[cc + 1];
+											cube[i - range[0], j - range[2], k - range[4]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale);
+											cc += 2;
+										}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+									return cube;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+								{
+									//check if vector
+									if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+									{
+										short[] vector = new short[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+										int cc = 0;
+										for (int i = 0; i < cube.GetLength(0); i++)
+											for (int j = 0; j < cube.GetLength(1); j++)
+												for (int k = 0; k < cube.GetLength(2); k++)
+													vector[cc++] = cube[i, j, k];
+
+										naxisn = new int[1] { vector.Length };
+										return vector;
+									}
+									else//must be 2d if gotten here
+									{
+										short[,] table = null;
+										if ((range[1] - range[0]) == 0)
+										{
+											table = new short[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[0, i, j];
+										}
+										else if ((range[3] - range[2]) == 0)
+										{
+											table = new short[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, 0, j];
+										}
+										else if ((range[5] - range[4]) == 0)
+										{
+											table = new short[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, j, 0];
+										}
+
+										naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+										return table;
+									}
+								}
+							}
+							else if (bzero == 32768)//unsigned uint16
+							{
+								ushort[,,] cube = new ushort[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+								Parallel.For(range[4], range[5] + 1, opts, k =>
+								{
+									int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 2;
+									byte[] bytes = new byte[2];
+									for (int j = range[2]; j <= range[3]; j++)
+										for (int i = range[0]; i <= range[1]; i++)
+										{
+											bytes[1] = arr[cc];
+											bytes[0] = arr[cc + 1];
+											cube[i - range[0], j - range[2], k - range[4]] = (ushort)(FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(bytes, 0)) * bscale);
+											cc += 2;
+										}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+									return cube;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+								{
+									//check if vector
+									if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+									{
+										ushort[] vector = new ushort[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+										int cc = 0;
+										for (int i = 0; i < cube.GetLength(0); i++)
+											for (int j = 0; j < cube.GetLength(1); j++)
+												for (int k = 0; k < cube.GetLength(2); k++)
+													vector[cc++] = cube[i, j, k];
+
+										naxisn = new int[1] { vector.Length };
+										return vector;
+									}
+									else//must be 2d if gotten here
+									{
+										ushort[,] table = null;
+										if ((range[1] - range[0]) == 0)
+										{
+											table = new ushort[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[0, i, j];
+										}
+										else if ((range[3] - range[2]) == 0)
+										{
+											table = new ushort[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, 0, j];
+										}
+										else if ((range[5] - range[4]) == 0)
+										{
+											table = new ushort[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, j, 0];
+										}
+
+										naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+										return table;
+									}
+								}
+							}
+
+							break;
+						}
+
+						case 32:
+						{
+							if (bzero == 0)//signed int32
+							{
+								int[,,] cube = new int[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+								Parallel.For(range[4], range[5] + 1, opts, k =>
+								{
+									int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 4;
+									byte[] bytes = new byte[4];
+									for (int j = range[2]; j <= range[3]; j++)
+										for (int i = range[0]; i <= range[1]; i++)
+										{
+											bytes[3] = arr[cc];
+											bytes[2] = arr[cc + 1];
+											bytes[1] = arr[cc + 2];
+											bytes[0] = arr[cc + 3];
+											cube[i - range[0], j - range[2], k - range[4]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale);
+											cc += 4;
+										}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+									return cube;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+								{
+									//check if vector
+									if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+									{
+										int[] vector = new int[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+										int cc = 0;
+										for (int i = 0; i < cube.GetLength(0); i++)
+											for (int j = 0; j < cube.GetLength(1); j++)
+												for (int k = 0; k < cube.GetLength(2); k++)
+													vector[cc++] = cube[i, j, k];
+
+										naxisn = new int[1] { vector.Length };
+										return vector;
+									}
+									else//must be 2d if gotten here
+									{
+										int[,] table = null;
+										if ((range[1] - range[0]) == 0)
+										{
+											table = new int[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[0, i, j];
+										}
+										else if ((range[3] - range[2]) == 0)
+										{
+											table = new int[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, 0, j];
+										}
+										else if ((range[5] - range[4]) == 0)
+										{
+											table = new int[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, j, 0];
+										}
+
+										naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+										return table;
+									}
+								}
+							}
+							else if (bzero == 2147483648)//unsigned uint32
+							{
+								uint[,,] cube = new uint[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+								Parallel.For(range[4], range[5] + 1, opts, k =>
+								{
+									int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 4;
+									byte[] bytes = new byte[4];
+									for (int j = range[2]; j <= range[3]; j++)
+										for (int i = range[0]; i <= range[1]; i++)
+										{
+											bytes[3] = arr[cc];
+											bytes[2] = arr[cc + 1];
+											bytes[1] = arr[cc + 2];
+											bytes[0] = arr[cc + 3];
+											cube[i - range[0], j - range[2], k - range[4]] = (uint)(FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(bytes, 0)) * bscale);
+											cc += 4;
+										}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+									return cube;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+								{
+									//check if vector
+									if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+									{
+										uint[] vector = new uint[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+										int cc = 0;
+										for (int i = 0; i < cube.GetLength(0); i++)
+											for (int j = 0; j < cube.GetLength(1); j++)
+												for (int k = 0; k < cube.GetLength(2); k++)
+													vector[cc++] = cube[i, j, k];
+
+										naxisn = new int[1] { vector.Length };
+										return vector;
+									}
+									else//must be 2d if gotten here
+									{
+										uint[,] table = null;
+										if ((range[1] - range[0]) == 0)
+										{
+											table = new uint[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[0, i, j];
+										}
+										else if ((range[3] - range[2]) == 0)
+										{
+											table = new uint[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, 0, j];
+										}
+										else if ((range[5] - range[4]) == 0)
+										{
+											table = new uint[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, j, 0];
+										}
+
+										naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+										return table;
+									}
+								}
+							}
+
+							break;
+						}
+
+						case 64:
+						{
+							if (bzero == 0)//signed int64
+							{
+								long[,,] cube = new long[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+								Parallel.For(range[4], range[5] + 1, opts, k =>
+								{
+									int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 8;
+									byte[] bytes = new byte[8];
+									for (int j = range[2]; j <= range[3]; j++)
+										for (int i = range[0]; i <= range[1]; i++)
+										{
+											bytes[7] = arr[cc];
+											bytes[6] = arr[cc + 1];
+											bytes[5] = arr[cc + 2];
+											bytes[4] = arr[cc + 3];
+											bytes[3] = arr[cc + 4];
+											bytes[2] = arr[cc + 5];
+											bytes[1] = arr[cc + 6];
+											bytes[0] = arr[cc + 7];
+											cube[i - range[0], j - range[2], k - range[4]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale);
+											cc += 8;
+										}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+									return cube;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+								{
+									//check if vector
+									if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+									{
+										long[] vector = new long[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+										int cc = 0;
+										for (int i = 0; i < cube.GetLength(0); i++)
+											for (int j = 0; j < cube.GetLength(1); j++)
+												for (int k = 0; k < cube.GetLength(2); k++)
+													vector[cc++] = cube[i, j, k];
+
+										naxisn = new int[1] { vector.Length };
+										return vector;
+									}
+									else//must be 2d if gotten here
+									{
+										long[,] table = null;
+										if ((range[1] - range[0]) == 0)
+										{
+											table = new long[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[0, i, j];
+										}
+										else if ((range[3] - range[2]) == 0)
+										{
+											table = new long[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, 0, j];
+										}
+										else if ((range[5] - range[4]) == 0)
+										{
+											table = new long[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, j, 0];
+										}
+
+										naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+										return table;
+									}
+								}
+							}
+							else if (bzero == 9223372036854775808)//unsigned uint64
+							{
+								ulong[,,] cube = new ulong[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+								Parallel.For(range[4], range[5] + 1, opts, k =>
+								{
+									int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 8;
+									byte[] bytes = new byte[8];
+									for (int j = range[2]; j <= range[3]; j++)
+										for (int i = range[0]; i <= range[1]; i++)
+										{
+											bytes[7] = arr[cc];
+											bytes[6] = arr[cc + 1];
+											bytes[5] = arr[cc + 2];
+											bytes[4] = arr[cc + 3];
+											bytes[3] = arr[cc + 4];
+											bytes[2] = arr[cc + 5];
+											bytes[1] = arr[cc + 6];
+											bytes[0] = arr[cc + 7];
+											cube[i - range[0], j - range[2], k - range[4]] = (ulong)(FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(bytes, 0)) * bscale);
+											cc += 8;
+										}
+								});
+
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+									return cube;
+								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+								{
+									//check if vector
+									if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+									{
+										ulong[] vector = new ulong[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+										int cc = 0;
+										for (int i = 0; i < cube.GetLength(0); i++)
+											for (int j = 0; j < cube.GetLength(1); j++)
+												for (int k = 0; k < cube.GetLength(2); k++)
+													vector[cc++] = cube[i, j, k];
+
+										naxisn = new int[1] { vector.Length };
+										return vector;
+									}
+									else//must be 2d if gotten here
+									{
+										ulong[,] table = null;
+										if ((range[1] - range[0]) == 0)
+										{
+											table = new ulong[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[0, i, j];
+										}
+										else if ((range[3] - range[2]) == 0)
+										{
+											table = new ulong[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, 0, j];
+										}
+										else if ((range[5] - range[4]) == 0)
+										{
+											table = new ulong[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+											for (int i = 0; i < table.GetLength(0); i++)
+												for (int j = 0; j < table.GetLength(1); j++)
+													table[i, j] = cube[i, j, 0];
+										}
+
+										naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+										return table;
+									}
+								}
+							}
+
+							break;
+						}
+
+						case -32:
+						{
+							float[,,] cube = new float[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+							Parallel.For(range[4], range[5] + 1, opts, k =>
+							{
+								int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 4;
+								byte[] bytes = new byte[4];
+
+								for (int j = range[2]; j <= range[3]; j++)
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										bytes[3] = arr[cc];
+										bytes[2] = arr[cc + 1];
+										bytes[1] = arr[cc + 2];
+										bytes[0] = arr[cc + 3];
+										cube[i - range[0], j - range[2], k - range[4]] = (float)(BitConverter.ToSingle(bytes, 0) * bscale);
+										cc += 4;
+									}
+							});
+
+							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								return cube;
+							else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+							{
+								//check if vector
+								if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+								{
+									float[] vector = new float[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+									int cc = 0;
+									for (int i = 0; i < cube.GetLength(0); i++)
+										for (int j = 0; j < cube.GetLength(1); j++)
+											for (int k = 0; k < cube.GetLength(2); k++)
+												vector[cc++] = cube[i, j, k];
+
+									naxisn = new int[1] { vector.Length };
+									return vector;
+								}
+								else//must be 2d if gotten here
+								{
+									float[,] table = null;
+									if ((range[1] - range[0]) == 0)
+									{
+										table = new float[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+										for (int i = 0; i < table.GetLength(0); i++)
+											for (int j = 0; j < table.GetLength(1); j++)
+												table[i, j] = cube[0, i, j];
+									}
+									else if ((range[3] - range[2]) == 0)
+									{
+										table = new float[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+										for (int i = 0; i < table.GetLength(0); i++)
+											for (int j = 0; j < table.GetLength(1); j++)
+												table[i, j] = cube[i, 0, j];
+									}
+									else if ((range[5] - range[4]) == 0)
+									{
+										table = new float[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+										for (int i = 0; i < table.GetLength(0); i++)
+											for (int j = 0; j < table.GetLength(1); j++)
+												table[i, j] = cube[i, j, 0];
+									}
+
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+							}
+
+							break;
+						}
+
+						case -64:
+						{
+							double[,,] cube = new double[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+							Parallel.For(range[4], range[5] + 1, opts, k =>
+							{
+								int cc = (k * naxis0 * naxis1 + range[2] * naxis1 + range[0]) * 8;
+								byte[] bytes = new byte[8];
+
+								for (int j = range[2]; j <= range[3]; j++)
+									for (int i = range[0]; i <= range[1]; i++)
+									{
+										bytes[7] = arr[cc];
+										bytes[6] = arr[cc + 1];
+										bytes[5] = arr[cc + 2];
+										bytes[4] = arr[cc + 3];
+										bytes[3] = arr[cc + 4];
+										bytes[2] = arr[cc + 5];
+										bytes[1] = arr[cc + 6];
+										bytes[0] = arr[cc + 7];
+										cube[i - range[0], j - range[2], k - range[4]] = BitConverter.ToDouble(bytes, 0) * bscale;
+										cc += 8;
+									}
+							});
+
+							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								return cube;
+							else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+							{
+								//check if vector
+								if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+								{
+									double[] vector = new double[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+									int cc = 0;
+									for (int i = 0; i < cube.GetLength(0); i++)
+										for (int j = 0; j < cube.GetLength(1); j++)
+											for (int k = 0; k < cube.GetLength(2); k++)
+												vector[cc++] = cube[i, j, k];
+
+									naxisn = new int[1] { vector.Length };
+									return vector;
+								}
+								else//must be 2d if gotten here
+								{
+									double[,] table = null;
+									if ((range[1] - range[0]) == 0)
+									{
+										table = new double[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+										for (int i = 0; i < table.GetLength(0); i++)
+											for (int j = 0; j < table.GetLength(1); j++)
+												table[i, j] = cube[0, i, j];
+									}
+									else if ((range[3] - range[2]) == 0)
+									{
+										table = new double[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+										for (int i = 0; i < table.GetLength(0); i++)
+											for (int j = 0; j < table.GetLength(1); j++)
+												table[i, j] = cube[i, 0, j];
+									}
+									else if ((range[5] - range[4]) == 0)
+									{
+										table = new double[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+										for (int i = 0; i < table.GetLength(0); i++)
+											for (int j = 0; j < table.GetLength(1); j++)
+												table[i, j] = cube[i, j, 0];
+									}
+
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+									return table;
+								}
+							}
+
+							break;
+						}
+					}
+				}
+			}
+			else if (returnPrecision == DataPrecision.Boolean)
+			{
+				if (bitpix != 8 && bzero != 0)//unsigned byte
+					throw new Exception("Boolean data must be unsigned bytes on disk.");
+
+				if (naxisn.Length == 1)//then a vector return
+				{
+					if (returnRankFormat == RankFormat.Default)
+					{
+						bool[] vector = new bool[range[1] - range[0] + 1];
+						Parallel.For(range[0], range[1] + 1, opts, i =>
+						{
+							if (arr[i] == 1)
+								vector[i - range[0]] = true;
+						});
+						return vector;
+					}
+					else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
+					{
+						bool[,] table = new bool[range[1] - range[0] + 1, 1];
+						Parallel.For(range[0], range[1] + 1, opts, i =>
+						{
+							if (arr[i] == 1)
+								table[i - range[0], 0] = true;
+						});
+						naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+						return table;
+					}
+					else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
+					{
+						bool[,] table = new bool[1, range[1] - range[0] + 1];
+						Parallel.For(range[0], range[1] + 1, opts, i =>
+						{
+							if (arr[i] == 1)
+								table[0, i - range[0]] = true;
+						});
+						naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+						return table;
+					}
+				}
+
+				else if (naxisn.Length == 2)//then a table or image return
+				{
+					int naxis0 = naxisn[0];
+
+					bool[,] table = new bool[range[1] - range[0] + 1, range[3] - range[2] + 1];
+
+					Parallel.For(range[2], range[3] + 1, opts, j =>
+					{
+						int cc = j * naxis0 + range[0];
+						for (int i = range[0]; i <= range[1]; i++)
+							if (arr[cc + i] == 1)
+								table[i - range[0], j - range[2]] = true;
+					});
+
+					if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+						return table;
+					else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
+					{
+						bool[] vector = new bool[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
+						System.Buffer.BlockCopy(table, 0, vector, 0, vector.Length * 1);
+						naxisn = new int[1] { vector.Length };
+						return vector;
+					}
+				}
+
+				else if (naxisn.Length == 3)//then a data cube
+				{
+					int naxis0 = naxisn[0], naxis1 = naxisn[1];
+
+					bool[,,] cube = new bool[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+
+					Parallel.For(range[4], range[5] + 1, opts, k =>
+					{
+						int cc = k * naxis0 * naxis1 + range[2] * naxis1 + range[0];
+
+						for (int j = range[2]; j <= range[3]; j++)
+							for (int i = range[0]; i <= range[1]; i++)
+								if (arr[cc + i] == 1)
+									cube[i - range[0], j - range[2], k - range[4]] = true;
+					});
+
+					if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+						return cube;
+					else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
+					{
+						//check if vector
+						if (((range[1] - range[0]) == 0 && (range[3] - range[2]) == 0) || ((range[1] - range[0]) == 0 && (range[5] - range[4]) == 0) || ((range[3] - range[2]) == 0 && (range[5] - range[4]) == 0))
+						{
+							bool[] vector = new bool[(range[1] - range[0] + 1) * (range[3] - range[2] + 1) * (range[5] - range[4] + 1)];
+							int cc = 0;
+							for (int i = 0; i < cube.GetLength(0); i++)
+								for (int j = 0; j < cube.GetLength(1); j++)
+									for (int k = 0; k < cube.GetLength(2); k++)
+										vector[cc++] = cube[i, j, k];
+
+							naxisn = new int[1] { vector.Length };
+							return vector;
+						}
+						else//must be 2d if gotten here
+						{
+							bool[,] table = null;
+							if ((range[1] - range[0]) == 0)
+							{
+								table = new bool[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+								for (int i = 0; i < table.GetLength(0); i++)
+									for (int j = 0; j < table.GetLength(1); j++)
+										table[i, j] = cube[0, i, j];
+							}
+							else if ((range[3] - range[2]) == 0)
+							{
+								table = new bool[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+								for (int i = 0; i < table.GetLength(0); i++)
+									for (int j = 0; j < table.GetLength(1); j++)
+										table[i, j] = cube[i, 0, j];
+							}
+							else if ((range[5] - range[4]) == 0)
+							{
+								table = new bool[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+								for (int i = 0; i < table.GetLength(0); i++)
+									for (int j = 0; j < table.GetLength(1); j++)
+										table[i, j] = cube[i, j, 0];
+							}
+
+							naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+							return table;
+						}
+					}
+				}
 			}
 
-			throw new Exception("Error in FITSFILEOPS.READDATAUNIT - made it to end without returning data.");
+			throw new Exception("Error in FITSFILEOPS.ReadImageDataUnit - made it to end without returning data.");
 		}
 
 		/// <summary>Returns a data unit as a byte array formatted at a specified precision. Useful for writing.</summary>
@@ -967,7 +2712,7 @@ namespace JPFITS
 			if (doubleDataUnit.Rank > 3)
 				throw new Exception("Error: I can only handle up to 3-dimensional data units - SORRY!");
 
-			if (Type.GetTypeCode((doubleDataUnit.GetType()).GetElementType()) != TypeCode.Double)
+			if (Type.GetTypeCode(doubleDataUnit.GetType().GetElementType()) != TypeCode.Double)
 				throw new Exception("Error: Only double-precision arrays can be passed.");
 
 			GetBitpixNaxisnBscaleBzero(formatPrecision, doubleDataUnit, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
@@ -975,7 +2720,7 @@ namespace JPFITS
 			long Ndatabytes = doubleDataUnit.Length * Math.Abs(bitpix) / 8;
 			int NBlocks = (int)(Math.Ceiling((double)(Ndatabytes) / 2880.0));
 			int NBytesTot = NBlocks * 2880;
-			byte[] data = new byte[NBytesTot];
+			byte[] bytearray = new byte[NBytesTot];
 
 			ParallelOptions opts = new ParallelOptions();
 			if (doParallel)
@@ -985,6 +2730,49 @@ namespace JPFITS
 
 			switch (formatPrecision)
 			{
+				case TypeCode.Boolean:
+				{
+					if (doubleDataUnit.Rank == 1)
+					{
+						Parallel.For(0, naxisn[0], opts, i =>
+						{
+							if (((double[])doubleDataUnit)[i] == 1)
+								bytearray[i] = 1;
+						});
+					}
+					else if (doubleDataUnit.Rank == 2)
+					{
+						Parallel.For(0, naxisn[1], opts, j =>
+						{
+							int cc = j * naxisn[0];
+							for (int i = 0; i < naxisn[0]; i++)
+							{
+								if (((double[,])doubleDataUnit)[i, j] == 1)
+									bytearray[cc] = 1;
+								cc += 1;
+							}
+						});
+					}
+					else if (doubleDataUnit.Rank == 3)
+					{
+						Parallel.For(0, naxisn[2], opts, k =>
+						{
+							int cc = k * naxisn[0] * naxisn[1];
+							for (int j = 0; j < naxisn[1]; j++)
+							{
+								cc += j * naxisn[0];
+								for (int i = 0; i < naxisn[0]; i++)
+								{
+									if (((double[,,])doubleDataUnit)[i, j, k] == 1);
+										bytearray[cc] = 1;
+									cc += 1;
+								}
+							}
+						});
+					}
+					break;
+				}
+
 				case TypeCode.Byte:
 				case TypeCode.SByte:
 				{
@@ -993,7 +2781,7 @@ namespace JPFITS
 						Parallel.For(0, naxisn[0], opts, i =>
 						{
 							byte val = (byte)((((double[])doubleDataUnit)[i] - bzero) / bscale);
-							data[i] = val;
+							bytearray[i] = val;
 						});
 					}
 					else if (doubleDataUnit.Rank == 2)
@@ -1005,7 +2793,7 @@ namespace JPFITS
 							for (int i = 0; i < naxisn[0]; i++)
 							{
 								val = (byte)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-								data[cc] = val;
+								bytearray[cc] = val;
 								cc += 1;
 							}
 						});
@@ -1021,8 +2809,8 @@ namespace JPFITS
 								cc += j * naxisn[0];
 								for (int i = 0; i < naxisn[0]; i++)
 								{
-									val = (byte)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-									data[cc] = val;
+									val = (byte)((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale);
+									bytearray[cc] = val;
 									cc += 1;
 								}
 							}
@@ -1040,8 +2828,8 @@ namespace JPFITS
 						{
 							int cc = i * 2;
 							short val = (short)((((double[])doubleDataUnit)[i] - bzero) / bscale);
-							data[cc] = (byte)((val >> 8) & 0xff);
-							data[cc + 1] = (byte)(val & 0xff);
+							bytearray[cc] = (byte)((val >> 8) & 0xff);
+							bytearray[cc + 1] = (byte)(val & 0xff);
 						});
 					}
 					else if (doubleDataUnit.Rank == 2)
@@ -1053,8 +2841,8 @@ namespace JPFITS
 							for (int i = 0; i < naxisn[0]; i++)
 							{
 								val = (short)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-								data[cc] = (byte)((val >> 8) & 0xff);
-								data[cc + 1] = (byte)(val & 0xff);
+								bytearray[cc] = (byte)((val >> 8) & 0xff);
+								bytearray[cc + 1] = (byte)(val & 0xff);
 								cc += 2;
 							}
 						});
@@ -1070,9 +2858,9 @@ namespace JPFITS
 								cc += (j * naxisn[0]) * 2;
 								for (int i = 0; i < naxisn[0]; i++)
 								{
-									val = (short)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-									data[cc] = (byte)((val >> 8) & 0xff);
-									data[cc + 1] = (byte)(val & 0xff);
+									val = (short)((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 1] = (byte)(val & 0xff);
 									cc += 2;
 								}
 							}
@@ -1090,10 +2878,10 @@ namespace JPFITS
 						{
 							int cc = i * 4;
 							int val = (int)((((double[])doubleDataUnit)[i] - bzero) / bscale);
-							data[cc] = (byte)((val >> 24) & 0xff);
-							data[cc + 1] = (byte)((val >> 16) & 0xff);
-							data[cc + 2] = (byte)((val >> 8) & 0xff);
-							data[cc + 3] = (byte)(val & 0xff);
+							bytearray[cc] = (byte)((val >> 24) & 0xff);
+							bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+							bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+							bytearray[cc + 3] = (byte)(val & 0xff);
 						});
 					}
 					else if (doubleDataUnit.Rank == 2)
@@ -1105,10 +2893,10 @@ namespace JPFITS
 							for (int i = 0; i < naxisn[0]; i++)
 							{
 								val = (int)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-								data[cc] = (byte)((val >> 24) & 0xff);
-								data[cc + 1] = (byte)((val >> 16) & 0xff);
-								data[cc + 2] = (byte)((val >> 8) & 0xff);
-								data[cc + 3] = (byte)(val & 0xff);
+								bytearray[cc] = (byte)((val >> 24) & 0xff);
+								bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+								bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+								bytearray[cc + 3] = (byte)(val & 0xff);
 								cc += 4;
 							}
 						});
@@ -1124,11 +2912,11 @@ namespace JPFITS
 								cc += (j * naxisn[0]) * 4;
 								for (int i = 0; i < naxisn[0]; i++)
 								{
-									val = (int)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-									data[cc] = (byte)((val >> 24) & 0xff);
-									data[cc + 1] = (byte)((val >> 16) & 0xff);
-									data[cc + 2] = (byte)((val >> 8) & 0xff);
-									data[cc + 3] = (byte)(val & 0xff);
+									val = (int)((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 3] = (byte)(val & 0xff);
 									cc += 4;
 								}
 							}
@@ -1146,14 +2934,14 @@ namespace JPFITS
 						{
 								int cc = i * 8;
 								long val = (long)((((double[])doubleDataUnit)[i] - bzero) / bscale);
-								data[cc] = (byte)((val >> 56) & 0xff);
-								data[cc + 1] = (byte)((val >> 48) & 0xff);
-								data[cc + 2] = (byte)((val >> 40) & 0xff);
-								data[cc + 3] = (byte)((val >> 32) & 0xff);
-								data[cc + 4] = (byte)((val >> 24) & 0xff);
-								data[cc + 5] = (byte)((val >> 16) & 0xff);
-								data[cc + 6] = (byte)((val >> 8) & 0xff);
-								data[cc + 7] = (byte)(val & 0xff);
+								bytearray[cc] = (byte)((val >> 56) & 0xff);
+								bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+								bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+								bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+								bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+								bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+								bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+								bytearray[cc + 7] = (byte)(val & 0xff);
 						});
 					}
 					else if (doubleDataUnit.Rank == 2)
@@ -1165,14 +2953,14 @@ namespace JPFITS
 							for (int i = 0; i < naxisn[0]; i++)
 							{
 								val = (long)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-								data[cc] = (byte)((val >> 56) & 0xff);
-								data[cc + 1] = (byte)((val >> 48) & 0xff);
-								data[cc + 2] = (byte)((val >> 40) & 0xff);
-								data[cc + 3] = (byte)((val >> 32) & 0xff);
-								data[cc + 4] = (byte)((val >> 24) & 0xff);
-								data[cc + 5] = (byte)((val >> 16) & 0xff);
-								data[cc + 6] = (byte)((val >> 8) & 0xff);
-								data[cc + 7] = (byte)(val & 0xff);
+								bytearray[cc] = (byte)((val >> 56) & 0xff);
+								bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+								bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+								bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+								bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+								bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+								bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+								bytearray[cc + 7] = (byte)(val & 0xff);
 								cc += 8;
 							}
 						});
@@ -1188,15 +2976,15 @@ namespace JPFITS
 								cc += (j * naxisn[0]) * 8;
 								for (int i = 0; i < naxisn[0]; i++)
 								{
-									val = (long)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-									data[cc] = (byte)((val >> 56) & 0xff);
-									data[cc + 1] = (byte)((val >> 48) & 0xff);
-									data[cc + 2] = (byte)((val >> 40) & 0xff);
-									data[cc + 3] = (byte)((val >> 32) & 0xff);
-									data[cc + 4] = (byte)((val >> 24) & 0xff);
-									data[cc + 5] = (byte)((val >> 16) & 0xff);
-									data[cc + 6] = (byte)((val >> 8) & 0xff);
-									data[cc + 7] = (byte)(val & 0xff);
+									val = (long)((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 56) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+									bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+									bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 7] = (byte)(val & 0xff);
 									cc += 8;
 								}
 							}
@@ -1213,10 +3001,10 @@ namespace JPFITS
 						{
 							int cc = i * 4;
 							byte[] sng = BitConverter.GetBytes((float)((((double[])doubleDataUnit)[i] - bzero) / bscale));
-							data[cc] = sng[3];
-							data[cc + 1] = sng[2];
-							data[cc + 2] = sng[1];
-							data[cc + 3] = sng[0];
+							bytearray[cc] = sng[3];
+							bytearray[cc + 1] = sng[2];
+							bytearray[cc + 2] = sng[1];
+							bytearray[cc + 3] = sng[0];
 						});
 					}
 					else if (doubleDataUnit.Rank == 2)
@@ -1228,10 +3016,10 @@ namespace JPFITS
 							for (int i = 0; i < naxisn[0]; i++)
 							{
 								sng = BitConverter.GetBytes((float)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale));
-								data[cc] = sng[3];
-								data[cc + 1] = sng[2];
-								data[cc + 2] = sng[1];
-								data[cc + 3] = sng[0];
+								bytearray[cc] = sng[3];
+								bytearray[cc + 1] = sng[2];
+								bytearray[cc + 2] = sng[1];
+								bytearray[cc + 3] = sng[0];
 								cc += 4;
 							}
 						});
@@ -1247,11 +3035,11 @@ namespace JPFITS
 								cc += (j * naxisn[0]) * 4;
 								for (int i = 0; i < naxisn[0]; i++)
 								{
-									sng = BitConverter.GetBytes((float)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale));
-									data[cc] = sng[3];
-									data[cc + 1] = sng[2];
-									data[cc + 2] = sng[1];
-									data[cc + 3] = sng[0];
+									sng = BitConverter.GetBytes((float)((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale));
+									bytearray[cc] = sng[3];
+									bytearray[cc + 1] = sng[2];
+									bytearray[cc + 2] = sng[1];
+									bytearray[cc + 3] = sng[0];
 									cc += 4;
 								}
 							}
@@ -1268,14 +3056,14 @@ namespace JPFITS
 						{
 							int cc = i * 8;
 							byte[] dbl = BitConverter.GetBytes((((double[])doubleDataUnit)[i] - bzero) / bscale);
-							data[cc] = dbl[7];
-							data[cc + 1] = dbl[6];
-							data[cc + 2] = dbl[5];
-							data[cc + 3] = dbl[4];
-							data[cc + 4] = dbl[3];
-							data[cc + 5] = dbl[2];
-							data[cc + 6] = dbl[1];
-							data[cc + 7] = dbl[0];
+							bytearray[cc] = dbl[7];
+							bytearray[cc + 1] = dbl[6];
+							bytearray[cc + 2] = dbl[5];
+							bytearray[cc + 3] = dbl[4];
+							bytearray[cc + 4] = dbl[3];
+							bytearray[cc + 5] = dbl[2];
+							bytearray[cc + 6] = dbl[1];
+							bytearray[cc + 7] = dbl[0];
 						});
 					}
 					else if (doubleDataUnit.Rank == 2)
@@ -1287,14 +3075,14 @@ namespace JPFITS
 							for (int i = 0; i < naxisn[0]; i++)
 							{
 								dbl = BitConverter.GetBytes((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-								data[cc] = dbl[7];
-								data[cc + 1] = dbl[6];
-								data[cc + 2] = dbl[5];
-								data[cc + 3] = dbl[4];
-								data[cc + 4] = dbl[3];
-								data[cc + 5] = dbl[2];
-								data[cc + 6] = dbl[1];
-								data[cc + 7] = dbl[0];
+								bytearray[cc] = dbl[7];
+								bytearray[cc + 1] = dbl[6];
+								bytearray[cc + 2] = dbl[5];
+								bytearray[cc + 3] = dbl[4];
+								bytearray[cc + 4] = dbl[3];
+								bytearray[cc + 5] = dbl[2];
+								bytearray[cc + 6] = dbl[1];
+								bytearray[cc + 7] = dbl[0];
 								cc += 8;
 							}
 						});
@@ -1310,15 +3098,15 @@ namespace JPFITS
 								cc += (j * naxisn[0]) * 8;
 								for (int i = 0; i < naxisn[0]; i++)
 								{
-									dbl = BitConverter.GetBytes((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-									data[cc] = dbl[7];
-									data[cc + 1] = dbl[6];
-									data[cc + 2] = dbl[5];
-									data[cc + 3] = dbl[4];
-									data[cc + 4] = dbl[3];
-									data[cc + 5] = dbl[2];
-									data[cc + 6] = dbl[1];
-									data[cc + 7] = dbl[0];
+									dbl = BitConverter.GetBytes((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale);
+									bytearray[cc] = dbl[7];
+									bytearray[cc + 1] = dbl[6];
+									bytearray[cc + 2] = dbl[5];
+									bytearray[cc + 3] = dbl[4];
+									bytearray[cc + 4] = dbl[3];
+									bytearray[cc + 5] = dbl[2];
+									bytearray[cc + 6] = dbl[1];
+									bytearray[cc + 7] = dbl[0];
 									cc += 8;
 								}
 							}
@@ -1328,7 +3116,7 @@ namespace JPFITS
 				}
 			}
 
-			return data;
+			return bytearray;
 		}
 
 		/// <summary>Outputs essential header keywords for a given precision and data unit.</summary>
@@ -1357,15 +3145,16 @@ namespace JPFITS
 				case TypeCode.SByte:
 				{
 					bitpix = 8;
-					bzero = 0;
+					bzero = -128;
 					bscale = 1;
 					break;
 				}
 
+				case TypeCode.Boolean:
 				case TypeCode.Byte:
 				{
 					bitpix = 8;
-					bzero = 128;
+					bzero = 0;
 					bscale = 1;
 					break;
 				}

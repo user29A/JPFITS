@@ -73,7 +73,7 @@ namespace JPFITS
 
 			WORLDCOORDINATESOLUTION = new JPFITS.WorldCoordinateSolution();
 
-			TypeCode type = Type.GetTypeCode((imageArrayVectorData.GetType()).GetElementType());
+			TypeCode type = Type.GetTypeCode(imageArrayVectorData.GetType().GetElementType());
 
 			ParallelOptions opts = new ParallelOptions();
 			if (doParallel)
@@ -83,6 +83,29 @@ namespace JPFITS
 
 			switch (type)
 			{
+				case TypeCode.Boolean:
+				{
+					if (rank == 1)
+					{
+						Parallel.For(0, NAXISN[1], opts, x =>
+						{
+							if (((bool[])imageArrayVectorData)[x])
+								DIMAGE[0, x] = 1;
+						});
+					}
+					else
+					{
+						Parallel.For(0, NAXISN[0], opts, x =>
+						{
+							for (int y = 0; y < NAXISN[1]; y++)
+								if (((bool[,])imageArrayVectorData)[x, y])
+									DIMAGE[x, y] = 1;
+						});
+					}
+
+					break;
+				}
+
 				case TypeCode.Double:
 				{
 					if (rank == 1)
@@ -288,7 +311,7 @@ namespace JPFITS
 			HEADER = new JPFITS.FITSHeader(header, HEADER_POP);
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.RankFormat.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -358,7 +381,7 @@ namespace JPFITS
 			HEADER.SetKey(0, "SIMPLE", "T", "file conforms to FITS standard");
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.RankFormat.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -431,7 +454,7 @@ namespace JPFITS
 			this.FileName = this.FileName.Substring(0, this.FileName.LastIndexOf(".")) + "_" + EXTNAME + this.FileName.Substring(this.FileName.LastIndexOf("."));
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.RankFormat.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -1152,7 +1175,7 @@ namespace JPFITS
 			ArrayList header = null;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out bool hasext, out int BITPIX, out int[] NAXISN, out double BSCALE, out double BZERO);
 
-			double[] result = (double[])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.ImageDataUnitFormatting.ArrayAsRangeRank);
+			double[] result = (double[])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.RankFormat.ArrayAsRangeRank);
 
 			fs.Close();
 
@@ -1336,212 +1359,198 @@ namespace JPFITS
 		#endregion
 
 		#region OPERATORS
+
 		public static double[,] operator +(FITSImage lhs_img, FITSImage rhs_img)
 		{
 			if (lhs_img.Width != rhs_img.Width || lhs_img.Height != rhs_img.Height)
-			{
 				throw new System.ArrayTypeMismatchException("Image Data Matrices not the Same Size...Discontinuing.");
-			}
-			int W = lhs_img.Width;
-			int H = lhs_img.Height;
-			double[,] result = new double[W, H];
 
-			Parallel.For(0, W, i =>
+			double[,] result = new double[lhs_img.Width, lhs_img.Height];
+
+			Parallel.For(0, lhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < lhs_img.Height; j++)
 					result[i, j] = lhs_img[i, j] + rhs_img[i, j];
 			});
 
 			return result;
 		}
+
 		public static double[,] operator +(FITSImage lhs_img, double scalar)
 		{
-			int W = lhs_img.Width;
-			int H = lhs_img.Height;
-			double[,] result = new double[W, H];
+			double[,] result = new double[lhs_img.Width, lhs_img.Height];
 
-			Parallel.For(0, W, i =>
+			Parallel.For(0, lhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < lhs_img.Height; j++)
 					result[i, j] = lhs_img[i, j] + scalar;
 			});
 
 			return result;
 		}
+
 		public static double[,] operator +(double scalar, FITSImage rhs_img)
 		{
 			return rhs_img + scalar;
 		}
+
 		public static double[,] operator -(FITSImage lhs_img, FITSImage rhs_img)
 		{
 			if (lhs_img.Width != rhs_img.Width || lhs_img.Height != rhs_img.Height)
-			{
 				throw new System.ArrayTypeMismatchException("Image Data Matrices not the Same Size...Discontinuing.");
-			}
-			int W = lhs_img.Width;
-			int H = lhs_img.Height;
-			double[,] result = new double[W, H];
 
-			Parallel.For(0, W, i =>
+			double[,] result = new double[lhs_img.Width, lhs_img.Height];
+
+			Parallel.For(0, lhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < lhs_img.Height; j++)
 					result[i, j] = lhs_img[i, j] - rhs_img[i, j];
 			});
 
 			return result;
 		}
+
 		public static double[,] operator -(FITSImage lhs_img, double scalar)
 		{
-			int W = lhs_img.Width;
-			int H = lhs_img.Height;
-			double[,] result = new double[W, H];
+			double[,] result = new double[lhs_img.Width, lhs_img.Height];
 
-			Parallel.For(0, W, i =>
+			Parallel.For(0, lhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < lhs_img.Height; j++)
 					result[i, j] = lhs_img[i, j] - scalar;
 			});
 
 			return result;
 		}
+
 		public static double[,] operator -(double scalar, FITSImage rhs_img)
 		{
-			int W = rhs_img.Width;
-			int H = rhs_img.Height;
-			double[,] result = new double[W, H];
+			double[,] result = new double[rhs_img.Width, rhs_img.Height];
 
-			Parallel.For(0, W, i =>
+			Parallel.For(0, rhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < rhs_img.Height; j++)
 					result[i, j] = scalar - rhs_img[i, j];
 			});
 
 			return result;
 		}
+
 		public static double[,] operator /(FITSImage lhs_img, FITSImage rhs_img)
 		{
 			if (lhs_img.Width != rhs_img.Width || lhs_img.Height != rhs_img.Height)
-			{
 				throw new System.ArrayTypeMismatchException("Image Data Matrices not the Same Size...Discontinuing.");
-			}
-			int W = lhs_img.Width;
-			int H = lhs_img.Height;
-			double[,] result = new double[W, H];
 
-			Parallel.For(0, W, i =>
+			double[,] result = new double[lhs_img.Width, lhs_img.Height];
+
+			Parallel.For(0, lhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < lhs_img.Height; j++)
 					result[i, j] = lhs_img[i, j] / rhs_img[i, j];
 			});
 
 			return result;
 		}
+
 		public static double[,] operator /(FITSImage lhs_img, double scalar)
 		{
-			int W = lhs_img.Width;
-			int H = lhs_img.Height;
-			double[,] result = new double[W, H];
+			double[,] result = new double[lhs_img.Width, lhs_img.Height];
 			scalar = 1 / scalar;
 
-			Parallel.For(0, W, i =>
+			Parallel.For(0, lhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < lhs_img.Height; j++)
 					result[i, j] = lhs_img[i, j] * scalar;
 			});
 
 			return result;
 		}
+
 		public static double[,] operator /(double scalar, FITSImage rhs_img)
 		{
-			int W = rhs_img.Width;
-			int H = rhs_img.Height;
-			double[,] result = new double[W, H];
+			double[,] result = new double[rhs_img.Width, rhs_img.Height];
 
-			Parallel.For(0, W, i =>
+			Parallel.For(0, rhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < rhs_img.Height; j++)
 					result[i, j] = scalar / rhs_img[i, j];
 			});
 
 			return result;
 		}
+
 		public static double[,] operator *(FITSImage lhs_img, FITSImage rhs_img)
 		{
 			if (lhs_img.Width != rhs_img.Width || lhs_img.Height != rhs_img.Height)
-			{
 				throw new System.ArrayTypeMismatchException("Image Data Matrices not the Same Size...Discontinuing.");
-			}
-			int W = lhs_img.Width;
-			int H = lhs_img.Height;
-			double[,] result = new double[W, H];
 
-			Parallel.For(0, W, i =>
+			double[,] result = new double[lhs_img.Width, lhs_img.Height];
+
+			Parallel.For(0, lhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < lhs_img.Height; j++)
 					result[i, j] = lhs_img[i, j] * rhs_img[i, j];
 			});
 
 			return result;
 		}
+
 		public static double[,] operator *(FITSImage lhs_img, double scalar)
 		{
-			int W = lhs_img.Width;
-			int H = lhs_img.Height;
-			double[,] result = new double[W, H];
+			double[,] result = new double[lhs_img.Width, lhs_img.Height];
 
-			Parallel.For(0, W, i =>
+			Parallel.For(0, lhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < lhs_img.Height; j++)
 					result[i, j] = lhs_img[i, j] * scalar;
 			});
 
 			return result;
 		}
+
 		public static double[,] operator *(double scalar, FITSImage rhs_img)
 		{
 			return rhs_img * scalar;
 		}
+
 		public static double[,] operator ^(FITSImage lhs_img, FITSImage rhs_img)
 		{
 			if (lhs_img.Width != rhs_img.Width || lhs_img.Height != rhs_img.Height)
-			{
 				throw new System.ArrayTypeMismatchException("Image Data Matrices not the Same Size...Discontinuing.");
-			}
-			int W = lhs_img.Width;
-			int H = lhs_img.Height;
-			double[,] result = new double[W, H];
 
-			Parallel.For(0, W, i =>
+			double[,] result = new double[lhs_img.Width, lhs_img.Height];
+
+			Parallel.For(0, lhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < lhs_img.Height; j++)
 					result[i, j] = Math.Pow(lhs_img[i, j], rhs_img[i, j]);
 			});
 
 			return result;
 		}
+
 		public static double[,] operator ^(FITSImage lhs_img, double scalar)
 		{
-			int W = lhs_img.Width;
-			int H = lhs_img.Height;
-			double[,] result = new double[W, H];
+			double[,] result = new double[lhs_img.Width, lhs_img.Height];
 
-			Parallel.For(0, W, i =>
+			Parallel.For(0, lhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < lhs_img.Height; j++)
 					result[i, j] = Math.Pow(lhs_img[i, j], scalar);
 			});
 
 			return result;
 		}
+
 		public static double[,] operator ^(double scalar, FITSImage rhs_img)
 		{
 			int W = rhs_img.Width;
 			int H = rhs_img.Height;
-			double[,] result = new double[W, H];
+			double[,] result = new double[rhs_img.Width, rhs_img.Height];
 
-			Parallel.For(0, W, i =>
+			Parallel.For(0, rhs_img.Width, i =>
 			{
-				for (int j = 0; j < H; j++)
+				for (int j = 0; j < rhs_img.Height; j++)
 					result[i, j] = Math.Pow(scalar, rhs_img[i, j]);
 			});
 
@@ -1688,7 +1697,10 @@ namespace JPFITS
 
 			FITSHeader.HeaderUnitType type = FITSHeader.HeaderUnitType.Primary;
 			if (ISEXTENSION)
+			{
 				type = FITSHeader.HeaderUnitType.ExtensionIMAGE;
+				this.Header.SetKey("EXTNAME", EXTNAME, true, -1);
+			}
 
 			//get formatted header block
 			string[] header = this.Header.GetFormattedHeaderBlock(type, false);

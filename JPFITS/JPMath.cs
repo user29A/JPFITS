@@ -1378,7 +1378,7 @@ namespace JPFITS
 		/// <param name="p_scale">The order of magnitude scale (positive) of the fit parameters.</param>
 		public static void Fit_WCSTransform2d(double[] x_intrmdt, double[] y_intrmdt, double[] x_pix, double[] y_pix, ref double[] p, double[] p_lbnd, double[] p_ubnd, double[] p_scale)
 		{
-			double epsx = 1e-9;
+			double epsx = 1e-11;
 			int maxits = 0;
 			alglib.ndimensional_fvec fvec = new alglib.ndimensional_fvec(alglib_WCSTransform2d_fvec);
 			alglib.ndimensional_jac jac = new alglib.ndimensional_jac(alglib_WCSTransform2d_jac);
@@ -1411,7 +1411,7 @@ namespace JPFITS
 		/// <param name="p_scale">The order of magnitude scale (positive) of the fit parameters.</param>
 		public static void Fit_GeneralTransform2d(double[] x_ref, double[] y_ref, double[] x_tran, double[] y_tran, ref double[] p, double[] p_lbnd, double[] p_ubnd, double[] p_scale)
 		{
-			double epsx = 1e-9;
+			double epsx = 1e-11;
 			int maxits = 0;
 			alglib.ndimensional_fvec fvec = new alglib.ndimensional_fvec(alglib_GeneralTransform2d_fvec);
 			object[] objj = new object[4];
@@ -4274,6 +4274,8 @@ namespace JPFITS
 			else
 				opt.MaxDegreeOfParallelism = 1;
 
+			object locker = new object();
+
 			Parallel.For(0, data.GetLength(0), opt, i =>
 			{
 				for (int j = 0; j < data.GetLength(1); j++)
@@ -4284,7 +4286,7 @@ namespace JPFITS
 						{
 							if (data[i, j] < val)
 							{
-								lock (ptslist)
+								lock (locker)
 								{
 									ptslist.Add(i);
 									ptslist.Add(j);
@@ -4296,7 +4298,7 @@ namespace JPFITS
 						{
 							if (data[i, j] <= val)
 							{
-								lock (ptslist)
+								lock (locker)
 								{
 									ptslist.Add(i);
 									ptslist.Add(j);
@@ -4308,7 +4310,7 @@ namespace JPFITS
 						{
 							if (data[i, j] == val)
 							{
-								lock (ptslist)
+								lock (locker)
 								{
 									ptslist.Add(i);
 									ptslist.Add(j);
@@ -4320,7 +4322,7 @@ namespace JPFITS
 						{
 							if (data[i, j] >= val)
 							{
-								lock (ptslist)
+								lock (locker)
 								{
 									ptslist.Add(i);
 									ptslist.Add(j);
@@ -4332,7 +4334,7 @@ namespace JPFITS
 						{
 							if (data[i, j] > val)
 							{
-								lock (ptslist)
+								lock (locker)
 								{
 									ptslist.Add(i);
 									ptslist.Add(j);
@@ -4344,7 +4346,7 @@ namespace JPFITS
 						{
 							if (data[i, j] != val)
 							{
-								lock (ptslist)
+								lock (locker)
 								{
 									ptslist.Add(i);
 									ptslist.Add(j);
@@ -4356,7 +4358,7 @@ namespace JPFITS
 						{
 							if (Double.IsNaN(data[i, j]))
 							{
-								lock (ptslist)
+								lock (locker)
 								{
 									ptslist.Add(i);
 									ptslist.Add(j);
@@ -4368,7 +4370,7 @@ namespace JPFITS
 						{
 							if (Double.IsPositiveInfinity(data[i, j]))
 							{
-								lock (ptslist)
+								lock (locker)
 								{
 									ptslist.Add(i);
 									ptslist.Add(j);
@@ -4380,7 +4382,7 @@ namespace JPFITS
 						{
 							if (Double.IsNegativeInfinity(data[i, j]))
 							{
-								lock (ptslist)
+								lock (locker)
 								{
 									ptslist.Add(i);
 									ptslist.Add(j);
@@ -5102,8 +5104,7 @@ namespace JPFITS
 
 		#region ARRAY OPERATIONS
 
-		/// <summary>Identifies and removes hot pixels from an image. The algorithm is not a simple find and replace, but assesses whether a pixel is part of a source<br />
-		/// with legitimate high values or is a solitary or paired high value which is simply hot.</summary>
+		/// <summary>Identifies and removes hot pixels from an image. The algorithm is not a simple find and replace, but assesses whether a pixel is part of a source with legitimate high values or is a solitary or paired high value which is simply hot.</summary>
 		/// <param name="image">An image array with hot pixels.</param>
 		/// <param name="countThreshold">The pixel value above which a pixel might be considered to be hot.</param>
 		/// <param name="Nhot">The maximum number of hot pixels in a hot pixel cluster. Recommend 1, 2, sometimes 3 if hot pixels cluster in 3's.</param>
@@ -5115,9 +5116,6 @@ namespace JPFITS
 				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
 			else
 				opts.MaxDegreeOfParallelism = 1;
-
-			/*if (countThreshold == 0)
-				countThreshold = image.Median + image.Std * 8;*/
 
 			double[,] result = new double[image.GetLength(0), image.GetLength(1)];
 			for (int y = 0; y < image.GetLength(1); y++)
@@ -5131,7 +5129,6 @@ namespace JPFITS
 				result[x, image.GetLength(1) - 1] = image[x, image.GetLength(1) - 1];
 			}
 
-			//for (int y = 1; y < image.Height - 1; y++)
 			Parallel.For(1, image.GetLength(1) - 1, opts, y =>
 			{
 				int npix = 0;

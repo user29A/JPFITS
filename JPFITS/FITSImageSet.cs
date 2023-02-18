@@ -40,6 +40,7 @@ namespace JPFITS
 				TypeCode precision = (TypeCode)arg[2];
 				string waitbar_message = (string)arg[3];
 				object countlock = new object();
+				object LOCKOBJECT = new object();
 
 				ParallelOptions opts = new ParallelOptions();
 				if (do_parallel)
@@ -62,7 +63,7 @@ namespace JPFITS
 
 						Interlocked.Increment(ref count);
 
-						lock (WAITBAR)
+						lock (LOCKOBJECT)
 						{
 							if (count * 100 / FITSLIST.Count > prog)
 							{
@@ -85,6 +86,7 @@ namespace JPFITS
 				bool do_parallel = (bool)(arg[3]);
 				int[] imgrange = (int[])arg[4];
 				string waitbar_message = (string)arg[5];
+				object LOCKOBJECT = new object();
 
 				ParallelOptions opts = new ParallelOptions();
 				if (do_parallel)
@@ -108,7 +110,7 @@ namespace JPFITS
 							break;
 
 						Interlocked.Increment(ref count);
-						lock (set)
+						lock (LOCKOBJECT)
 						{
 							if (count * 100 / files.Length > prog)
 							{
