@@ -777,6 +777,7 @@ namespace JPFITS
 			CPIX1RS = JPMath.Stdv(dxpix, true);
 			CVAL1RM = CPIX1RM * CDELTN[0];
 			CVAL1RS = CPIX1RS * CDELTN[0];
+
 			CPIX2RM = JPMath.Mean(dypix, true);
 			CPIX2RS = JPMath.Stdv(dypix, true);
 			CVAL2RM = CPIX2RM * CDELTN[1];

@@ -2180,17 +2180,13 @@ namespace JPFITS
 		public static double[] COG(double[,] ROI, int N_last_fit_pts, out double[] N_points_COG, out double background_signal_per_pix, out double source_signal)
 		{
 			if (ROI.GetLength(0) != ROI.GetLength(1))
-			{
 				throw new Exception("Error: ROI array must be square.");
-			}
+
 			if (ROI.GetLength(0) < 5)
-			{
 				throw new Exception("Error: Region of interest SubWindow must be at least 5x5 pixels...");
-			}
+
 			if (JPMath.IsEven(ROI.GetLength(0)) || JPMath.IsEven(ROI.GetLength(1)))
-			{
 				throw new Exception("Error: ROI array not odd-size.");
-			}
 
 			int HalfWidth = (ROI.GetLength(0) - 1) / 2;
 			double[] N_points_COGlocal = new double[HalfWidth + 1];

@@ -70,8 +70,8 @@ namespace JPFITS
 						{
 							VALUE = line.Substring(indx + 1, line.LastIndexOf("'") - indx - 1);
 							VALUE = VALUE.Trim();
-							if (VALUE.Length > 18)
-								VALUE = VALUE.Substring(0, 18);
+							//if (VALUE.Length > 18)
+							//	VALUE = VALUE.Substring(0, 18);
 						}
 					}
 
@@ -119,8 +119,8 @@ namespace JPFITS
 			}
 			else
 			{
-				if (!ValueIsNumeric() && VALUE.Length > 18)
-					VALUE = VALUE.Substring(0, 18);
+				//if (!ValueIsNumeric() && VALUE.Length > 18)
+				//	VALUE = VALUE.Substring(0, 18);
 					//throw new Exception("Error: Key value cannot exceed 18 characters. Key value: '" + VALUE + "' is " + VALUE.Length + " characters long.");
 
 				LINEISCOMMENTFORMAT = false;
