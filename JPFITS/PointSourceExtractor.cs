@@ -7,9 +7,6 @@ using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Drawing;
 using System.IO;
-using System.Xml.Serialization;
-using System.Xml.Schema;
-using System.Windows.Forms.VisualStyles;
 #nullable enable
 
 namespace JPFITS
@@ -24,6 +21,11 @@ namespace JPFITS
 			public void Add(PointSourceExtractor PSE)
 			{
 				PSESET.Add(PSE);
+			}
+
+			public void Add()
+			{
+				PSESET.Add(new PointSourceExtractor());
 			}
 
 			public void RemoveAt(int pseIndex)
@@ -48,6 +50,1036 @@ namespace JPFITS
 			}
 		}
 
+		public class Group
+		{
+			public Group(int id)
+			{
+				ID = id;
+			}
+
+			public Color GroupColor
+			{
+				get { return COLOR; }
+				set { COLOR = value; }
+			}
+
+			public int ID = -1;
+			public int NElements = 0;
+			public int[]? ElementIndices;
+			public Region? REGION;
+			private Color COLOR;
+		};
+
+		#region CONSTRUCTORS
+		/// <summary>The default constructor, used when an image is to be examined for sources.</summary>
+		public PointSourceExtractor()
+		{
+			this.BGWRKR = new BackgroundWorker();
+			this.BGWRKR.WorkerReportsProgress = true;
+			this.BGWRKR.WorkerSupportsCancellation = true;
+			this.BGWRKR.DoWork += new DoWorkEventHandler(BGWRKR_DoWork);
+			this.BGWRKR.ProgressChanged += new ProgressChangedEventHandler(BGWRKR_ProgressChanged);
+			this.BGWRKR.RunWorkerCompleted += new RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
+			WAITBAR = new WaitBar();
+		}
+
+		/// <summary>
+		/// The constructor used when an image already has a list of valid centroids for sources in the image. Centroids will NOT be redetermined.
+		/// </summary>
+		/// <param name="image">The 2D image array to which the centroids belong.</param>
+		/// <param name="XCoords">The x-axis coordinates of the sources.</param>
+		/// <param name="YCoords">The y-axis coordinates of the sources.</param>
+		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
+		/// <param name="kernel_radius">The radius (pixels) of the kernel to centroid.</param>
+		/// <param name="auto_background">Estimate the background at the sources.</param>
+		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
+		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default is the same value as pix_saturation.</param> 
+		public PointSourceExtractor(double[,] image, double[] XCoords, double[] YCoords, double pix_saturation, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, double pix_saturation_mapmin = 0)
+		{
+			this.BGWRKR = new BackgroundWorker();
+			this.BGWRKR.WorkerReportsProgress = true;
+			this.BGWRKR.WorkerSupportsCancellation = true;
+			this.BGWRKR.DoWork += new DoWorkEventHandler(BGWRKR_DoWork);
+			this.BGWRKR.ProgressChanged += new ProgressChangedEventHandler(BGWRKR_ProgressChanged);
+			this.BGWRKR.RunWorkerCompleted += new RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
+			WAITBAR = new WaitBar();
+
+			IMAGE = image;
+			PIX_SAT = pix_saturation;
+			if (pix_saturation_mapmin == 0)
+				PIX_SAT_MINMAP = PIX_SAT;
+			else
+				PIX_SAT_MINMAP = pix_saturation_mapmin;
+			IMAGEWIDTH = IMAGE.GetLength(0);
+			IMAGEHEIGHT = IMAGE.GetLength(1);
+			KERNEL_RADIUS = kernel_radius;
+			BACKGROUND_RADIUS = background_radius;
+			KERNEL_WIDTH = KERNEL_RADIUS * 2 + 1;
+			N_SRC = XCoords.Length;
+			INITARRAYS();
+			AUTO_BG = auto_background;
+			SAVE_PS = kernel_filename_template != "";
+			SAVE_PS_FILENAME = kernel_filename_template;
+			SOURCE_BOOLEAN_MAP = new bool[IMAGEWIDTH, IMAGEHEIGHT];
+			SOURCE_INDEX_MAP = new int[IMAGEWIDTH, IMAGEHEIGHT];
+			Parallel.For(0, IMAGE.GetLength(0), i =>
+			{
+				for (int j = 0; j < IMAGE.GetLength(1); j++)
+					SOURCE_INDEX_MAP[i, j] = -1;
+			});
+			FITTED = false;
+			WCS_GENERATED = false;
+			VALIDPSERECTS = false;
+			double sigma = -1, bg_est;
+			double[,] kernel;
+			double[] sigmas = new double[N_SRC];
+
+			for (int i = 0; i < N_SRC; i++)
+			{
+				bg_est = ESTIMATELOCALBACKGROUND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), BACKGROUND_RADIUS, BackGroundEstimateStyle.Corners2ndMin, ref sigma);
+
+				if (PIX_SAT != 0 && IMAGE[(int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i])] >= PIX_SAT)
+				{
+					int xmin = (int)Math.Round(XCoords[i]), xmax = xmin, ymin = (int)Math.Round(YCoords[i]), ymax = ymin;
+					MAPSATURATIONISLAND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), i, ref xmin, ref xmax, ref ymin, ref ymax);
+					SATURATED[i] = true;
+
+					if (xmax - xmin == 0)//single pixel, expand to 3 pixels
+					{
+						xmin--;
+						if (xmin < 0)
+							xmin = 0;
+						xmax++;
+						if (xmax >= IMAGE.GetLength(0))
+							xmax = IMAGE.GetLength(0) - 1;
+					}
+					if (ymax - ymin == 0)//single pixel, expand to 3 pixels
+					{
+						ymin--;
+						if (ymin < 0)
+							ymin = 0;
+						ymax++;
+						if (ymax >= IMAGE.GetLength(1))
+							ymax = IMAGE.GetLength(1) - 1;
+					}
+
+					Centroid(xmin, xmax, ymin, ymax, bg_est, out _, out _, out kernel);
+				}
+				else
+				{
+					kernel = GetKernel(image, (int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), KERNEL_RADIUS, out int[] xrange, out int[] yrange);
+					if (bg_est != 0)
+						kernel = JPMath.MatrixAddScalar(kernel, -bg_est, false);
+
+					RADIALIZE_MAPS_KERNEL(xrange[KERNEL_RADIUS], yrange[KERNEL_RADIUS], i);
+				}
+
+				CENTROIDS_PIXEL_X[i] = (int)Math.Round(XCoords[i]);
+				CENTROIDS_PIXEL_Y[i] = (int)Math.Round(YCoords[i]);
+				CENTROIDS_X[i] = XCoords[i];
+				CENTROIDS_Y[i] = YCoords[i];
+				CENTROIDS_AMPLITUDE[i] = JPMath.Max(kernel);
+				CENTROIDS_VOLUME[i] = JPMath.Sum(kernel);
+				CENTROIDS_AUTOBGEST[i] = bg_est;
+				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
+				sigma = 0;
+				CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.BackgoundRadiusSquareAnnulus, ref sigma);
+				sigmas[i] = sigma;
+
+				if (SAVE_PS)
+				{
+					string file = SAVE_PS_FILENAME;
+					int ind = file.LastIndexOf(".");//for saving PS
+					file = String.Concat(file.Substring(0, ind), "_", (i + 1).ToString("00000000"), ".fits");
+
+					JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
+					f.WriteImage(TypeCode.Double, false);
+				}
+			}
+
+			double rsq = KERNEL_RADIUS * KERNEL_RADIUS;
+			if (rsq == 0)
+				rsq = 1;
+			double mediansigma = JPMath.Median(sigmas);
+			double bg = rsq * mediansigma * mediansigma;
+			for (int i = 0; i < N_SRC; i++)
+				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
+		}
+
+		#endregion
+
+		#region MEMBER METHODS
+		/// <summary>Searches for sources withn a 2D image array.</summary>
+		/// <param name="image">The 2D image array to find sources in.</param>
+		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
+		/// <param name="pix_min">The minimum pixel threshold value (or SN) to consider a potential source.</param>
+		/// <param name="pix_max">The maximum pixel threshold value (or SN) to consider a potential source.</param>
+		/// <param name="kernel_min">The minimum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
+		/// <param name="kernel_max">The maximum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
+		/// <param name="threshholds_as_SN">Treat the thresholds as Signal to Noise instead of pixel values.</param>
+		/// <param name="kernel_radius">The radius (pixels) of the kernel to find sources within. Secondary sources within the radius will be ignored.</param>
+		/// <param name="background_radius">The separation (pixels) between sources. Only the brightest source within the separation radius is kept.</param>
+		/// <param name="auto_background">Automatically determine the local background for potential sources. Use None if the image is already background subtracted.</param>
+		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
+		/// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
+		/// <param name="show_waitbar">Show a cancellable wait bar. False equates to a syncronous call.</param>
+		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default is the same value as pix_saturation.</param>
+		public void Extract_Sources(double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar, double pix_saturation_mapmin = 0, bool reject_saturated = false)
+		{
+			IMAGE = image;
+			PIX_SAT = pix_saturation;
+			if (pix_saturation_mapmin == 0)
+				PIX_SAT_MINMAP = PIX_SAT;
+			else
+				PIX_SAT_MINMAP = pix_saturation_mapmin;
+			IMAGEWIDTH = IMAGE.GetLength(0);
+			IMAGEHEIGHT = IMAGE.GetLength(1);
+			KERNEL_RADIUS = kernel_radius;
+			KERNEL_WIDTH = KERNEL_RADIUS * 2 + 1;
+			BACKGROUND_RADIUS = background_radius;
+			PIX_MAX = pix_max;
+			PIX_MIN = pix_min;
+			N_SRC = 0;
+			KERNEL_MIN = kernel_min;
+			KERNEL_MAX = kernel_max;
+			AUTO_BG = auto_background;
+			SAVE_PS = kernel_filename_template != "";
+			SAVE_PS_FILENAME = kernel_filename_template;
+			SOURCE_BOOLEAN_MAP = new bool[IMAGEWIDTH, IMAGEHEIGHT];
+			SOURCE_INDEX_MAP = new int[IMAGEWIDTH, IMAGEHEIGHT];
+			Parallel.For(0, IMAGE.GetLength(0), i =>
+			{
+				for (int j = 0; j < IMAGE.GetLength(1); j++)
+					SOURCE_INDEX_MAP[i, j] = -1;
+			});
+			WCS_GENERATED = false;
+			VALIDPSERECTS = false;
+			FITTED = false;
+			THRESHHOLDS_AS_SN = threshholds_as_SN;
+			SEARCH_ROI = ROI_region != null;
+			ROI_REGION = ROI_region;
+			SHOWWAITBAR = show_waitbar;
+			REJECT_SATURATED = reject_saturated;
+
+			if (SHOWWAITBAR)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Scanning Image...";
+				BGWRKR.RunWorkerAsync(1);
+				WAITBAR.ShowDialog();
+
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+					N_SRC = -1;
+			}
+			else
+			{
+				object sender = new Object();
+				DoWorkEventArgs e = new DoWorkEventArgs(1);
+				BGWRKR_DoWork(sender, e);
+			}
+		}
+
+		/// <summary>Determines centroids and other kernel information for sources at given coordinates. Centroids WILL be attempted to be redetermined; if one is NaN or Inf, the X/YCoords is then used for default.</summary>
+		/// <param name="image">The 2D image array containing the known sources to extract.</param>
+		/// <param name="XCoords">The x-axis coordinates of the sources.</param>
+		/// <param name="YCoords">The y-axis coordinates of the sources.</param>
+		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
+		/// <param name="kernel_radius">The radius (pixels) of the kernel to centroid.</param>
+		/// <param name="auto_background">Automatically determine the local background for potential sources.  Not required if background is known to be zeroed, but should have no effect if used in this case.</param>
+		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
+		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default is the same value as pix_saturation.</param>
+		public void Extract_Sources(double[,] image, double[] XCoords, double[] YCoords, double pix_saturation, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, double pix_saturation_mapmin = 0)
+		{
+			IMAGE = image;
+			PIX_SAT = pix_saturation;
+			if (pix_saturation_mapmin == 0)
+				PIX_SAT_MINMAP = PIX_SAT;
+			else
+				PIX_SAT_MINMAP = pix_saturation_mapmin;
+			IMAGEWIDTH = IMAGE.GetLength(0);
+			IMAGEHEIGHT = IMAGE.GetLength(1);
+			KERNEL_RADIUS = kernel_radius;
+			BACKGROUND_RADIUS = background_radius;
+			KERNEL_WIDTH = KERNEL_RADIUS * 2 + 1;
+			N_SRC = XCoords.Length;
+			INITARRAYS();
+			AUTO_BG = auto_background;
+			SAVE_PS = kernel_filename_template != "";
+			SAVE_PS_FILENAME = kernel_filename_template;
+			SOURCE_BOOLEAN_MAP = new bool[IMAGEWIDTH, IMAGEHEIGHT];
+			SOURCE_INDEX_MAP = new int[IMAGEWIDTH, IMAGEHEIGHT];
+			Parallel.For(0, IMAGE.GetLength(0), i =>
+			{
+				for (int j = 0; j < IMAGE.GetLength(1); j++)
+					SOURCE_INDEX_MAP[i, j] = -1;
+			});
+			FITTED = false;
+			WCS_GENERATED = false;
+			VALIDPSERECTS = false;
+			double y_centroid, x_centroid, sigma = -1, bg_est;
+			int kernelxmax, kernelymax;
+			double[,] kernel;
+			double[] sigmas = new double[N_SRC];
+
+			for (int i = 0; i < N_SRC; i++)
+			{
+				bg_est = ESTIMATELOCALBACKGROUND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), BACKGROUND_RADIUS, BackGroundEstimateStyle.Corners2ndMin, ref sigma);
+
+				if (PIX_SAT != 0 && IMAGE[(int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i])] >= PIX_SAT)
+				{
+					int xmin = (int)Math.Round(XCoords[i]), xmax = xmin, ymin = (int)Math.Round(YCoords[i]), ymax = ymin;
+					MAPSATURATIONISLAND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), i, ref xmin, ref xmax, ref ymin, ref ymax);
+					SATURATED[i] = true;
+
+					if (xmax - xmin == 0)//single pixel, expand to 3 pixels
+					{
+						xmin--;
+						if (xmin < 0)
+							xmin = 0;
+						xmax++;
+						if (xmax >= IMAGE.GetLength(0))
+							xmax = IMAGE.GetLength(0) - 1;
+					}
+					if (ymax - ymin == 0)//single pixel, expand to 3 pixels
+					{
+						ymin--;
+						if (ymin < 0)
+							ymin = 0;
+						ymax++;
+						if (ymax >= IMAGE.GetLength(1))
+							ymax = IMAGE.GetLength(1) - 1;
+					}
+
+					kernelxmax = (xmin + xmax) / 2;
+					kernelymax = (ymin + ymax) / 2;
+
+					Centroid(xmin, xmax, ymin, ymax, bg_est, out x_centroid, out y_centroid, out kernel);
+				}
+				else
+				{
+					kernel = GetKernel(image, (int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), KERNEL_RADIUS, out int[] xrange, out int[] yrange);
+					if (bg_est != 0)
+						kernel = JPMath.MatrixAddScalar(kernel, -bg_est, false);
+
+					RADIALIZE_MAPS_KERNEL(xrange[KERNEL_RADIUS], yrange[KERNEL_RADIUS], i);
+					Centroid(xrange, yrange, kernel, out x_centroid, out y_centroid);
+					JPMath.Max(kernel, out kernelxmax, out kernelymax);
+					kernelxmax += xrange[0];
+					kernelymax += yrange[0];
+				}
+
+				if (Double.IsNaN(x_centroid) || Double.IsInfinity(x_centroid) || Double.IsNaN(y_centroid) || Double.IsInfinity(y_centroid))
+				{
+					x_centroid = XCoords[i];
+					y_centroid = YCoords[i];
+				}
+
+				CENTROIDS_PIXEL_X[i] = kernelxmax;
+				CENTROIDS_PIXEL_Y[i] = kernelymax;
+				CENTROIDS_X[i] = x_centroid;
+				CENTROIDS_Y[i] = y_centroid;
+				CENTROIDS_AMPLITUDE[i] = JPMath.Max(kernel);
+				CENTROIDS_VOLUME[i] = JPMath.Sum(kernel);
+				CENTROIDS_AUTOBGEST[i] = bg_est;
+				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
+				sigma = 0;
+				CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.BackgoundRadiusSquareAnnulus, ref sigma);
+				sigmas[i] = sigma;
+
+				if (SAVE_PS)
+				{
+					string file = SAVE_PS_FILENAME;
+					int ind = file.LastIndexOf(".");//for saving PS
+					file = String.Concat(file.Substring(0, ind), "_", (i + 1).ToString("00000000"), ".fits");
+
+					JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
+					f.WriteImage(TypeCode.Double, false);
+				}
+			}
+
+			double rsq = KERNEL_RADIUS * KERNEL_RADIUS;
+			if (rsq == 0)
+				rsq = 1;
+			double mediansigma = JPMath.Median(sigmas);
+			double bg = rsq * mediansigma * mediansigma;
+			for (int i = 0; i < N_SRC; i++)
+				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
+		}
+
+		/// <summary>Attempt to find N strongest sources in an image.</summary>
+		/// <param name="nBrightestSources">The number of strongest sources to try to find.</param>
+		/// <param name="image">The 2D image array to find sources in.</param>
+		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
+		/// <param name="kernel_radius">The radius (pixels) of the kernel to find sources within. Secondary sources within the radius will be ignored.</param>
+		/// <param name="source_separation">The separation (pixels) between sources. Only the brightest source within the separation radius is kept.</param>
+		/// <param name="auto_background">Automatically determine the local background for potential sources.  Not required if background is known to be zeroed, but should have no effect if used in this case.</param>
+		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
+		/// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
+		/// <param name="show_waitbar">Show a cancellable wait bar.</param>
+		//public void Extract_Attempt_N_Sources(int N, double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar)
+		public void Extract_Attempt_NBrightestSources(int nBrightestSources, double[,] image, double pix_saturation, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar, out int niters)
+		{
+			double immax = JPMath.Max(image, true);
+			double immed = JPMath.Median(image);
+			double imamp = immax - immed;
+			double div = 8;
+			double pixthresh = imamp / div + immed;
+			niters = 0;
+			int maxiters = 11;
+
+			while (this.N_Sources != nBrightestSources && niters <= maxiters)
+			{
+				niters++;
+
+				Extract_Sources(image, pix_saturation, pixthresh, Double.MaxValue, 0, Double.MaxValue, false, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar);
+
+				if (this.N_Sources >= nBrightestSources)
+					break;
+
+				div *= 2;
+				pixthresh = imamp / div + immed;
+			}
+			if (this.N_Sources > nBrightestSources)
+				this.ClipToNBrightest(nBrightestSources);
+		}
+
+		/// <summary>Performs a least-squares fit on all sources of the form:
+		/// <br />G(x,y|P) = P(0) * exp( -((x - P(1)).^2 + (y - P(2)).^2 ) / (2*P(3)^2)) + P(4).</summary>
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3) is used, all other parameter initial estimates are determined locally. Can pass null for auto-estimate.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
+		/// <param name="showwaitbar">Show a cancellable waitbar. False equates to a syncronous call.</param>
+		public void Fit_Sources_Gaussian_Circular(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
+		{
+			//G = P(0) * exp( -((X-P(1)).^2 + (Y-P(2)).^2 ) / (2*P(3)^2)) + P(4);
+
+			FITS_PARAMS = new double[5, N_SRC];
+			FITTED = true;
+			FIT_EQUATION = "Gaussian (Circular): P(0) * exp( -((X-P(1)).^2 + (Y-P(2)).^2 ) / (2*P(3)^2)) + P(4)";
+			LBND = LBnds;
+			UBND = UBnds;
+			PINI = Pinit;
+			SHOWWAITBAR = showwaitbar;
+
+			if (showwaitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Fitting Sources...";
+				BGWRKR.RunWorkerAsync(2);
+				WAITBAR.ShowDialog();
+
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+					FITTED = false;
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(2));
+		}
+
+		/// <summary>Performs a least-squares fit on all sources of the form:
+		/// <br />G(x,y|P) = P(0) * exp( -((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))).^2 / (2*P(4)^2) - ( -(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))).^2 / (2*P(5)^2) ) + P(6).</summary>
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5) are used, all other parameter initial estimates are determined locally.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
+		public void Fit_Sources_Gaussian_Elliptical(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
+		{
+			//G = P(0) * exp( -((x-P(1))*cosd(P(3)) + (y-P(2))*sind(P(3))).^2 / (2*P(4)^2) - ( -(x-P(1))*sind(P(3)) + (y-P(2))*cosd(P(3))).^2 / (2*P(5)^2) ) + P(6);
+
+			FITS_PARAMS = new double[7, N_SRC];
+			FITTED = true;
+			FIT_EQUATION = "Gaussian (Elliptical): P(0) * exp( -((x-P(1))*cos(P(3)) + (y-P(2))*sin(P(3))).^2 / (2*P(4)^2) - ( -(x-P(1))*sin(P(3)) + (y-P(2))*cos(P(3))).^2 / (2*P(5)^2) ) + P(6)";
+			LBND = LBnds;
+			UBND = UBnds;
+			PINI = Pinit;
+			SHOWWAITBAR = showwaitbar;
+
+			if (showwaitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Fitting Sources...";
+				BGWRKR.RunWorkerAsync(3);
+				WAITBAR.ShowDialog();
+
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+					FITTED = false;
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(3));
+		}
+
+		/// <summary>Performs a least-squares fit on all sources of the form:
+		/// <br />M(x,y|P) = P(0) * ( 1 + { (x - P(1))^2 + (y - P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5).</summary>
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4) are used, all other parameter initial estimates are determined locally.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
+		public void Fit_Sources_Moffat_Circular(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
+		{
+			// M = P(0) * ( 1 + { (X-P(1))^2 + (Y-P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5)
+
+			FITS_PARAMS = new double[6, N_SRC];
+			FITTED = true;
+			FIT_EQUATION = "Moffat (Circular): P(0) * ( 1 + { (X-P(1))^2 + (Y-P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5)";
+			LBND = LBnds;
+			UBND = UBnds;
+			PINI = Pinit;
+			SHOWWAITBAR = showwaitbar;
+
+			if (showwaitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Fitting Sources...";
+				BGWRKR.RunWorkerAsync(4);
+				WAITBAR.ShowDialog();
+
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+					FITTED = false;
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(4));
+		}
+
+		/// <summary>Performs a least-squares fit on all sources of the form:
+		/// <br />M(x,y|P) = P(0) * (1 + { ((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))) ^ 2 } / P(4) ^ 2 + { (-(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))) ^ 2 } / P(5) ^ 2) ^ (-P(6)) + P(7).</summary>
+		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5),  P(6) are used, all other parameter initial estimates are determined locally.</param>
+		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
+		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
+		public void Fit_Sources_Moffat_Elliptical(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
+		{
+			//M = P(0) * ( 1 + { ((X-P(1))*cosd(P(3)) + (Y-P(2))*sind(P(3)))^2 } / P(4)^2 + { (-(X-P(1))*sind(P(3)) + (Y-P(2))*cosd(P(3)))^2 } / P(5)^2 ) ^ (-P(6)) + P(7);
+
+			FITS_PARAMS = new double[8, N_SRC];
+			FITTED = true;
+			FIT_EQUATION = "Moffat (Elliptical): P(0) * ( 1 + { ((X-P(1))*cos(P(3)) + (Y-P(2))*sin(P(3)))^2 } / P(4)^2 + { (-(X-P(1))*sin(P(3)) + (Y-P(2))*cos(P(3)))^2 } / P(5)^2 ) ^ (-P(6)) + P(7)";
+			LBND = LBnds;
+			UBND = UBnds;
+			PINI = Pinit;
+			SHOWWAITBAR = showwaitbar;
+
+			if (showwaitbar)
+			{
+				WAITBAR = new WaitBar();
+				WAITBAR.ProgressBar.Maximum = 100;
+				WAITBAR.Text = "Fitting Sources...";
+				BGWRKR.RunWorkerAsync(5);
+				WAITBAR.ShowDialog();
+
+				if (WAITBAR.DialogResult == DialogResult.Cancel)
+					FITTED = false;
+			}
+			else
+				BGWRKR_DoWork(this, new DoWorkEventArgs(5));
+		}
+
+		/// <summary>Saves the metadata table of the extracted sources as a delimited text file.</summary>
+		/// <param name="delimit">The delimit argument string: &quot;tab&quot; specifies a tab-delimit, otherwise provide a character (such as the comma &quot;,&quot; etc).</param>
+		public void Save_Source_Table(string delimit)
+		{
+			SaveFileDialog sfd = new SaveFileDialog();
+			sfd.Filter = "Delimited Text file (*.txt)|*.txt";
+			if (sfd.ShowDialog() == DialogResult.Cancel)
+				return;
+
+			this.GENERATEPSETABLE();
+
+			if (delimit == "tab")
+				delimit = "\t";
+
+			string line;
+			StreamWriter sw = new StreamWriter(sfd.FileName);
+			for (int j = 0; j < PSE_TABLE.GetLength(1); j++)
+			{
+				line = "";
+				for (int i = 0; i < PSE_TABLE.GetLength(0); i++)
+					line += PSE_TABLE[i, j] + delimit;
+				line = line.Substring(0, line.LastIndexOf(delimit) + 1);
+				sw.WriteLine(line);
+			}
+			sw.Close();
+		}
+
+		public void View_Source_Table()
+		{
+			string[,] table = this.Source_Table;
+
+			PSETableViewer PSETABLEVIEWER = new PSETableViewer(table);
+			PSETABLEVIEWER.Text = this.LSFit_Equation;
+			PSETABLEVIEWER.Show();
+		}
+
+		/// <summary>Generates RA and Dec coordinates for the sources in this instance, using the supplied World Coordinate System instance.</summary>
+		/// <param name="wcs">The world coordinate system to use for converting image pixel locations to world coordinates.</param>
+		public void Generate_Source_RADec_Coords(JPFITS.WorldCoordinateSolution wcs)
+		{
+			for (int i = 0; i < N_SRC; i++)
+			{
+				wcs.Get_Coordinate(CENTROIDS_X[i], CENTROIDS_Y[i], true, "TAN", out double a, out double d, out string RAhms, out string DECdamas);
+
+				CENTROIDS_RADEG[i] = a;
+				CENTROIDS_RAHMS[i] = RAhms;
+				CENTROIDS_DECDEG[i] = d;
+				CENTROIDS_DECDMS[i] = DECdamas;
+
+				if (FITTED)
+				{
+					wcs.Get_Coordinate(FITS_X[i], FITS_Y[i], true, "TAN", out a, out d, out RAhms, out DECdamas);
+
+					FITS_RA_DEG[i] = a;
+					FITS_RA_HMS[i] = RAhms;
+					FITS_DEC_DEG[i] = d;
+					FITS_DEC_DMS[i] = DECdamas;
+				}
+			}
+
+			WCS_GENERATED = true;
+		}
+
+		/// <summary>
+		/// Generate signal to noise ratios for all sources
+		/// </summary>
+		/// <param name="sigma">The standard deviation of the image-sky background. Pass -1 and a value will be estimated.</param>
+		public void Generate_SNR(double sigma)
+		{
+			double r = KERNEL_RADIUS;
+			if (r == 0)
+				r = 1;
+
+			double bg = r * r * sigma * sigma;
+
+			for (int i = 0; i < N_Sources; i++)
+				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
+		}
+
+		/// <summary>
+		/// Draw PSE source locations on a PictureBox control. Can plot to a main window or optionally a subwindow.
+		/// </summary>
+		/// <param name="e">The PaintEventArgs from the PictureBox.Paint callback.</param>
+		/// <param name="pen">The pen to draw with.</param>
+		/// <param name="pictureBox">The PictureBox control issuing the paint request.</param>
+		/// <param name="PSEImage">The 2d array image or subimage.</param>
+		/// <param name="xmin">Optional parameter for specifying subimage x-start.</param>
+		/// <param name="xmax">Optional parameter for specifying subimage x-end.</param>
+		/// <param name="ymin">Optional parameter for specifying subimage y-start.</param>
+		/// <param name="ymax">Optional parameter for specifying subimage y-end.</param>
+		/// <param name="brush">Optional parameter for subwidow brush to fill pixels.</param>
+		public void Draw_PSEKernels(PaintEventArgs e, Pen pen, PictureBox pictureBox, Array PSEImage, int xmin = 0, int xmax = Int32.MaxValue, int ymin = 0, int ymax = Int32.MaxValue, Brush? brush = null)
+		{
+			if (CENTROIDS_PIXEL_X == null)
+				return;
+
+			if (xmin == 0 && xmax == Int32.MaxValue && ymin == 0 && ymax == Int32.MaxValue)
+			{
+				if (!VALIDPSERECTS)
+				{
+					VALIDPSERECTS = true;
+
+					float xscale = (float)pictureBox.Width / (float)PSEImage.GetLength(0);
+					float yscale = (float)pictureBox.Height / (float)PSEImage.GetLength(1);
+
+					PSESRECTS = new Rectangle[this.N_Sources];
+					int radius = KERNEL_RADIUS;
+					if (radius < 2)
+						radius = 2;
+
+					for (int i = 0; i < this.N_Sources; i++)
+						PSESRECTS[i] = new Rectangle((int)(((float)CENTROIDS_PIXEL_X[i] + 0.5 - radius) * xscale), (int)(((float)CENTROIDS_PIXEL_Y[i] + 0.5 - radius) * yscale), (int)((float)(radius * 2 + 1) * xscale), (int)((float)(radius * 2 + 1) * yscale));
+				}
+				e.Graphics.DrawRectangles(pen, PSESRECTS);
+			}
+			else
+			{
+				float xscale = (float)pictureBox.Width / (float)PSEImage.GetLength(0);
+				float yscale = (float)pictureBox.Height / (float)PSEImage.GetLength(1);
+				float xleft, ytop;
+				SolidBrush br = new SolidBrush(pen.Color);
+
+				for (int i = 0; i < this.N_Sources; i++)
+					if (this.Centroids_X_Pixel[i] + 2 >= xmin && this.Centroids_X_Pixel[i] - 2 <= xmax && this.Centroids_Y_Pixel[i] + 2 >= ymin && this.Centroids_Y_Pixel[i] - 2 <= ymax)
+						e.Graphics.FillEllipse(br, (float)(((float)(this.Centroids_X[i]) - (float)xmin + 0.5) * xscale - 3.0), (float)(((float)(this.Centroids_Y[i]) - (float)ymin + 0.5) * yscale - 3.0), (float)7.0, (float)7.0);
+
+				for (int x = xmin; x <= xmax; x++)
+					for (int y = ymin; y <= ymax; y++)
+						if (SOURCE_BOOLEAN_MAP[x, y])
+						{
+							xleft = (float)(x - xmin) * xscale;
+							ytop = (float)(y - ymin) * yscale;
+							e.Graphics.FillRectangle(brush, xleft, ytop, xscale, yscale);
+						}
+			}
+		}
+
+		public void KernelRectangles_Refresh()
+		{
+			VALIDPSERECTS = false;
+		}
+
+		public void ClipToNBrightest(int NBright)
+		{
+			if (NBright >= N_SRC)
+				return;
+
+			VALIDPSERECTS = false;
+
+			double[] volkey = new double[N_SRC];
+			Array.Copy(CENTROIDS_VOLUME, volkey, N_SRC);
+
+			int[] indices = new int[N_SRC];
+			for (int i = 0; i < N_SRC; i++)
+				indices[i] = i;
+
+			Array.Sort(volkey, indices);//by increasing brightness
+			Array.Reverse(indices);//by decreasing brightness; now all location at indices at index >= NBright are no longer wanted
+
+			double dum;
+			string dumstr;
+			for (int i = 0; i < NBright; i++)
+			{
+				dum = CENTROIDS_X[i];
+				CENTROIDS_X[i] = CENTROIDS_X[indices[i]];
+				CENTROIDS_X[indices[i]] = dum;
+
+				dum = CENTROIDS_Y[i];
+				CENTROIDS_Y[i] = CENTROIDS_Y[indices[i]];
+				CENTROIDS_Y[indices[i]] = dum;
+
+				dum = CENTROIDS_PIXEL_X[i];
+				CENTROIDS_PIXEL_X[i] = CENTROIDS_PIXEL_X[indices[i]];
+				CENTROIDS_PIXEL_X[indices[i]] = (int)dum;
+
+				dum = CENTROIDS_PIXEL_Y[i];
+				CENTROIDS_PIXEL_Y[i] = CENTROIDS_PIXEL_Y[indices[i]];
+				CENTROIDS_PIXEL_Y[indices[i]] = (int)dum;
+
+				REMAP((int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i]), indices[i], i);
+				REMAP((int)Math.Round(CENTROIDS_X[indices[i]]), (int)Math.Round(CENTROIDS_Y[indices[i]]), i, indices[i]);
+
+				dum = FITS_X[i];
+				FITS_X[i] = FITS_X[indices[i]];
+				FITS_X[indices[i]] = dum;
+
+				dum = FITS_Y[i];
+				FITS_Y[i] = FITS_Y[indices[i]];
+				FITS_Y[indices[i]] = dum;
+
+				dum = FITS_FWHM_X[i];
+				FITS_FWHM_X[i] = FITS_FWHM_X[indices[i]];
+				FITS_FWHM_X[indices[i]] = dum;
+
+				dum = FITS_FWHM_Y[i];
+				FITS_FWHM_Y[i] = FITS_FWHM_Y[indices[i]];
+				FITS_FWHM_Y[indices[i]] = dum;
+
+				dum = FITS_PHI[i];
+				FITS_PHI[i] = FITS_PHI[indices[i]];
+				FITS_PHI[indices[i]] = dum;
+
+				dum = FITS_CHISQNORM[i];
+				FITS_CHISQNORM[i] = FITS_CHISQNORM[indices[i]];
+				FITS_CHISQNORM[indices[i]] = dum;
+
+				dum = CENTROIDS_RADEG[i];
+				CENTROIDS_RADEG[i] = CENTROIDS_RADEG[indices[i]];
+				CENTROIDS_RADEG[indices[i]] = dum;
+
+				dumstr = CENTROIDS_RAHMS[i];
+				CENTROIDS_RAHMS[i] = CENTROIDS_RAHMS[indices[i]];
+				CENTROIDS_RAHMS[indices[i]] = dumstr;
+
+				dum = CENTROIDS_DECDEG[i];
+				CENTROIDS_DECDEG[i] = CENTROIDS_DECDEG[indices[i]];
+				CENTROIDS_DECDEG[indices[i]] = dum;
+
+				dumstr = CENTROIDS_DECDMS[i];
+				CENTROIDS_DECDMS[i] = CENTROIDS_DECDMS[indices[i]];
+				CENTROIDS_DECDMS[indices[i]] = dumstr;
+
+				dum = CENTROIDS_AMPLITUDE[i];
+				CENTROIDS_AMPLITUDE[i] = CENTROIDS_AMPLITUDE[indices[i]];
+				CENTROIDS_AMPLITUDE[indices[i]] = dum;
+
+				dum = CENTROIDS_AUTOBGEST[i];
+				CENTROIDS_AUTOBGEST[i] = CENTROIDS_AUTOBGEST[indices[i]];
+				CENTROIDS_AUTOBGEST[indices[i]] = dum;
+
+				dum = CENTROIDS_ANULMEDBGEST[i];
+				CENTROIDS_ANULMEDBGEST[i] = CENTROIDS_ANULMEDBGEST[indices[i]];
+				CENTROIDS_ANULMEDBGEST[indices[i]] = dum;
+
+				dum = CENTROIDS_SNR[i];
+				CENTROIDS_SNR[i] = CENTROIDS_SNR[indices[i]];
+				CENTROIDS_SNR[indices[i]] = dum;
+
+				dum = FITS_AMPLITUDE[i];
+				FITS_AMPLITUDE[i] = FITS_AMPLITUDE[indices[i]];
+				FITS_AMPLITUDE[indices[i]] = dum;
+
+				dum = FITS_VOLUME[i];
+				FITS_VOLUME[i] = FITS_VOLUME[indices[i]];
+				FITS_VOLUME[indices[i]] = dum;
+
+				dum = FITS_BGESTIMATE[i];
+				FITS_BGESTIMATE[i] = FITS_BGESTIMATE[indices[i]];
+				FITS_BGESTIMATE[indices[i]] = dum;
+
+				dum = FITS_RA_DEG[i];
+				FITS_RA_DEG[i] = FITS_RA_DEG[indices[i]];
+				FITS_RA_DEG[indices[i]] = dum;
+
+				dumstr = FITS_RA_HMS[i];
+				FITS_RA_HMS[i] = FITS_RA_HMS[indices[i]];
+				FITS_RA_HMS[indices[i]] = dumstr;
+
+				dum = FITS_DEC_DEG[i];
+				FITS_DEC_DEG[i] = FITS_DEC_DEG[indices[i]];
+				FITS_DEC_DEG[indices[i]] = dum;
+
+				dumstr = FITS_DEC_DMS[i];
+				FITS_DEC_DMS[i] = FITS_DEC_DMS[indices[i]];
+				FITS_DEC_DMS[indices[i]] = dumstr;
+
+				dum = CENTROIDS_VOLUME[i];
+				CENTROIDS_VOLUME[i] = CENTROIDS_VOLUME[indices[i]];
+				CENTROIDS_VOLUME[indices[i]] = dum;
+			}
+
+			for (int i = NBright; i < N_SRC; i++)//all location at indices[i] where i >= NBright are no longer wanted
+				DEMAP((int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i]), SOURCE_INDEX_MAP[(int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i])]);
+
+			Array.Resize(ref CENTROIDS_X, NBright);
+			Array.Resize(ref CENTROIDS_Y, NBright);
+			Array.Resize(ref FITS_X, NBright);
+			Array.Resize(ref FITS_Y, NBright);
+			Array.Resize(ref FITS_FWHM_X, NBright);
+			Array.Resize(ref FITS_FWHM_Y, NBright);
+			Array.Resize(ref FITS_PHI, NBright);
+			Array.Resize(ref FITS_CHISQNORM, NBright);
+			Array.Resize(ref CENTROIDS_RADEG, NBright);
+			Array.Resize(ref CENTROIDS_RAHMS, NBright);
+			Array.Resize(ref CENTROIDS_SNR, NBright);
+			Array.Resize(ref CENTROIDS_DECDEG, NBright);
+			Array.Resize(ref CENTROIDS_DECDMS, NBright);
+			Array.Resize(ref CENTROIDS_AMPLITUDE, NBright);
+			Array.Resize(ref CENTROIDS_VOLUME, NBright);
+			Array.Resize(ref CENTROIDS_AUTOBGEST, NBright);
+			Array.Resize(ref CENTROIDS_ANULMEDBGEST, NBright);
+			Array.Resize(ref FITS_AMPLITUDE, NBright);
+			Array.Resize(ref FITS_VOLUME, NBright);
+			Array.Resize(ref FITS_BGESTIMATE, NBright);
+			Array.Resize(ref FITS_RA_DEG, NBright);
+			Array.Resize(ref FITS_RA_HMS, NBright);
+			Array.Resize(ref FITS_DEC_DEG, NBright);
+			Array.Resize(ref FITS_DEC_DMS, NBright);
+			N_SRC = NBright;
+
+			CENTROID_POINTS = new JPMath.PointD[N_SRC];
+			for (int i = 0; i < N_SRC; i++)
+				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
+
+			/*JPFITS.FITSImage^ ff = new FITSImage("C:\\Users\\Joseph E Postma\\Desktop\\test.fits", IMAGE_KERNEL_INDEX_SOURCE, false);
+			ff.WriteFile(TypeCode.Int32);*/
+		}
+
+		public void GroupizePSE(double groupRadius)
+		{
+			GROUPIDS = new int[N_SRC];
+			for (int i = 0; i < N_SRC; i++)
+				GROUPIDS[i] = -1;
+
+			int currgroupid = -1;
+			ArrayList groups = new ArrayList();
+			Color[] colors = new Color[11] { Color.OrangeRed, Color.Cyan, Color.LawnGreen, Color.BlueViolet, Color.DeepPink, Color.Aqua, Color.Crimson, Color.DarkGoldenrod, Color.Red, Color.Chartreuse, Color.HotPink };
+
+			for (int i = 0; i < N_SRC - 1; i++)
+				for (int j = i + 1; j < N_SRC; j++)
+					if (CENTROID_POINTS[i].DistanceTo(CENTROID_POINTS[j]) <= groupRadius)
+						if (GROUPIDS[i] == -1)
+						{
+							GROUPIDS[i] = ++currgroupid;
+
+							GraphicsPath path = new GraphicsPath();
+							path.AddEllipse((float)(CENTROIDS_X[i] - groupRadius), (float)(CENTROIDS_Y[i] - groupRadius), (float)(groupRadius * 2), (float)(groupRadius * 2));
+
+							groups.Add(new Group(currgroupid));
+							((Group)groups[currgroupid]).REGION = new Region(path);
+							Math.DivRem(i, colors.Length, out int rem);
+							((Group)groups[currgroupid]).GroupColor = colors[rem];
+
+							RECURSGROUP(i, j, groupRadius, currgroupid, groups);
+						}
+						else if (GROUPIDS[j] == -1)
+							RECURSGROUP(i, j, groupRadius, currgroupid, groups);
+
+			NGROUPS = groups.Count;
+
+			GROUPS = new Group[NGROUPS];
+			for (int i = 0; i < NGROUPS; i++)
+				GROUPS[i] = (Group)groups[i];
+
+			for (int i = 0; i < N_SRC; i++)
+				if (GROUPIDS[i] != -1)
+					GROUPS[GROUPIDS[i]].NElements++;
+
+			for (int i = 0; i < NGROUPS; i++)
+			{
+				GROUPS[i].ElementIndices = new int[GROUPS[i].NElements];
+
+				int c = 0;
+				for (int j = 0; j < N_SRC; j++)
+					if (GROUPIDS[j] == i)
+					{
+						GROUPS[i].ElementIndices[c] = j;
+						c++;
+					}
+			}
+
+			SOURCE_GROUP_MAP = new int[IMAGE.GetLength(0), IMAGE.GetLength(1)];
+
+			Parallel.For(0, SOURCE_GROUP_MAP.GetLength(0), i =>
+			{
+				for (int j = 0; j < SOURCE_GROUP_MAP.GetLength(1); j++)
+					SOURCE_GROUP_MAP[i, j] = -1;
+			});
+
+			Parallel.For(0, NGROUPS, i =>
+			{
+				for (int j = 0; j < GROUPS[i].NElements; j++)
+					for (int x = (int)(CENTROIDS_X[GROUPS[i].ElementIndices[j]] - groupRadius); x <= (int)(CENTROIDS_X[GROUPS[i].ElementIndices[j]] + groupRadius); x++)
+						for (int y = (int)(CENTROIDS_Y[GROUPS[i].ElementIndices[j]] - groupRadius); y <= (int)(CENTROIDS_Y[GROUPS[i].ElementIndices[j]] + groupRadius); y++)
+							if (x >= 0 && x < IMAGE.GetLength(0) && y >= 0 && y < IMAGE.GetLength(0))
+								if ((x - CENTROIDS_X[GROUPS[i].ElementIndices[j]]) * (x - CENTROIDS_X[GROUPS[i].ElementIndices[j]]) + (y - CENTROIDS_Y[GROUPS[i].ElementIndices[j]]) * (y - CENTROIDS_Y[GROUPS[i].ElementIndices[j]]) < groupRadius)
+									if (SOURCE_GROUP_MAP[x, y] == -1)
+										SOURCE_GROUP_MAP[x, y] = i;
+			});
+		}
+
+		public void Save(string fileName, string extensionName)
+		{
+			string[,] table = this.Source_Table;
+
+			string[] ttypes = new string[table.GetLength(0)];
+			for (int j = 0; j < ttypes.Length; j++)
+				ttypes[j] = table[j, 0];
+
+			Array[] entries = new Array[ttypes.Length];
+			for (int j = 0; j < ttypes.Length; j++)
+			{
+				if (!JPMath.IsNumeric(table[j, 1]))
+				{
+					entries[j] = new string[table.GetLength(1) - 1];
+					for (int k = 1; k < table.GetLength(1); k++)
+						((string[])entries[j])[k - 1] = table[j, k];
+				}
+				else
+				{
+					entries[j] = new double[table.GetLength(1) - 1];
+					for (int k = 1; k < table.GetLength(1); k++)
+						((double[])entries[j])[k - 1] = Convert.ToDouble(table[j, k]);
+				}
+			}
+
+			FITSBinTable bt = new FITSBinTable(extensionName);
+			bt.AddExtraHeaderKey("PIXSAT", this.PixelSaturation.ToString(), "Pixel saturation threshold");
+			bt.AddExtraHeaderKey("PIXMIN", this.PixelMinimum.ToString(), "Pixel minimum threshold");
+			bt.AddExtraHeaderKey("PIXMAX", this.PixelMaximum.ToString(), "Pixel maximum threshold");
+			bt.AddExtraHeaderKey("KERNMIN", this.KernelMinimum.ToString(), "Kernel minimum threshold");
+			bt.AddExtraHeaderKey("KERNMAX", this.KernelMaximum.ToString(), "Kernel maximum threshold");
+			bt.AddExtraHeaderKey("KERNRAD", this.KernelRadius.ToString(), "Pixel kernel radius");
+			bt.AddExtraHeaderKey("BGRADIUS", this.BackgroundRadius.ToString(), "Source background radius");
+			bt.AddExtraHeaderKey("AUTOBG", this.AutoBackground.ToString(), "Auto background");
+			bt.AddExtraHeaderKey("SAVESRC", this.SavePointSources.ToString(), "Save sources");
+			if (this.SavePointSources)
+				bt.AddExtraHeaderKey("", "", this.SAVE_PS_FILENAME);
+			bt.AddExtraHeaderKey("ROIONLY", this.SearchROI.ToString(), "Search ROI only");
+			if (this.SearchROI)
+				bt.AddExtraHeaderKey("ROIEXTN", extensionName + "_ROI", "name of the extension which contains the ROI map");
+			bt.SetTTYPEEntries(ttypes, null, entries);
+			bt.Write(fileName, true);
+
+			if (this.SearchROI)
+			{
+				FITSImage roifits = new FITSImage(fileName, ROI_REGION, false, false);
+				roifits.WriteImage(fileName, extensionName + "_ROI", true, TypeCode.Boolean, false);
+			}
+
+			FITSImage imapfits = new FITSImage(fileName, SOURCE_INDEX_MAP, false, false);
+			imapfits.WriteImage(fileName, extensionName + "_IMAP", true, TypeCode.Int32, false);
+
+			FITSImage bmapfits = new FITSImage(fileName, SOURCE_BOOLEAN_MAP, false, false);
+			bmapfits.WriteImage(fileName, extensionName + "_BMAP", true, TypeCode.Boolean, false);
+		}
+
+		/// <summary>The constructor for the class object based on a PointSourceExtractor saved from another session.</summary>
+		public void Load(string fileName, string extensionName)
+		{
+			FITSBinTable BinTablePSE = new FITSBinTable(fileName, extensionName);
+
+			PIX_SAT = Convert.ToDouble(BinTablePSE.GetExtraHeaderKeyValue("PIXSAT"));
+			PIX_MIN = Convert.ToDouble(BinTablePSE.GetExtraHeaderKeyValue("PIXMIN"));
+			PIX_MAX = Convert.ToDouble(BinTablePSE.GetExtraHeaderKeyValue("PIXMAX"));
+			KERNEL_MIN = Convert.ToDouble(BinTablePSE.GetExtraHeaderKeyValue("KERNMIN"));
+			KERNEL_MAX = Convert.ToDouble(BinTablePSE.GetExtraHeaderKeyValue("KERNMAX"));
+			KERNEL_RADIUS = Convert.ToInt32(BinTablePSE.GetExtraHeaderKeyValue("KERNRAD"));
+			KERNEL_WIDTH = KERNEL_RADIUS * 2 + 1;
+			BACKGROUND_RADIUS = Convert.ToInt32(BinTablePSE.GetExtraHeaderKeyValue("BGRADIUS"));
+			AUTO_BG = Convert.ToBoolean(BinTablePSE.GetExtraHeaderKeyValue("AUTOBG"));
+			SEARCH_ROI = Convert.ToBoolean(BinTablePSE.GetExtraHeaderKeyValue("ROIONLY"));
+			SAVE_PS = Convert.ToBoolean(BinTablePSE.GetExtraHeaderKeyValue("SAVESRC"));
+			if (this.SavePointSources)
+				SAVE_PS_FILENAME = "";//needs work...the key index after last...
+			SEARCH_ROI = Convert.ToBoolean(BinTablePSE.GetExtraHeaderKeyValue("ROIONLY"));
+
+			FileStream fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
+			ArrayList header = null;
+			FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_IMAP", ref header, out long start, out _, out _, out _, out _);
+			fs.Position = start;
+			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
+			SOURCE_INDEX_MAP = (int[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, FITSFILEOPS.RankFormat.Default, FITSFILEOPS.DataPrecision.Native);
+			fs.Close();
+
+			fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
+			header = null;
+			FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_BMAP", ref header, out start, out _, out _, out _, out _);
+			fs.Position = start;
+			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
+			SOURCE_BOOLEAN_MAP = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, FITSFILEOPS.RankFormat.Default, FITSFILEOPS.DataPrecision.Boolean);
+			fs.Close();
+
+			if (this.SearchROI)
+			{
+				fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
+				header = null;
+				FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_ROI", ref header, out start, out _, out _, out _, out _);
+				fs.Position = start;
+				FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
+				ROI_REGION = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, FITSFILEOPS.RankFormat.Default, FITSFILEOPS.DataPrecision.Boolean);
+				fs.Close();
+			}
+
+			N_SRC = BinTablePSE.Naxis2;
+			CENTROIDS_X = (double[])BinTablePSE.GetTTYPEEntry("PSE X-Centroid", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			CENTROIDS_Y = (double[])BinTablePSE.GetTTYPEEntry("PSE Y-Centroid", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			CENTROIDS_AMPLITUDE = (double[])BinTablePSE.GetTTYPEEntry("PSE Amplitude", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			CENTROIDS_VOLUME = (double[])BinTablePSE.GetTTYPEEntry("PSE Volume", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			CENTROIDS_AUTOBGEST = (double[])BinTablePSE.GetTTYPEEntry("PSE Background", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+
+			CENTROID_POINTS = new JPMath.PointD[N_SRC];
+			for (int i = 0; i < N_SRC; i++)
+				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
+
+			if (BinTablePSE.TTYPEEntryExists("PSE RA (deg)"))
+				CENTROIDS_RADEG = (double[])BinTablePSE.GetTTYPEEntry("PSE RA (deg)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			if (BinTablePSE.TTYPEEntryExists("PSE Dec (deg)"))
+				CENTROIDS_DECDEG = (double[])BinTablePSE.GetTTYPEEntry("PSE Dec (deg)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			if (BinTablePSE.TTYPEEntryExists("PSE RA (sxgsml)"))
+				CENTROIDS_RAHMS = (string[])BinTablePSE.GetTTYPEEntry("PSE RA (sxgsml)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			if (BinTablePSE.TTYPEEntryExists("PSE Dec (sxgsml)"))
+				CENTROIDS_DECDMS = (string[])BinTablePSE.GetTTYPEEntry("PSE Dec (sxgsml)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+		}
+
+		#endregion
+
 		#region PRIVATE MEMBERS
 
 		private string? NAME;
@@ -59,20 +1091,20 @@ namespace JPFITS
 		bool VALIDPSERECTS = false;
 
 		private int IMAGEWIDTH, IMAGEHEIGHT;
-		private int N_SRC = -1;                          // number of sources found
+		private int N_SRC = -1;
 		private int N_SATURATED = 0;
-		private int KERNEL_RADIUS;                      // source widths for centroiding
+		private int KERNEL_RADIUS;
 		private int KERNEL_WIDTH;
 		private int BACKGROUND_RADIUS;
-		private double PIX_SAT;                         //pixel saturation
+		private double PIX_SAT;
 		private double PIX_SAT_MINMAP;
-		private double PIX_MIN;                         // source min pixel thresh
-		private double PIX_MAX;                         // source max pixel thresh
-		private double KERNEL_MIN;                      // total source min count thresh
-		private double KERNEL_MAX;                      // total source max count thresh
-		bool AUTO_BG;                           //automatic background approximation
+		private double PIX_MIN = 0;
+		private double PIX_MAX = UInt16.MaxValue;
+		private double KERNEL_MIN = 0;
+		private double KERNEL_MAX = UInt16.MaxValue * 10;
+		bool AUTO_BG;
 		private bool SAVE_PS;
-		private bool THRESHHOLDS_AS_SN;                 //interpret pixel value and total count thresholds as SN
+		private bool THRESHHOLDS_AS_SN;
 		private bool SEARCH_ROI;
 		private bool[,]? ROI_REGION;
 		private int NGROUPS = 0;
@@ -86,34 +1118,36 @@ namespace JPFITS
 		private int[]? GROUPIDS;
 		private Group[]? GROUPS;
 		private JPMath.PointD[]? CENTROID_POINTS;
-		private double[]? CENTROIDS_X;               // x centroid positions of sources
-		private double[]? CENTROIDS_Y;               // y centroid positions of sources
+		private double[]? CENTROIDS_X;
+		private double[]? CENTROIDS_Y;
 		private int[]? CENTROIDS_PIXEL_X;
 		private int[]? CENTROIDS_PIXEL_Y;
-		private double[]? CENTROIDS_RADEG;      // right ascension centroid positions of sources - if available
-		private string[]? CENTROIDS_RAHMS;      // right ascension centroid positions of sources - if available
-		private double[]? CENTROIDS_DECDEG;     // declination centroid positions of sources - if available
-		private string[]? CENTROIDS_DECDMS;     // declination centroid positions of sources - if available
-		private double[]? CENTROIDS_AMPLITUDE;       // sources values (above fcmin)
-		private double[]? CENTROIDS_VOLUME;      // sources energies (above fcmin)
-		private double[]? CENTROIDS_AUTOBGEST;  // corner minimum - estimate of background
-		private double[]? CENTROIDS_ANULMEDBGEST;  // annulus median background estimate
+		private double[]? CENTROIDS_RADEG;
+		private string[]? CENTROIDS_RAHMS;
+		private double[]? CENTROIDS_DECDEG;
+		private string[]? CENTROIDS_DECDMS;
+		private double[]? CENTROIDS_AMPLITUDE;
+		private double[]? CENTROIDS_VOLUME;
+		private double[]? CENTROIDS_AUTOBGEST;
+		private double[]? CENTROIDS_ANULMEDBGEST;
 		private double[]? CENTROIDS_SNR;
+		private bool[]? SATURATED;
+		private bool REJECT_SATURATED;
 
-		private double[]? FITS_X;                    // x fitted positions of sources
-		private double[]? FITS_Y;                    // y fitted positions of sources
-		private double[]? FITS_FWHM_X;               // FWHM of sources
-		private double[]? FITS_FWHM_Y;               // FWHM of sources
-		private double[]? FITS_PHI;              // rotation theta of elliptical fits
-		private double[]? FITS_RA_DEG;               // right ascension centroid positions of sources - if available
-		private string[]? FITS_RA_HMS;           // right ascension centroid positions of sources - if available
-		private double[]? FITS_DEC_DEG;          // declination centroid positions of sources - if available
-		private string[]? FITS_DEC_DMS;          // declination centroid positions of sources - if available
-		private double[,]? FITS_PARAMS;          // fitted paramaters of sources - 2d because multiple parameters per source
-		private double[]? FITS_AMPLITUDE;            // 
-		private double[]? FITS_VOLUME;               // 
-		private double[]? FITS_BGESTIMATE;           // 
-		private double[]? FITS_CHISQNORM;            //
+		private double[]? FITS_X;
+		private double[]? FITS_Y;
+		private double[]? FITS_FWHM_X;
+		private double[]? FITS_FWHM_Y;
+		private double[]? FITS_PHI;
+		private double[]? FITS_RA_DEG;
+		private string[]? FITS_RA_HMS;
+		private double[]? FITS_DEC_DEG;
+		private string[]? FITS_DEC_DMS;
+		private double[,]? FITS_PARAMS;
+		private double[]? FITS_AMPLITUDE;
+		private double[]? FITS_VOLUME;
+		private double[]? FITS_BGESTIMATE;
+		private double[]? FITS_CHISQNORM;
 
 		private string[,]? PSE_TABLE;
 
@@ -440,29 +1474,28 @@ namespace JPFITS
 					if (WAITBAR.DialogResult == DialogResult.Cancel)
 						return;
 
-				//bool rejectsaturated = true;
-				//if (rejectsaturated)
-				//{
-				//	for (int i = 0; i < N_SATURATED; i++)
-				//		DEMAP((int)XPIXs[i], (int)YPIXs[i], i);
+				if (REJECT_SATURATED)
+				{
+					for (int i = 0; i < N_SATURATED; i++)
+						DEMAP((int)XPIXs[i], (int)YPIXs[i], i);
 
-				//	XPIXs.RemoveRange(0, N_SATURATED);
-				//	YPIXs.RemoveRange(0, N_SATURATED);
-				//	Xs.RemoveRange(0, N_SATURATED);
-				//	Ys.RemoveRange(0, N_SATURATED);
-				//	Ks.RemoveRange(0, N_SATURATED);
-				//	Ps.RemoveRange(0, N_SATURATED);
-				//	Bs.RemoveRange(0, N_SATURATED);
+					XPIXs.RemoveRange(0, N_SATURATED);
+					YPIXs.RemoveRange(0, N_SATURATED);
+					Xs.RemoveRange(0, N_SATURATED);
+					Ys.RemoveRange(0, N_SATURATED);
+					Ks.RemoveRange(0, N_SATURATED);
+					Ps.RemoveRange(0, N_SATURATED);
+					Bs.RemoveRange(0, N_SATURATED);
 
-				//	int[] indexes = new int[XPIXs.Count];
-				//	for (int i = 0; i < XPIXs.Count; i++)
-				//		indexes[i] = SOURCE_INDEX_MAP[(int)XPIXs[i], (int)YPIXs[i]];
+					int[] indexes = new int[XPIXs.Count];
+					for (int i = 0; i < XPIXs.Count; i++)
+						indexes[i] = SOURCE_INDEX_MAP[(int)XPIXs[i], (int)YPIXs[i]];
 
-				//	for (int i = 0; i < XPIXs.Count; i++)
-				//		REMAP((int)XPIXs[i], (int)YPIXs[i], indexes[i], i);
+					for (int i = 0; i < XPIXs.Count; i++)
+						REMAP((int)XPIXs[i], (int)YPIXs[i], indexes[i], i);
 
-				//	N_SATURATED = 0;
-				//}
+					N_SATURATED = 0;
+				}
 
 				N_SRC = Xs.Count;
 				INITARRAYS();
@@ -482,6 +1515,8 @@ namespace JPFITS
 					CENTROIDS_VOLUME[i] = Convert.ToDouble(Ks[i]);
 					CENTROIDS_AUTOBGEST[i] = Convert.ToDouble(Bs[i]);
 					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
+					if (i < N_SATURATED)
+						SATURATED[i] = true;
 
 					double sig = 0;
 					CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.BackgoundRadiusSquareAnnulus, ref sig);
@@ -897,6 +1932,7 @@ namespace JPFITS
 			CENTROIDS_AUTOBGEST = new double[N_SRC];
 			CENTROIDS_ANULMEDBGEST = new double[N_SRC];
 			CENTROIDS_SNR = new double[N_SRC];
+			SATURATED = new bool[N_SRC];
 			CENTROIDS_RADEG = new double[N_SRC];
 			CENTROIDS_DECDEG = new double[N_SRC];
 			CENTROIDS_RAHMS = new string[N_SRC];
@@ -932,27 +1968,7 @@ namespace JPFITS
 		}
 
 		#endregion
-
-		public class Group
-		{
-			public Group(int id)
-			{
-				ID = id;
-			}
-
-			public Color GroupColor
-			{
-				get { return COLOR; }
-				set { COLOR = value; }
-			}
-
-			public int ID = -1;
-			public int NElements = 0;
-			public int[]? ElementIndices;
-			public Region? REGION;
-			private Color COLOR;
-		};
-
+		
 		#region PROPERTIES
 
 		public Group[] Groups
@@ -1061,8 +2077,6 @@ namespace JPFITS
 			get { return CENTROIDS_DECDEG; }
 		}
 
-		//public double[] 
-
 		public double[] Centroids_Fit_FWHMX
 		{
 			get { return FITS_FWHM_X; }
@@ -1151,6 +2165,12 @@ namespace JPFITS
 			get { return PIX_SAT; }
 		}
 
+		/// <summary>Returns whether the source at the specified index is a saturated source.</summary>
+		public bool IsSaturated(int index)
+		{
+			return SATURATED[index];
+		}
+
 		/// <summary>Returns the kernel radius value which was passed when performing the source extraction</summary>
 		public int KernelRadius
 		{
@@ -1220,875 +2240,7 @@ namespace JPFITS
 			get { return NGROUPS; }
 		}
 		#endregion
-
-		#region MEMBER METHODS
-		/// <summary>Searches for sources withn a 2D image array.</summary>
-		/// <param name="image">The 2D image array to find sources in.</param>
-		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
-		/// <param name="pix_min">The minimum pixel threshold value (or SN) to consider a potential source.</param>
-		/// <param name="pix_max">The maximum pixel threshold value (or SN) to consider a potential source.</param>
-		/// <param name="kernel_min">The minimum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
-		/// <param name="kernel_max">The maximum kernel pixel sum threshold value (or SN) to consider a potential source.</param>
-		/// <param name="threshholds_as_SN">Treat the thresholds as Signal to Noise instead of pixel values.</param>
-		/// <param name="kernel_radius">The radius (pixels) of the kernel to find sources within. Secondary sources within the radius will be ignored.</param>
-		/// <param name="background_radius">The separation (pixels) between sources. Only the brightest source within the separation radius is kept.</param>
-		/// <param name="auto_background">Automatically determine the local background for potential sources. Use None if the image is already background subtracted.</param>
-		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
-		/// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
-		/// <param name="show_waitbar">Show a cancellable wait bar. False equates to a syncronous call.</param>
-		public void Extract_Sources(double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar, double pix_saturation_mapmin = 0)
-		{
-			IMAGE = image;
-			PIX_SAT = pix_saturation;
-			if (pix_saturation_mapmin == 0)
-				PIX_SAT_MINMAP = PIX_SAT;
-			else
-				PIX_SAT_MINMAP = pix_saturation_mapmin;
-			IMAGEWIDTH = IMAGE.GetLength(0);
-			IMAGEHEIGHT = IMAGE.GetLength(1);
-			KERNEL_RADIUS = kernel_radius;
-			KERNEL_WIDTH = KERNEL_RADIUS * 2 + 1;
-			BACKGROUND_RADIUS = background_radius;
-			PIX_MAX = pix_max;
-			PIX_MIN = pix_min;
-			N_SRC = 0;
-			KERNEL_MIN = kernel_min;
-			KERNEL_MAX = kernel_max;
-			AUTO_BG = auto_background;
-			SAVE_PS = kernel_filename_template != "";
-			SAVE_PS_FILENAME = kernel_filename_template;
-			SOURCE_BOOLEAN_MAP = new bool[IMAGEWIDTH, IMAGEHEIGHT];
-			SOURCE_INDEX_MAP = new int[IMAGEWIDTH, IMAGEHEIGHT];			
-			Parallel.For(0, IMAGE.GetLength(0), i =>
-			{
-				for (int j = 0; j < IMAGE.GetLength(1); j++)
-					SOURCE_INDEX_MAP[i, j] = -1;
-			});
-			WCS_GENERATED = false;
-			VALIDPSERECTS = false;
-			FITTED = false;
-			THRESHHOLDS_AS_SN = threshholds_as_SN;
-			SEARCH_ROI = ROI_region != null;
-			ROI_REGION = ROI_region;
-			SHOWWAITBAR = show_waitbar;
-
-			if (SHOWWAITBAR)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Scanning Image...";
-				BGWRKR.RunWorkerAsync(1);
-				WAITBAR.ShowDialog();
-
-				if (WAITBAR.DialogResult == DialogResult.Cancel)
-					N_SRC = -1;
-			}
-			else
-			{
-				object sender = new Object();
-				DoWorkEventArgs e = new DoWorkEventArgs(1);
-				BGWRKR_DoWork(sender, e);
-			}
-		}
-
-		/// <summary>Determines centroids and other kernel information for sources at given coordinates. Centroids WILL be attempted to be redetermined; if one is NaN or Inf, the X/YCoords is then used for default.</summary>
-		/// <param name="image">The 2D image array containing the known sources to extract.</param>
-		/// <param name="XCoords">The x-axis coordinates of the sources.</param>
-		/// <param name="YCoords">The y-axis coordinates of the sources.</param>
-		/// /// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
-		/// <param name="kernel_radius">The radius (pixels) of the kernel to centroid.</param>
-		/// <param name="auto_background">Automatically determine the local background for potential sources.  Not required if background is known to be zeroed, but should have no effect if used in this case.</param>
-		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
-		public void Extract_Sources(double[,] image, double[] XCoords, double[] YCoords, double pix_saturation, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, double pix_saturation_mapmin = 0)
-		{
-			IMAGE = image;
-			PIX_SAT = pix_saturation;
-			if (pix_saturation_mapmin == 0)
-				PIX_SAT_MINMAP = PIX_SAT;
-			else
-				PIX_SAT_MINMAP = pix_saturation_mapmin;
-			IMAGEWIDTH = IMAGE.GetLength(0);
-			IMAGEHEIGHT = IMAGE.GetLength(1);
-			KERNEL_RADIUS = kernel_radius;
-			BACKGROUND_RADIUS = background_radius;
-			KERNEL_WIDTH = KERNEL_RADIUS * 2 + 1;
-			N_SRC = XCoords.Length;
-			INITARRAYS();
-			AUTO_BG = auto_background;
-			SAVE_PS = kernel_filename_template != "";
-			SAVE_PS_FILENAME = kernel_filename_template;
-			SOURCE_BOOLEAN_MAP = new bool[IMAGEWIDTH, IMAGEHEIGHT];
-			SOURCE_INDEX_MAP = new int[IMAGEWIDTH, IMAGEHEIGHT];
-			Parallel.For(0, IMAGE.GetLength(0), i =>
-			{
-				for (int j = 0; j < IMAGE.GetLength(1); j++)
-					SOURCE_INDEX_MAP[i, j] = -1;
-			});
-			FITTED = false;
-			WCS_GENERATED = false;
-			VALIDPSERECTS = false;
-			double y_centroid, x_centroid, sigma = -1, bg_est;
-			int kernelxmax, kernelymax;
-			double[,] kernel;
-			double[] sigmas = new double[N_SRC];
-
-			for (int i = 0; i < N_SRC; i++)
-			{
-				bg_est = ESTIMATELOCALBACKGROUND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), BACKGROUND_RADIUS, BackGroundEstimateStyle.Corners2ndMin, ref sigma);				
-
-				if (PIX_SAT != 0 && IMAGE[(int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i])] >= PIX_SAT)
-				{
-					int xmin = (int)Math.Round(XCoords[i]), xmax = xmin, ymin = (int)Math.Round(YCoords[i]), ymax = ymin;
-					MAPSATURATIONISLAND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), i, ref xmin, ref xmax, ref ymin, ref ymax);
-
-					if (xmax - xmin == 0)//single pixel, expand to 3 pixels
-					{
-						xmin--;
-						if (xmin < 0)
-							xmin = 0;
-						xmax++;
-						if (xmax >= IMAGE.GetLength(0))
-							xmax = IMAGE.GetLength(0) - 1;
-					}
-					if (ymax - ymin == 0)//single pixel, expand to 3 pixels
-					{
-						ymin--;
-						if (ymin < 0)
-							ymin = 0;
-						ymax++;
-						if (ymax >= IMAGE.GetLength(1))
-							ymax = IMAGE.GetLength(1) - 1;
-					}
-
-					kernelxmax = (xmin + xmax) / 2;
-					kernelymax = (ymin + ymax) / 2;
-
-					Centroid(xmin, xmax, ymin, ymax, bg_est, out x_centroid, out y_centroid, out kernel);
-				}
-				else
-				{
-					kernel = GetKernel(image, (int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), KERNEL_RADIUS, out int[] xrange, out int[] yrange);
-					if (bg_est != 0)
-						kernel = JPMath.MatrixAddScalar(kernel, -bg_est, false);
-
-					RADIALIZE_MAPS_KERNEL(xrange[KERNEL_RADIUS], yrange[KERNEL_RADIUS], i);
-					Centroid(xrange, yrange, kernel, out x_centroid, out y_centroid);
-					JPMath.Max(kernel, out kernelxmax, out kernelymax);
-					kernelxmax += xrange[0];
-					kernelymax += yrange[0];
-				}
-
-				if (Double.IsNaN(x_centroid) || Double.IsInfinity(x_centroid) || Double.IsNaN(y_centroid) || Double.IsInfinity(y_centroid))
-				{
-					x_centroid = XCoords[i];
-					y_centroid = YCoords[i];
-				}
-
-				CENTROIDS_PIXEL_X[i] = kernelxmax;
-				CENTROIDS_PIXEL_Y[i] = kernelymax;
-				CENTROIDS_X[i] = x_centroid;
-				CENTROIDS_Y[i] = y_centroid;
-				CENTROIDS_AMPLITUDE[i] = JPMath.Max(kernel);
-				CENTROIDS_VOLUME[i] = JPMath.Sum(kernel);
-				CENTROIDS_AUTOBGEST[i] = bg_est;
-				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
-				sigma = 0;
-				CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.BackgoundRadiusSquareAnnulus, ref sigma);
-				sigmas[i] = sigma;
-
-				if (SAVE_PS)
-				{
-					string file = SAVE_PS_FILENAME;
-					int ind = file.LastIndexOf(".");//for saving PS
-					file = String.Concat(file.Substring(0, ind), "_", (i + 1).ToString("00000000"), ".fits");
-
-					JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
-					f.WriteImage(TypeCode.Double, false);
-				}
-			}
-			
-			double rsq = KERNEL_RADIUS * KERNEL_RADIUS;
-			if (rsq == 0)
-				rsq = 1;
-			double mediansigma = JPMath.Median(sigmas);
-			double bg = rsq * mediansigma * mediansigma;
-			for (int i = 0; i < N_SRC; i++)
-				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
-		}
-
-		/// <summary>Attempt to find N strongest sources in an image.</summary>
-		/// <param name="nBrightestSources">The number of strongest sources to try to find.</param>
-		/// <param name="image">The 2D image array to find sources in.</param>
-		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
-		/// <param name="kernel_radius">The radius (pixels) of the kernel to find sources within. Secondary sources within the radius will be ignored.</param>
-		/// <param name="source_separation">The separation (pixels) between sources. Only the brightest source within the separation radius is kept.</param>
-		/// <param name="auto_background">Automatically determine the local background for potential sources.  Not required if background is known to be zeroed, but should have no effect if used in this case.</param>
-		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
-		/// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
-		/// <param name="show_waitbar">Show a cancellable wait bar.</param>
-		//public void Extract_Attempt_N_Sources(int N, double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar)
-		public void Extract_Attempt_NBrightestSources(int nBrightestSources, double[,] image, double pix_saturation, int kernel_radius, int source_separation, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar, out int niters)
-		{
-			double immax = JPMath.Max(image, true);
-			double immed = JPMath.Median(image);
-			double imamp = immax - immed;
-			double div = 8;
-			double pixthresh = imamp / div + immed;
-			niters = 0;
-			int maxiters = 11;
-
-			while (this.N_Sources != nBrightestSources && niters <= maxiters)
-			{
-				niters++;
-
-				Extract_Sources(image, pix_saturation, pixthresh, Double.MaxValue, 0, Double.MaxValue, false, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar);
-
-				if (this.N_Sources >= nBrightestSources)
-					break;
-
-				div *= 2;
-				pixthresh = imamp / div + immed;
-			}
-			if (this.N_Sources > nBrightestSources)
-				this.ClipToNBrightest(nBrightestSources);
-		}
-
-		/// <summary>Performs a least-squares fit on all sources of the form:
-		/// <br />G(x,y|P) = P(0) * exp( -((x - P(1)).^2 + (y - P(2)).^2 ) / (2*P(3)^2)) + P(4).</summary>
-		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3) is used, all other parameter initial estimates are determined locally. Can pass null for auto-estimate.</param>
-		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
-		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
-		/// <param name="showwaitbar">Show a cancellable waitbar. False equates to a syncronous call.</param>
-		public void Fit_Sources_Gaussian_Circular(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
-		{
-			//G = P(0) * exp( -((X-P(1)).^2 + (Y-P(2)).^2 ) / (2*P(3)^2)) + P(4);
-
-			FITS_PARAMS = new double[5, N_SRC];
-			FITTED = true;
-			FIT_EQUATION = "Gaussian (Circular): P(0) * exp( -((X-P(1)).^2 + (Y-P(2)).^2 ) / (2*P(3)^2)) + P(4)";
-			LBND = LBnds;
-			UBND = UBnds;
-			PINI = Pinit;
-			SHOWWAITBAR = showwaitbar;
-
-			if (showwaitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Fitting Sources...";
-				BGWRKR.RunWorkerAsync(2);
-				WAITBAR.ShowDialog();
-
-				if (WAITBAR.DialogResult == DialogResult.Cancel)
-					FITTED = false;
-			}
-			else
-				BGWRKR_DoWork(this, new DoWorkEventArgs(2));
-		}
-
-		/// <summary>Performs a least-squares fit on all sources of the form:
-		/// <br />G(x,y|P) = P(0) * exp( -((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))).^2 / (2*P(4)^2) - ( -(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))).^2 / (2*P(5)^2) ) + P(6).</summary>
-		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5) are used, all other parameter initial estimates are determined locally.</param>
-		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
-		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
-		public void Fit_Sources_Gaussian_Elliptical(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
-		{
-			//G = P(0) * exp( -((x-P(1))*cosd(P(3)) + (y-P(2))*sind(P(3))).^2 / (2*P(4)^2) - ( -(x-P(1))*sind(P(3)) + (y-P(2))*cosd(P(3))).^2 / (2*P(5)^2) ) + P(6);
-
-			FITS_PARAMS = new double[7, N_SRC];
-			FITTED = true;
-			FIT_EQUATION = "Gaussian (Elliptical): P(0) * exp( -((x-P(1))*cos(P(3)) + (y-P(2))*sin(P(3))).^2 / (2*P(4)^2) - ( -(x-P(1))*sin(P(3)) + (y-P(2))*cos(P(3))).^2 / (2*P(5)^2) ) + P(6)";
-			LBND = LBnds;
-			UBND = UBnds;
-			PINI = Pinit;
-			SHOWWAITBAR = showwaitbar;
-
-			if (showwaitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Fitting Sources...";
-				BGWRKR.RunWorkerAsync(3);
-				WAITBAR.ShowDialog();
-
-				if (WAITBAR.DialogResult == DialogResult.Cancel)
-					FITTED = false;
-			}
-			else
-				BGWRKR_DoWork(this, new DoWorkEventArgs(3));
-		}
-
-		/// <summary>Performs a least-squares fit on all sources of the form:
-		/// <br />M(x,y|P) = P(0) * ( 1 + { (x - P(1))^2 + (y - P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5).</summary>
-		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4) are used, all other parameter initial estimates are determined locally.</param>
-		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
-		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
-		public void Fit_Sources_Moffat_Circular(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
-		{
-			// M = P(0) * ( 1 + { (X-P(1))^2 + (Y-P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5)
-
-			FITS_PARAMS = new double[6, N_SRC];
-			FITTED = true;
-			FIT_EQUATION = "Moffat (Circular): P(0) * ( 1 + { (X-P(1))^2 + (Y-P(2))^2 } / P(3)^2 ) ^ (-P(4)) + P(5)";
-			LBND = LBnds;
-			UBND = UBnds;
-			PINI = Pinit;
-			SHOWWAITBAR = showwaitbar;
-
-			if (showwaitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Fitting Sources...";
-				BGWRKR.RunWorkerAsync(4);
-				WAITBAR.ShowDialog();
-
-				if (WAITBAR.DialogResult == DialogResult.Cancel)
-					FITTED = false;
-			}
-			else
-				BGWRKR_DoWork(this, new DoWorkEventArgs(4));
-		}
-
-		/// <summary>Performs a least-squares fit on all sources of the form:
-		/// <br />M(x,y|P) = P(0) * (1 + { ((x - P(1))*cosd(P(3)) + (y - P(2))*sind(P(3))) ^ 2 } / P(4) ^ 2 + { (-(x - P(1))*sind(P(3)) + (y - P(2))*cosd(P(3))) ^ 2 } / P(5) ^ 2) ^ (-P(6)) + P(7).</summary>
-		/// <param name="Pinit">Initial guesses for the fit parameters. Only P(3), P(4), P(5),  P(6) are used, all other parameter initial estimates are determined locally.</param>
-		/// <param name="LBnds">Lower bounds for the fit parameters. Same restrictions as Pinit.</param>
-		/// <param name="UBnds">Upper bounds for the fit parameters. Same restrictions as Pinit.</param>
-		public void Fit_Sources_Moffat_Elliptical(double[]? Pinit, double[]? LBnds, double[]? UBnds, bool showwaitbar = true)
-		{
-			//M = P(0) * ( 1 + { ((X-P(1))*cosd(P(3)) + (Y-P(2))*sind(P(3)))^2 } / P(4)^2 + { (-(X-P(1))*sind(P(3)) + (Y-P(2))*cosd(P(3)))^2 } / P(5)^2 ) ^ (-P(6)) + P(7);
-
-			FITS_PARAMS = new double[8, N_SRC];
-			FITTED = true;
-			FIT_EQUATION = "Moffat (Elliptical): P(0) * ( 1 + { ((X-P(1))*cos(P(3)) + (Y-P(2))*sin(P(3)))^2 } / P(4)^2 + { (-(X-P(1))*sin(P(3)) + (Y-P(2))*cos(P(3)))^2 } / P(5)^2 ) ^ (-P(6)) + P(7)";
-			LBND = LBnds;
-			UBND = UBnds;
-			PINI = Pinit;
-			SHOWWAITBAR = showwaitbar;
-
-			if (showwaitbar)
-			{
-				WAITBAR = new WaitBar();
-				WAITBAR.ProgressBar.Maximum = 100;
-				WAITBAR.Text = "Fitting Sources...";
-				BGWRKR.RunWorkerAsync(5);
-				WAITBAR.ShowDialog();
-
-				if (WAITBAR.DialogResult == DialogResult.Cancel)
-					FITTED = false;
-			}
-			else
-				BGWRKR_DoWork(this, new DoWorkEventArgs(5));
-		}
-
-		/// <summary>Saves the metadata table of the extracted sources as a delimited text file.</summary>
-		/// <param name="delimit">The delimit argument string: &quot;tab&quot; specifies a tab-delimit, otherwise provide a character (such as the comma &quot;,&quot; etc).</param>
-		public void Save_Source_Table(string delimit)
-		{
-			SaveFileDialog sfd = new SaveFileDialog();
-			sfd.Filter = "Delimited Text file (*.txt)|*.txt";
-			if (sfd.ShowDialog() == DialogResult.Cancel)
-				return;
-
-			this.GENERATEPSETABLE();
-
-			if (delimit == "tab")
-				delimit = "\t";
-
-			string line;
-			StreamWriter sw = new StreamWriter(sfd.FileName);
-			for (int j = 0; j < PSE_TABLE.GetLength(1); j++)
-			{
-				line = "";
-				for (int i = 0; i < PSE_TABLE.GetLength(0); i++)
-					line += PSE_TABLE[i, j] + delimit;
-				line = line.Substring(0, line.LastIndexOf(delimit) + 1);
-				sw.WriteLine(line);
-			}
-			sw.Close();
-		}
-
-		public void View_Source_Table()
-		{			
-			string[,] table = this.Source_Table;
-
-			PSETableViewer PSETABLEVIEWER = new PSETableViewer(table);
-			PSETABLEVIEWER.Text = this.LSFit_Equation;
-			PSETABLEVIEWER.Show();
-		}
-
-		/// <summary>Generates RA and Dec coordinates for the sources in this instance, using the supplied World Coordinate System instance.</summary>
-		/// <param name="wcs">The world coordinate system to use for converting image pixel locations to world coordinates.</param>
-		public void Generate_Source_RADec_Coords(JPFITS.WorldCoordinateSolution wcs)
-		{
-			for (int i = 0; i < N_SRC; i++)
-			{
-				wcs.Get_Coordinate(CENTROIDS_X[i], CENTROIDS_Y[i], true, "TAN", out double a, out double d, out string RAhms, out string DECdamas);
-
-				CENTROIDS_RADEG[i] = a;
-				CENTROIDS_RAHMS[i] = RAhms;
-				CENTROIDS_DECDEG[i] = d;
-				CENTROIDS_DECDMS[i] = DECdamas;
-
-				if (FITTED)
-				{
-					wcs.Get_Coordinate(FITS_X[i], FITS_Y[i], true, "TAN", out a, out d, out RAhms, out DECdamas);
-
-					FITS_RA_DEG[i] = a;
-					FITS_RA_HMS[i] = RAhms;
-					FITS_DEC_DEG[i] = d;
-					FITS_DEC_DMS[i] = DECdamas;
-				}
-			}
-
-			WCS_GENERATED = true;
-		}
-
-		/// <summary>
-		/// Generate signal to noise ratios for all sources
-		/// </summary>
-		/// <param name="sigma">The standard deviation of the image-sky background. Pass -1 and a value will be estimated.</param>
-		public void Generate_SNR(double sigma)
-		{
-			double r = KERNEL_RADIUS;
-			if (r == 0)
-				r = 1;
-
-			double bg = r * r * sigma * sigma;
-
-			for (int i = 0; i < N_Sources; i++)
-				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
-		}
-
-		/// <summary>
-		/// Draw PSE source locations on a PictureBox control. Can plot to a main window or optionally a subwindow.
-		/// </summary>
-		/// <param name="e">The PaintEventArgs from the PictureBox.Paint callback.</param>
-		/// <param name="pen">The pen to draw with.</param>
-		/// <param name="pictureBox">The PictureBox control issuing the paint request.</param>
-		/// <param name="PSEImage">The 2d array image or subimage.</param>
-		/// <param name="xmin">Optional parameter for specifying subimage x-start.</param>
-		/// <param name="xmax">Optional parameter for specifying subimage x-end.</param>
-		/// <param name="ymin">Optional parameter for specifying subimage y-start.</param>
-		/// <param name="ymax">Optional parameter for specifying subimage y-end.</param>
-		/// <param name="brush">Optional parameter for subwidow brush to fill pixels.</param>
-		public void Draw_PSEKernels(PaintEventArgs e, Pen pen, PictureBox pictureBox, Array PSEImage, int xmin = 0, int xmax = Int32.MaxValue, int ymin = 0, int ymax = Int32.MaxValue, Brush? brush = null)
-		{
-			if (CENTROIDS_PIXEL_X == null)
-				return;
-
-			if (xmin == 0 && xmax == Int32.MaxValue && ymin == 0 && ymax == Int32.MaxValue)
-			{
-				if (!VALIDPSERECTS)
-				{
-					VALIDPSERECTS = true;
-
-					float xscale = (float)pictureBox.Width / (float)PSEImage.GetLength(0);
-					float yscale = (float)pictureBox.Height / (float)PSEImage.GetLength(1);
-
-					PSESRECTS = new Rectangle[this.N_Sources];
-					int radius = KERNEL_RADIUS;
-					if (radius < 2)
-						radius = 2;
-
-					for (int i = 0; i < this.N_Sources; i++)
-						PSESRECTS[i] = new Rectangle((int)(((float)CENTROIDS_PIXEL_X[i] + 0.5 - radius) * xscale), (int)(((float)CENTROIDS_PIXEL_Y[i] + 0.5 - radius) * yscale), (int)((float)(radius * 2 + 1) * xscale), (int)((float)(radius * 2 + 1) * yscale));
-				}
-				e.Graphics.DrawRectangles(pen, PSESRECTS);
-			}
-			else
-			{
-				float xscale = (float)pictureBox.Width / (float)PSEImage.GetLength(0);
-				float yscale = (float)pictureBox.Height / (float)PSEImage.GetLength(1);
-				float xleft, ytop;
-				SolidBrush br = new SolidBrush(pen.Color);
-
-				for (int i = 0; i < this.N_Sources; i++)
-					if (this.Centroids_X_Pixel[i] + 2 >= xmin && this.Centroids_X_Pixel[i] - 2 <= xmax && this.Centroids_Y_Pixel[i] + 2 >= ymin && this.Centroids_Y_Pixel[i] - 2 <= ymax)
-						e.Graphics.FillEllipse(br, (float)(((float)(this.Centroids_X[i]) - (float)xmin + 0.5) * xscale - 3.0), (float)(((float)(this.Centroids_Y[i]) - (float)ymin + 0.5) * yscale - 3.0), (float)7.0, (float)7.0);
-
-				for (int x = xmin; x <= xmax; x++)
-					for (int y = ymin; y <= ymax; y++)
-						if (SOURCE_BOOLEAN_MAP[x, y])
-						{
-							xleft = (float)(x - xmin) * xscale;
-							ytop = (float)(y - ymin) * yscale;
-							e.Graphics.FillRectangle(brush, xleft, ytop, xscale, yscale);
-						}
-			}
-		}
-
-		public void KernelRectangles_Refresh()
-		{
-			VALIDPSERECTS = false;
-		}
-
-		public void ClipToNBrightest(int NBright)
-		{
-			if (NBright >= N_SRC)
-				return;
-
-			VALIDPSERECTS = false;
-
-			double[] volkey = new double[N_SRC];
-			Array.Copy(CENTROIDS_VOLUME, volkey, N_SRC);
-
-			int[] indices = new int[N_SRC];
-			for (int i = 0; i < N_SRC; i++)
-				indices[i] = i;
-
-			Array.Sort(volkey, indices);//by increasing brightness
-			Array.Reverse(indices);//by decreasing brightness; now all location at indices at index >= NBright are no longer wanted
-
-			double dum;
-			string dumstr;
-			for (int i = 0; i < NBright; i++)
-			{
-				dum = CENTROIDS_X[i];
-				CENTROIDS_X[i] = CENTROIDS_X[indices[i]];
-				CENTROIDS_X[indices[i]] = dum;
-
-				dum = CENTROIDS_Y[i];
-				CENTROIDS_Y[i] = CENTROIDS_Y[indices[i]];
-				CENTROIDS_Y[indices[i]] = dum;
-
-				dum = CENTROIDS_PIXEL_X[i];
-				CENTROIDS_PIXEL_X[i] = CENTROIDS_PIXEL_X[indices[i]];
-				CENTROIDS_PIXEL_X[indices[i]] = (int)dum;
-
-				dum = CENTROIDS_PIXEL_Y[i];
-				CENTROIDS_PIXEL_Y[i] = CENTROIDS_PIXEL_Y[indices[i]];
-				CENTROIDS_PIXEL_Y[indices[i]] = (int)dum;
-
-				REMAP((int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i]), indices[i], i);
-				REMAP((int)Math.Round(CENTROIDS_X[indices[i]]), (int)Math.Round(CENTROIDS_Y[indices[i]]), i, indices[i]);
-
-				dum = FITS_X[i];
-				FITS_X[i] = FITS_X[indices[i]];
-				FITS_X[indices[i]] = dum;
-
-				dum = FITS_Y[i];
-				FITS_Y[i] = FITS_Y[indices[i]];
-				FITS_Y[indices[i]] = dum;
-
-				dum = FITS_FWHM_X[i];
-				FITS_FWHM_X[i] = FITS_FWHM_X[indices[i]];
-				FITS_FWHM_X[indices[i]] = dum;
-
-				dum = FITS_FWHM_Y[i];
-				FITS_FWHM_Y[i] = FITS_FWHM_Y[indices[i]];
-				FITS_FWHM_Y[indices[i]] = dum;
-
-				dum = FITS_PHI[i];
-				FITS_PHI[i] = FITS_PHI[indices[i]];
-				FITS_PHI[indices[i]] = dum;
-
-				dum = FITS_CHISQNORM[i];
-				FITS_CHISQNORM[i] = FITS_CHISQNORM[indices[i]];
-				FITS_CHISQNORM[indices[i]] = dum;
-
-				dum = CENTROIDS_RADEG[i];
-				CENTROIDS_RADEG[i] = CENTROIDS_RADEG[indices[i]];
-				CENTROIDS_RADEG[indices[i]] = dum;
-
-				dumstr = CENTROIDS_RAHMS[i];
-				CENTROIDS_RAHMS[i] = CENTROIDS_RAHMS[indices[i]];
-				CENTROIDS_RAHMS[indices[i]] = dumstr;
-
-				dum = CENTROIDS_DECDEG[i];
-				CENTROIDS_DECDEG[i] = CENTROIDS_DECDEG[indices[i]];
-				CENTROIDS_DECDEG[indices[i]] = dum;
-
-				dumstr = CENTROIDS_DECDMS[i];
-				CENTROIDS_DECDMS[i] = CENTROIDS_DECDMS[indices[i]];
-				CENTROIDS_DECDMS[indices[i]] = dumstr;
-
-				dum = CENTROIDS_AMPLITUDE[i];
-				CENTROIDS_AMPLITUDE[i] = CENTROIDS_AMPLITUDE[indices[i]];
-				CENTROIDS_AMPLITUDE[indices[i]] = dum;
-
-				dum = CENTROIDS_AUTOBGEST[i];
-				CENTROIDS_AUTOBGEST[i] = CENTROIDS_AUTOBGEST[indices[i]];
-				CENTROIDS_AUTOBGEST[indices[i]] = dum;
-
-				dum = CENTROIDS_ANULMEDBGEST[i];
-				CENTROIDS_ANULMEDBGEST[i] = CENTROIDS_ANULMEDBGEST[indices[i]];
-				CENTROIDS_ANULMEDBGEST[indices[i]] = dum;
-
-				dum = CENTROIDS_SNR[i];
-				CENTROIDS_SNR[i] = CENTROIDS_SNR[indices[i]];
-				CENTROIDS_SNR[indices[i]] = dum;
-
-				dum = FITS_AMPLITUDE[i];
-				FITS_AMPLITUDE[i] = FITS_AMPLITUDE[indices[i]];
-				FITS_AMPLITUDE[indices[i]] = dum;
-
-				dum = FITS_VOLUME[i];
-				FITS_VOLUME[i] = FITS_VOLUME[indices[i]];
-				FITS_VOLUME[indices[i]] = dum;
-
-				dum = FITS_BGESTIMATE[i];
-				FITS_BGESTIMATE[i] = FITS_BGESTIMATE[indices[i]];
-				FITS_BGESTIMATE[indices[i]] = dum;
-
-				dum = FITS_RA_DEG[i];
-				FITS_RA_DEG[i] = FITS_RA_DEG[indices[i]];
-				FITS_RA_DEG[indices[i]] = dum;
-
-				dumstr = FITS_RA_HMS[i];
-				FITS_RA_HMS[i] = FITS_RA_HMS[indices[i]];
-				FITS_RA_HMS[indices[i]] = dumstr;
-
-				dum = FITS_DEC_DEG[i];
-				FITS_DEC_DEG[i] = FITS_DEC_DEG[indices[i]];
-				FITS_DEC_DEG[indices[i]] = dum;
-
-				dumstr = FITS_DEC_DMS[i];
-				FITS_DEC_DMS[i] = FITS_DEC_DMS[indices[i]];
-				FITS_DEC_DMS[indices[i]] = dumstr;
-
-				dum = CENTROIDS_VOLUME[i];
-				CENTROIDS_VOLUME[i] = CENTROIDS_VOLUME[indices[i]];
-				CENTROIDS_VOLUME[indices[i]] = dum;
-			}			
-
-			for (int i = NBright; i < N_SRC; i++)//all location at indices[i] where i >= NBright are no longer wanted
-				DEMAP((int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i]), SOURCE_INDEX_MAP[(int)Math.Round(CENTROIDS_X[i]), (int)Math.Round(CENTROIDS_Y[i])]);
-
-			Array.Resize(ref CENTROIDS_X, NBright);
-			Array.Resize(ref CENTROIDS_Y, NBright);
-			Array.Resize(ref FITS_X, NBright);
-			Array.Resize(ref FITS_Y, NBright);
-			Array.Resize(ref FITS_FWHM_X, NBright);
-			Array.Resize(ref FITS_FWHM_Y, NBright);
-			Array.Resize(ref FITS_PHI, NBright);
-			Array.Resize(ref FITS_CHISQNORM, NBright);
-			Array.Resize(ref CENTROIDS_RADEG, NBright);
-			Array.Resize(ref CENTROIDS_RAHMS, NBright);
-			Array.Resize(ref CENTROIDS_SNR, NBright);
-			Array.Resize(ref CENTROIDS_DECDEG, NBright);
-			Array.Resize(ref CENTROIDS_DECDMS, NBright);
-			Array.Resize(ref CENTROIDS_AMPLITUDE, NBright);
-			Array.Resize(ref CENTROIDS_VOLUME, NBright);
-			Array.Resize(ref CENTROIDS_AUTOBGEST, NBright);
-			Array.Resize(ref CENTROIDS_ANULMEDBGEST, NBright);			
-			Array.Resize(ref FITS_AMPLITUDE, NBright);
-			Array.Resize(ref FITS_VOLUME, NBright);
-			Array.Resize(ref FITS_BGESTIMATE, NBright);
-			Array.Resize(ref FITS_RA_DEG, NBright);
-			Array.Resize(ref FITS_RA_HMS, NBright);
-			Array.Resize(ref FITS_DEC_DEG, NBright);
-			Array.Resize(ref FITS_DEC_DMS, NBright);
-			N_SRC = NBright;
-
-			CENTROID_POINTS = new JPMath.PointD[N_SRC];
-			for (int i = 0; i < N_SRC; i++)
-				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
-
-			/*JPFITS.FITSImage^ ff = new FITSImage("C:\\Users\\Joseph E Postma\\Desktop\\test.fits", IMAGE_KERNEL_INDEX_SOURCE, false);
-			ff.WriteFile(TypeCode.Int32);*/
-		}
-
-		public void GroupizePSE(double groupRadius)
-		{
-			GROUPIDS = new int[N_SRC];
-			for (int i = 0; i < N_SRC; i++)
-				GROUPIDS[i] = -1;
-
-			int currgroupid = -1;
-			ArrayList groups = new ArrayList();
-			Color[] colors = new Color[11] { Color.OrangeRed, Color.Cyan, Color.LawnGreen, Color.BlueViolet, Color.DeepPink, Color.Aqua, Color.Crimson, Color.DarkGoldenrod, Color.Red, Color.Chartreuse, Color.HotPink };
-
-			for (int i = 0; i < N_SRC - 1; i++)
-				for (int j = i + 1; j < N_SRC; j++)
-					if (CENTROID_POINTS[i].DistanceTo(CENTROID_POINTS[j]) <= groupRadius)
-						if (GROUPIDS[i] == -1)
-						{
-							GROUPIDS[i] = ++currgroupid;
-
-							GraphicsPath path = new GraphicsPath();
-							path.AddEllipse((float)(CENTROIDS_X[i] - groupRadius), (float)(CENTROIDS_Y[i] - groupRadius), (float)(groupRadius * 2), (float)(groupRadius * 2));
-
-							groups.Add(new Group(currgroupid));
-							((Group)groups[currgroupid]).REGION = new Region(path);
-							Math.DivRem(i, colors.Length, out int rem);
-							((Group)groups[currgroupid]).GroupColor = colors[rem];
-
-							RECURSGROUP(i, j, groupRadius, currgroupid, groups);
-						}
-						else if (GROUPIDS[j] == -1)
-							RECURSGROUP(i, j, groupRadius, currgroupid, groups);
-
-			NGROUPS = groups.Count;
-
-			GROUPS = new Group[NGROUPS];
-			for (int i = 0; i < NGROUPS; i++)
-				GROUPS[i] = (Group)groups[i];
-
-			for (int i = 0; i < N_SRC; i++)
-				if (GROUPIDS[i] != -1)
-					GROUPS[GROUPIDS[i]].NElements++;
-
-			for (int i = 0; i < NGROUPS; i++)
-			{
-				GROUPS[i].ElementIndices = new int[GROUPS[i].NElements];
-
-				int c = 0;
-				for (int j = 0; j < N_SRC; j++)
-					if (GROUPIDS[j] == i)
-					{
-						GROUPS[i].ElementIndices[c] = j;
-						c++;
-					}
-			}
-
-			SOURCE_GROUP_MAP = new int[IMAGE.GetLength(0), IMAGE.GetLength(1)];
-
-			Parallel.For(0, SOURCE_GROUP_MAP.GetLength(0), i =>
-			{
-				for (int j = 0; j < SOURCE_GROUP_MAP.GetLength(1); j++)
-					SOURCE_GROUP_MAP[i, j] = -1;
-			});
-
-			Parallel.For(0, NGROUPS, i =>
-			{
-					for (int j = 0; j < GROUPS[i].NElements; j++)
-						for (int x = (int)(CENTROIDS_X[GROUPS[i].ElementIndices[j]] - groupRadius); x <= (int)(CENTROIDS_X[GROUPS[i].ElementIndices[j]] + groupRadius); x++)
-							for (int y = (int)(CENTROIDS_Y[GROUPS[i].ElementIndices[j]] - groupRadius); y <= (int)(CENTROIDS_Y[GROUPS[i].ElementIndices[j]] + groupRadius); y++)
-								if (x >= 0 && x < IMAGE.GetLength(0) && y >= 0 && y < IMAGE.GetLength(0))
-									if ((x - CENTROIDS_X[GROUPS[i].ElementIndices[j]]) * (x - CENTROIDS_X[GROUPS[i].ElementIndices[j]]) + (y - CENTROIDS_Y[GROUPS[i].ElementIndices[j]]) * (y - CENTROIDS_Y[GROUPS[i].ElementIndices[j]]) < groupRadius)
-										if (SOURCE_GROUP_MAP[x, y] == -1)
-											SOURCE_GROUP_MAP[x, y] = i;
-			});
-		}
-
-		public void Save(string fileName, string extensionName)
-		{
-			string[,] table = this.Source_Table;
-
-			string[] ttypes = new string[table.GetLength(0)];
-			for (int j = 0; j < ttypes.Length; j++)
-				ttypes[j] = table[j, 0];
-
-			Array[] entries = new Array[ttypes.Length];
-			for (int j = 0; j < ttypes.Length; j++)
-			{
-				if (!JPMath.IsNumeric(table[j, 1]))
-				{
-					entries[j] = new string[table.GetLength(1) - 1];
-					for (int k = 1; k < table.GetLength(1); k++)
-						((string[])entries[j])[k - 1] = table[j, k];
-				}
-				else
-				{
-					entries[j] = new double[table.GetLength(1) - 1];
-					for (int k = 1; k < table.GetLength(1); k++)
-						((double[])entries[j])[k - 1] = Convert.ToDouble(table[j, k]);
-				}
-			}
-
-			FITSBinTable bt = new FITSBinTable(extensionName);
-			bt.AddExtraHeaderKey("PIXSAT", this.PixelSaturation.ToString(), "Pixel saturation threshold");
-			bt.AddExtraHeaderKey("PIXMIN", this.PixelMinimum.ToString(), "Pixel minimum threshold");
-			bt.AddExtraHeaderKey("PIXMAX", this.PixelMaximum.ToString(), "Pixel maximum threshold");
-			bt.AddExtraHeaderKey("KERNMIN", this.KernelMinimum.ToString(), "Kernel minimum threshold");
-			bt.AddExtraHeaderKey("KERNMAX", this.KernelMaximum.ToString(), "Kernel maximum threshold");
-			bt.AddExtraHeaderKey("KERNRAD", this.KernelRadius.ToString(), "Pixel kernel radius");
-			bt.AddExtraHeaderKey("BGRADIUS", this.BackgroundRadius.ToString(), "Source background radius");
-			bt.AddExtraHeaderKey("AUTOBG", this.AutoBackground.ToString(), "Auto background");
-			bt.AddExtraHeaderKey("SAVESRC", this.SavePointSources.ToString(), "Save sources");
-			if (this.SavePointSources)
-				bt.AddExtraHeaderKey("", "", this.SAVE_PS_FILENAME);
-			bt.AddExtraHeaderKey("ROIONLY", this.SearchROI.ToString(), "Search ROI only");
-			if (this.SearchROI)
-				bt.AddExtraHeaderKey("ROIEXTN", extensionName + "_ROI", "name of the extension which contains the ROI map");
-			bt.SetTTYPEEntries(ttypes, null, entries);
-			bt.Write(fileName, true);
-
-			if (this.SearchROI)
-			{
-				FITSImage roifits = new FITSImage(fileName, ROI_REGION, false, false);
-				roifits.WriteImage(fileName, extensionName + "_ROI", true, TypeCode.Boolean, false);
-			}
-
-			FITSImage imapfits = new FITSImage(fileName, SOURCE_INDEX_MAP, false, false);
-			imapfits.WriteImage(fileName, extensionName + "_IMAP", true, TypeCode.Int32, false);
-			
-			FITSImage bmapfits = new FITSImage(fileName, SOURCE_BOOLEAN_MAP, false, false);
-			bmapfits.WriteImage(fileName, extensionName + "_BMAP", true, TypeCode.Boolean, false);
-		}
-
-		/// <summary>The constructor for the class object based on a PointSourceExtractor saved from another session.</summary>
-		public void Load(string fileName, string extensionName)
-		{
-			FITSBinTable BinTablePSE = new FITSBinTable(fileName, extensionName);
-
-			PIX_SAT = Convert.ToDouble(BinTablePSE.GetExtraHeaderKeyValue("PIXSAT"));
-			PIX_MIN = Convert.ToDouble(BinTablePSE.GetExtraHeaderKeyValue("PIXMIN"));
-			PIX_MAX = Convert.ToDouble(BinTablePSE.GetExtraHeaderKeyValue("PIXMAX"));
-			KERNEL_MIN = Convert.ToDouble(BinTablePSE.GetExtraHeaderKeyValue("KERNMIN"));
-			KERNEL_MAX = Convert.ToDouble(BinTablePSE.GetExtraHeaderKeyValue("KERNMAX"));
-			KERNEL_RADIUS = Convert.ToInt32(BinTablePSE.GetExtraHeaderKeyValue("KERNRAD"));
-			KERNEL_WIDTH = KERNEL_RADIUS * 2 + 1;
-			BACKGROUND_RADIUS = Convert.ToInt32(BinTablePSE.GetExtraHeaderKeyValue("BGRADIUS"));
-			AUTO_BG = Convert.ToBoolean(BinTablePSE.GetExtraHeaderKeyValue("AUTOBG"));
-			SEARCH_ROI = Convert.ToBoolean(BinTablePSE.GetExtraHeaderKeyValue("ROIONLY"));
-			SAVE_PS = Convert.ToBoolean(BinTablePSE.GetExtraHeaderKeyValue("SAVESRC"));
-			if (this.SavePointSources)
-				SAVE_PS_FILENAME = "";//needs work...the key index after last...
-			SEARCH_ROI = Convert.ToBoolean(BinTablePSE.GetExtraHeaderKeyValue("ROIONLY"));			
-
-			FileStream fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-			ArrayList header = null;
-			FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_IMAP", ref header, out long start, out _, out _, out _, out _);
-			fs.Position = start;
-			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
-			SOURCE_INDEX_MAP = (int[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, FITSFILEOPS.RankFormat.Default, FITSFILEOPS.DataPrecision.Native);
-			fs.Close();
-
-			fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-			header = null;
-			FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_BMAP", ref header, out start, out _, out _, out _, out _);
-			fs.Position = start;
-			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
-			SOURCE_BOOLEAN_MAP = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, FITSFILEOPS.RankFormat.Default, FITSFILEOPS.DataPrecision.Boolean);
-			fs.Close();
-
-			if (this.SearchROI)
-			{
-				fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-				header = null;
-				FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_ROI", ref header, out start, out _, out _, out _, out _);
-				fs.Position = start;
-				FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
-				ROI_REGION = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, FITSFILEOPS.RankFormat.Default, FITSFILEOPS.DataPrecision.Boolean);
-				fs.Close();
-			}
-
-			N_SRC = BinTablePSE.Naxis2;
-			CENTROIDS_X = (double[])BinTablePSE.GetTTYPEEntry("PSE X-Centroid", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
-			CENTROIDS_Y = (double[])BinTablePSE.GetTTYPEEntry("PSE Y-Centroid", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
-			CENTROIDS_AMPLITUDE = (double[])BinTablePSE.GetTTYPEEntry("PSE Amplitude", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
-			CENTROIDS_VOLUME = (double[])BinTablePSE.GetTTYPEEntry("PSE Volume", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
-			CENTROIDS_AUTOBGEST = (double[])BinTablePSE.GetTTYPEEntry("PSE Background", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
-
-			CENTROID_POINTS = new JPMath.PointD[N_SRC];
-			for (int i = 0; i < N_SRC; i++)
-				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
-
-			if (BinTablePSE.TTYPEEntryExists("PSE RA (deg)"))
-				CENTROIDS_RADEG = (double[])BinTablePSE.GetTTYPEEntry("PSE RA (deg)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
-			if (BinTablePSE.TTYPEEntryExists("PSE Dec (deg)"))
-				CENTROIDS_DECDEG = (double[])BinTablePSE.GetTTYPEEntry("PSE Dec (deg)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
-			if (BinTablePSE.TTYPEEntryExists("PSE RA (sxgsml)"))
-				CENTROIDS_RAHMS = (string[])BinTablePSE.GetTTYPEEntry("PSE RA (sxgsml)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
-			if (BinTablePSE.TTYPEEntryExists("PSE Dec (sxgsml)"))
-				CENTROIDS_DECDMS = (string[])BinTablePSE.GetTTYPEEntry("PSE Dec (sxgsml)", out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
-		}
-
-		#endregion
-
+		
 		#region STATIC METHODS
 
 		/// <summary>Gets a square sub-array kernel from a primary image given a center position and square half-width radius.</summary>
@@ -2237,142 +2389,7 @@ namespace JPFITS
 		}
 
 		#endregion
-
-		#region CONSTRUCTORS
-		/// <summary>The default constructor, used when an image is to be examined for sources.</summary>
-		public PointSourceExtractor()
-		{
-			this.BGWRKR = new BackgroundWorker();
-			this.BGWRKR.WorkerReportsProgress = true;
-			this.BGWRKR.WorkerSupportsCancellation = true;
-			this.BGWRKR.DoWork += new DoWorkEventHandler(BGWRKR_DoWork);
-			this.BGWRKR.ProgressChanged += new ProgressChangedEventHandler(BGWRKR_ProgressChanged);
-			this.BGWRKR.RunWorkerCompleted += new RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
-			WAITBAR = new WaitBar();
-		}
-
-		/// <summary>
-		/// The constructor used when an image already has a list of valid centroids for sources in the image. Centroids will NOT be redetermined.
-		/// </summary>
-		/// <param name="image">The 2D image array to which the centroids belong.</param>
-		/// <param name="XCoords">The x-axis coordinates of the sources.</param>
-		/// <param name="YCoords">The y-axis coordinates of the sources.</param>
-		/// <param name="pix_saturation">The saturation threshold of of the image pixels, for finding saturation islands. Set equal to zero (0) if not needed.</param>
-		/// <param name="kernel_radius">The radius (pixels) of the kernel to centroid.</param>
-		/// <param name="auto_background">Estimate the background at the sources.</param>
-		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
-		public PointSourceExtractor(double[,] image, double[] XCoords, double[] YCoords, double pix_saturation, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, double pix_saturation_mapmin = 0)
-		{
-			this.BGWRKR = new BackgroundWorker();
-			this.BGWRKR.WorkerReportsProgress = true;
-			this.BGWRKR.WorkerSupportsCancellation = true;
-			this.BGWRKR.DoWork += new DoWorkEventHandler(BGWRKR_DoWork);
-			this.BGWRKR.ProgressChanged += new ProgressChangedEventHandler(BGWRKR_ProgressChanged);
-			this.BGWRKR.RunWorkerCompleted += new RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
-			WAITBAR = new WaitBar();
-
-			IMAGE = image;
-			PIX_SAT = pix_saturation;
-			if (pix_saturation_mapmin == 0)
-				PIX_SAT_MINMAP = PIX_SAT;
-			else
-				PIX_SAT_MINMAP = pix_saturation_mapmin;
-			IMAGEWIDTH = IMAGE.GetLength(0);
-			IMAGEHEIGHT = IMAGE.GetLength(1);
-			KERNEL_RADIUS = kernel_radius;
-			BACKGROUND_RADIUS = background_radius;
-			KERNEL_WIDTH = KERNEL_RADIUS * 2 + 1;
-			N_SRC = XCoords.Length;
-			INITARRAYS();
-			AUTO_BG = auto_background;
-			SAVE_PS = kernel_filename_template != "";
-			SAVE_PS_FILENAME = kernel_filename_template;
-			SOURCE_BOOLEAN_MAP = new bool[IMAGEWIDTH, IMAGEHEIGHT];
-			SOURCE_INDEX_MAP = new int[IMAGEWIDTH, IMAGEHEIGHT];
-			Parallel.For(0, IMAGE.GetLength(0), i =>
-			{
-				for (int j = 0; j < IMAGE.GetLength(1); j++)
-					SOURCE_INDEX_MAP[i, j] = -1;
-			});
-			FITTED = false;
-			WCS_GENERATED = false;
-			VALIDPSERECTS = false;
-			double sigma = -1, bg_est;
-			double[,] kernel;
-			double[] sigmas = new double[N_SRC];
-
-			for (int i = 0; i < N_SRC; i++)
-			{
-				bg_est = ESTIMATELOCALBACKGROUND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), BACKGROUND_RADIUS, BackGroundEstimateStyle.Corners2ndMin, ref sigma);
-
-				if (PIX_SAT != 0 && IMAGE[(int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i])] >= PIX_SAT)
-				{
-					int xmin = (int)Math.Round(XCoords[i]), xmax = xmin, ymin = (int)Math.Round(YCoords[i]), ymax = ymin;
-					MAPSATURATIONISLAND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), i, ref xmin, ref xmax, ref ymin, ref ymax);
-
-					if (xmax - xmin == 0)//single pixel, expand to 3 pixels
-					{
-						xmin--;
-						if (xmin < 0)
-							xmin = 0;
-						xmax++;
-						if (xmax >= IMAGE.GetLength(0))
-							xmax = IMAGE.GetLength(0) - 1;
-					}
-					if (ymax - ymin == 0)//single pixel, expand to 3 pixels
-					{
-						ymin--;
-						if (ymin < 0)
-							ymin = 0;
-						ymax++;
-						if (ymax >= IMAGE.GetLength(1))
-							ymax = IMAGE.GetLength(1) - 1;
-					}
-
-					Centroid(xmin, xmax, ymin, ymax, bg_est, out _, out _, out kernel);
-				}
-				else
-				{
-					kernel = GetKernel(image, (int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), KERNEL_RADIUS, out int[] xrange, out int[] yrange);
-					if (bg_est != 0)
-						kernel = JPMath.MatrixAddScalar(kernel, -bg_est, false);
-
-					RADIALIZE_MAPS_KERNEL(xrange[KERNEL_RADIUS], yrange[KERNEL_RADIUS], i);
-				}				
-
-				CENTROIDS_PIXEL_X[i] = (int)Math.Round(XCoords[i]);
-				CENTROIDS_PIXEL_Y[i] = (int)Math.Round(YCoords[i]);
-				CENTROIDS_X[i] = XCoords[i];
-				CENTROIDS_Y[i] = YCoords[i];
-				CENTROIDS_AMPLITUDE[i] = JPMath.Max(kernel);
-				CENTROIDS_VOLUME[i] = JPMath.Sum(kernel);
-				CENTROIDS_AUTOBGEST[i] = bg_est;
-				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
-				sigma = 0;
-				CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.BackgoundRadiusSquareAnnulus, ref sigma);
-				sigmas[i] = sigma;
-
-				if (SAVE_PS)
-				{
-					string file = SAVE_PS_FILENAME;
-					int ind = file.LastIndexOf(".");//for saving PS
-					file = String.Concat(file.Substring(0, ind), "_", (i + 1).ToString("00000000"), ".fits");
-
-					JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
-					f.WriteImage(TypeCode.Double, false);
-				}
-			}
-
-			double rsq = KERNEL_RADIUS * KERNEL_RADIUS;
-			if (rsq == 0)
-				rsq = 1;
-			double mediansigma = JPMath.Median(sigmas);
-			double bg = rsq * mediansigma * mediansigma;
-			for (int i = 0; i < N_SRC; i++)
-				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
-		}		
-
-		#endregion
+				
 	}
 }
 

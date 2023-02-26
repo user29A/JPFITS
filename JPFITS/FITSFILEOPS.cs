@@ -3114,6 +3114,9 @@ namespace JPFITS
 					}
 					break;
 				}
+
+				default:
+					throw new Exception("TypeCode '" + formatPrecision + "' not acceptable in GetByteFormattedImageDataUnit.");
 			}
 
 			return bytearray;

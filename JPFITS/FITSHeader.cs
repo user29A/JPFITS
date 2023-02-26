@@ -625,7 +625,7 @@ namespace JPFITS
 
 		private static string[] INVALIDEDITKEYS = { "SIMPLE", "EXTEND", "BITPIX", "NAXIS", "BZERO", "BSCALE", "END", "PCOUNT", "GCOUNT", "THEAP", "GROUPS", "XTENSION", "TFIELDS", "TUNIT", "TFORM", "TTYPE", "TZERO", "TSCAL" };
 
-		/// <summary>ValidKeyEdit returns whether the given key is an essential key and shouldn't be user-modified.</summary>
+		/// <summary>Returns whether the given key is NOT an essential key and therefore is OKAY to modify, copy, etc.</summary>
 		/// <param name="key">The name of the header key.</param>
 		public static bool ValidKeyEdit(string key, bool showMessageBox)
 		{

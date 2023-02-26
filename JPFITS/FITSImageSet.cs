@@ -6,6 +6,8 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Windows.Forms.DataVisualization.Charting;
+
 #nullable enable
 
 namespace JPFITS
@@ -1540,34 +1542,77 @@ namespace JPFITS
 
 		/// <summary></summary>
 		/// <param name="sourceFullFileName"></param>
-		public static FITSImageSet ReadPrimaryImageLayerCubeAsSet(string sourceFullFileName)
+		public static FITSImageSet ReadPrimaryImageCubeAsSet(string sourceFullFileName)
 		{
-			double[] cube = FITSImage.ReadPrimaryNDimensionalData(sourceFullFileName, out int[] axesN);
+			FileStream fs = new FileStream(sourceFullFileName, FileMode.Open, FileAccess.Read, FileShare.Read);
+			ArrayList header = new ArrayList();
+			if (!FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out bool hasext, out int BITPIX, out int[] naxisn, out double BSCALE, out double BZERO))
+			{
+				fs.Close();
+				throw new Exception("File '" + sourceFullFileName + "' not formatted as FITS file.");
+			}
 
-			if (axesN.Length != 3)
-				throw new Exception("File does not contain a data cube: NAXIS = " + axesN.Length);
-			if (axesN[3] == 1)
-				throw new Exception("File does not contain a data cube: NAXIS3 = 1");
+			if (naxisn.Length != 3)
+				throw new Exception("File does not contain a data cube: NAXIS = " + naxisn.Length);
+
+			FITSHeader HEADER = new FITSHeader(header, true);
+
+			double[,,] cube = (double[,,])FITSFILEOPS.ReadImageDataUnit(fs, null, true, BITPIX, ref naxisn, BSCALE, BZERO, FITSFILEOPS.RankFormat.Default);
+
+			fs.Close();			
 
 			string destFullFileName = sourceFullFileName.Substring(0, sourceFullFileName.LastIndexOf("\\")) + "\\";
 
 			FITSImageSet set = new FITSImageSet();
 
-			for (int z = 0; z < axesN[2]; z++)//z is each layer of the cube
+			for (int z = 0; z < naxisn[2]; z++)//z is each layer of the cube
 			{
-				double[,] layer = new double[axesN[0], axesN[1]];
+				double[,] layer = new double[naxisn[0], naxisn[1]];
 
-				Parallel.For(0, axesN[1], y =>
+				Parallel.For(0, naxisn[1], y =>
 				{
-					for (int x = 0; x < axesN[0]; x++)
-						layer[x, y] = cube[z * axesN[1] * axesN[0] + y * axesN[0] + x];
+					for (int x = 0; x < naxisn[0]; x++)
+						layer[x, y] = cube[x, y, z];
 				});
 
-				FITSImage fi = new FITSImage(destFullFileName + z.ToString("000000000") + ".fits", layer, false, true);
+				FITSImage fi = new FITSImage(destFullFileName + z.ToString("000000000") + ".fits", layer, true, true);
+				
+				for (int m = 0; m < HEADER.Length; m++)
+					if (FITSHeader.ValidKeyEdit(HEADER[m].Name, false))
+						fi.Header.AddKey(HEADER[m], -1);
+
 				set.Add(fi);
 			}
 
 			return set;
+
+
+			//double[] cube = FITSImage.ReadPrimaryNDimensionalData(sourceFullFileName, out int[] axesN);
+
+			//if (axesN.Length != 3)
+			//	throw new Exception("File does not contain a data cube: NAXIS = " + axesN.Length);
+			//if (axesN[3] == 1)
+			//	throw new Exception("File does not contain a data cube: NAXIS3 = 1");
+
+			//string destFullFileName = sourceFullFileName.Substring(0, sourceFullFileName.LastIndexOf("\\")) + "\\";
+
+			//FITSImageSet set = new FITSImageSet();
+
+			//for (int z = 0; z < axesN[2]; z++)//z is each layer of the cube
+			//{
+			//	double[,] layer = new double[axesN[0], axesN[1]];
+
+			//	Parallel.For(0, axesN[1], y =>
+			//	{
+			//		for (int x = 0; x < axesN[0]; x++)
+			//			layer[x, y] = cube[z * axesN[1] * axesN[0] + y * axesN[0] + x];
+			//	});
+
+			//	FITSImage fi = new FITSImage(destFullFileName + z.ToString("000000000") + ".fits", layer, false, true);
+			//	set.Add(fi);
+			//}
+
+			//return set;
 		}
 		#endregion
 	}

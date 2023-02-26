@@ -48,7 +48,7 @@ namespace JPFITS
 							VALUE = line.Substring(10, 20).Trim();
 						else
 						{
-							int slashind = line.IndexOf("/");
+							int slashind = line.IndexOf("/", 10);
 							if (slashind == -1)
 								VALUE = line.Substring(10).Trim();//get rid of leading and trailing white space
 							else
@@ -75,7 +75,7 @@ namespace JPFITS
 						}
 					}
 
-					int ind = line.IndexOf("/");
+					int ind = line.IndexOf("/", 10);
 					if (ind != -1)
 						COMMENT = line.Substring(ind + 1).Trim();
 					else
@@ -84,7 +84,7 @@ namespace JPFITS
 			}
 			catch
 			{
-				throw new Exception("Header line: \r\r'" + line + "'\r\r is very poorly formatted. Continuing should allow the file to be processed but the header will not likely contain whatever was intended.");
+				throw new Exception("Header line: \r\r'" + line + "'\r\r is very poorly formatted.");
 			}
 		}
 
@@ -200,7 +200,7 @@ namespace JPFITS
 
 			string key = NAME.PadRight(8);
 			key += "= ";
-			//key name formatting done			
+			//key name formatting done
 
 			//do value formatting
 			string value;
