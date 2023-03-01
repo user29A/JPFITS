@@ -349,7 +349,7 @@ namespace JPFITS
 			return true;
 		}
 
-		/// <summary>Reads the image data unit from a FITS file and returns its Array at double-precision. Supports image data units with up to 3 axes. May return either a vector, table, or cube.</summary>
+		/// <summary>Reads the image data unit from a FITS file and returns its Array at native or alternative precisions. Supports image data units with up to 3 axes. May return either a vector, table, or cube.</summary>
 		/// <param name="fs">The FileStream of the FITS file, positioned at the start of the primary or image extension data unit.</param>
 		/// <param name="range">Pass null or range[0] = -1 to default to full data unit size. Otherwise range is ZERO BASED 1-D int array [xmin xmax] or [xmin xmax ymin ymax]  or [xmin xmax ymin ymax zmin zmax] to return a sub-array.</param>
 		/// <param name="doParallel">Populate the Array object with parallelization after serial disk read.</param>

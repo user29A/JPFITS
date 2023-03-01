@@ -819,6 +819,14 @@ namespace JPFITS
 				FITS_VOLUME[i] = FITS_VOLUME[indices[i]];
 				FITS_VOLUME[indices[i]] = dum;
 
+				dum = FITS_ECCENTRICITY[i];
+				FITS_ECCENTRICITY[i] = FITS_ECCENTRICITY[indices[i]];
+				FITS_ECCENTRICITY[indices[i]] = dum;
+
+				dum = FITS_FLATNESS[i];
+				FITS_FLATNESS[i] = FITS_FLATNESS[indices[i]];
+				FITS_FLATNESS[indices[i]] = dum;
+
 				dum = FITS_BGESTIMATE[i];
 				FITS_BGESTIMATE[i] = FITS_BGESTIMATE[indices[i]];
 				FITS_BGESTIMATE[indices[i]] = dum;
@@ -866,6 +874,8 @@ namespace JPFITS
 			Array.Resize(ref CENTROIDS_ANULMEDBGEST, NBright);
 			Array.Resize(ref FITS_AMPLITUDE, NBright);
 			Array.Resize(ref FITS_VOLUME, NBright);
+			Array.Resize(ref FITS_ECCENTRICITY, NBright);
+			Array.Resize(ref FITS_FLATNESS, NBright);
 			Array.Resize(ref FITS_BGESTIMATE, NBright);
 			Array.Resize(ref FITS_RA_DEG, NBright);
 			Array.Resize(ref FITS_RA_HMS, NBright);
@@ -1146,6 +1156,8 @@ namespace JPFITS
 		private double[,]? FITS_PARAMS;
 		private double[]? FITS_AMPLITUDE;
 		private double[]? FITS_VOLUME;
+		private double[]? FITS_ECCENTRICITY;
+		private double[]? FITS_FLATNESS;
 		private double[]? FITS_BGESTIMATE;
 		private double[]? FITS_CHISQNORM;
 
@@ -1592,6 +1604,8 @@ namespace JPFITS
 					FITS_VOLUME[k] = 2 * Math.PI * P0[0] * P0[3] * P0[3];
 					FITS_FWHM_X[k] = 2.355 * P0[3];
 					FITS_FWHM_Y[k] = FITS_FWHM_X[k];
+					FITS_ECCENTRICITY[k] = 0;
+					FITS_FLATNESS[k] = 0;
 					for (int i = 0; i < P0.Length; i++)
 						FITS_PARAMS[i, k] = P0[i];
 				}
@@ -1605,6 +1619,14 @@ namespace JPFITS
 					FITS_VOLUME[k] = 2 * Math.PI * P0[0] * P0[4] * P0[5];
 					FITS_FWHM_X[k] = 2.355 * P0[4];
 					FITS_FWHM_Y[k] = 2.355 * P0[5];
+					double a = FITS_FWHM_X[k], b = FITS_FWHM_Y[k];
+					if (FITS_FWHM_Y[k] > FITS_FWHM_X[k])
+					{
+						a = FITS_FWHM_Y[k];
+						b = FITS_FWHM_X[k];
+					}
+					FITS_ECCENTRICITY[k] = Math.Sqrt(1 - b * b / a / a);
+					FITS_FLATNESS[k] = a / b - 1;
 					FITS_PHI[k] = P0[3];
 					for (int i = 0; i < P0.Length; i++)
 						FITS_PARAMS[i, k] = P0[i];
@@ -1619,6 +1641,8 @@ namespace JPFITS
 					FITS_VOLUME[k] = Math.PI * P0[3] * P0[3] * P0[0] / (P0[4] - 1);
 					FITS_FWHM_X[k] = 2 * P0[3] * Math.Sqrt(Math.Pow(2, 1 / (P0[4])) - 1);
 					FITS_FWHM_Y[k] = FITS_FWHM_X[k];
+					FITS_ECCENTRICITY[k] = 0;
+					FITS_FLATNESS[k] = 0;
 					for (int i = 0; i < P0.Length; i++)
 						FITS_PARAMS[i, k] = P0[i];
 				}
@@ -1632,6 +1656,14 @@ namespace JPFITS
 					FITS_VOLUME[k] = Math.PI * P0[4] * P0[5] * P0[0] / (P0[6] - 1);
 					FITS_FWHM_X[k] = 2 * P0[4] * Math.Sqrt(Math.Pow(2, 1 / (P0[6])) - 1);
 					FITS_FWHM_Y[k] = 2 * P0[5] * Math.Sqrt(Math.Pow(2, 1 / (P0[6])) - 1);
+					double a = FITS_FWHM_X[k], b = FITS_FWHM_Y[k];
+					if (FITS_FWHM_Y[k] > FITS_FWHM_X[k])
+					{
+						a = FITS_FWHM_Y[k];
+						b = FITS_FWHM_X[k];
+					}
+					FITS_ECCENTRICITY[k] = Math.Sqrt(1 - b * b / a / a);
+					FITS_FLATNESS[k] = a / b - 1;
 					FITS_PHI[k] = P0[3];
 					for (int i = 0; i < P0.Length; i++)
 						FITS_PARAMS[i, k] = P0[i];
@@ -1679,7 +1711,7 @@ namespace JPFITS
 			if (!FITTED)
 				PSE_TABLE = new string[13, N_SRC + 1];
 			else
-				PSE_TABLE = new string[26 + FITS_PARAMS.GetLength(0), N_SRC + 1];
+				PSE_TABLE = new string[27 + FITS_PARAMS.GetLength(0), N_SRC + 1];
 
 			int c = 0;
 
@@ -1710,6 +1742,7 @@ namespace JPFITS
 				PSE_TABLE[c++, 0] = "Fit Dec (sxgsml)";
 				PSE_TABLE[c++, 0] = "Fit FWHM_X";
 				PSE_TABLE[c++, 0] = "Fit FWHM_Y";
+				PSE_TABLE[c++, 0] = "Fit Eccentricity";
 				PSE_TABLE[c++, 0] = "Fit Phi";
 				PSE_TABLE[c++, 0] = "Fit ChiSqNorm";
 
@@ -1747,6 +1780,7 @@ namespace JPFITS
 					PSE_TABLE[c++, i + 1] = FITS_DEC_DMS[i];
 					PSE_TABLE[c++, i + 1] = FITS_FWHM_X[i].ToString();
 					PSE_TABLE[c++, i + 1] = FITS_FWHM_Y[i].ToString();
+					PSE_TABLE[c++, i + 1] = FITS_ECCENTRICITY[i].ToString();
 					PSE_TABLE[c++, i + 1] = FITS_PHI[i].ToString();
 					PSE_TABLE[c++, i + 1] = FITS_CHISQNORM[i].ToString();
 
@@ -1950,6 +1984,8 @@ namespace JPFITS
 			FITS_RA_HMS = new string[N_SRC];
 			FITS_DEC_DEG = new double[N_SRC];
 			FITS_DEC_DMS = new string[N_SRC];
+			FITS_ECCENTRICITY = new double[N_SRC];
+			FITS_FLATNESS = new double[N_SRC];
 			CENTROID_POINTS = new JPMath.PointD[N_SRC];
 		}
 
@@ -2077,17 +2113,17 @@ namespace JPFITS
 			get { return CENTROIDS_DECDEG; }
 		}
 
-		public double[] Centroids_Fit_FWHMX
+		public double[] Fit_FWHM_X
 		{
 			get { return FITS_FWHM_X; }
 		}
 
-		public double[] Centroids_Fit_FWHMY
+		public double[] Fit_FWHM_Y
 		{
 			get { return FITS_FWHM_Y; }
 		}
 
-		public double[] Centroids_Fit_FWHM
+		public double[] Fit_FWHM
 		{
 			get 
 			{
@@ -2096,6 +2132,22 @@ namespace JPFITS
 					fwhm[i] = (FITS_FWHM_Y[i] + FITS_FWHM_X[i]) / 2;
 
 				return fwhm;
+			}
+		}
+
+		public double[] Fit_Eccentricity
+		{
+			get
+			{
+				return FITS_ECCENTRICITY;
+			}
+		}
+
+		public double[] Fit_Flatness
+		{
+			get
+			{
+				return FITS_FLATNESS;
 			}
 		}
 

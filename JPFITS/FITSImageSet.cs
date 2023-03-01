@@ -1575,7 +1575,7 @@ namespace JPFITS
 						layer[x, y] = cube[x, y, z];
 				});
 
-				FITSImage fi = new FITSImage(destFullFileName + z.ToString("000000000") + ".fits", layer, true, true);
+				FITSImage fi = new FITSImage(destFullFileName + z.ToString("00000") + ".fits", layer, true, true);
 				
 				for (int m = 0; m < HEADER.Length; m++)
 					if (FITSHeader.ValidKeyEdit(HEADER[m].Name, false))

@@ -1305,9 +1305,14 @@ namespace JPFITS
 		/// <summary>If a Primary data unit is saved as a layered image cube where each layer is unique, separate the layers into individual named extensions instead. The primary header will be copied into the new file.</summary>
 		/// <param name="sourceFullFileName">The file name of the FITS file with the layered primary data unit.</param>
 		/// <param name="destFullFileName">The file name to write the extensions to. If it is the same name as the source, the source file will be backed up with a bkp extension.</param>
-		/// <param name="layerExtensionNames">The names for each layer extension. Must be equal in length to the number of layers to pull out of the primary data unit; all extenions must have a unique name.</param>
-		public static void ExtendizePrimaryImageLayerCube(string sourceFullFileName, string destFullFileName, string[] layerExtensionNames)
+		/// <param name="layerExtensionNames">The names for each layer extension. Must be equal in length to the number of layers to pull out of the primary data unit; all extenions must have a unique name. Pass null for auto-naming.</param>
+		public static void ExtendizePrimaryImageLayerCube(string sourceFullFileName, string destFullFileName, string[]? layerExtensionNames)
 		{
+			if (layerExtensionNames == null)
+			{
+				//layerExtensionNames = new string[];
+			}
+
 			for (int i = 0; i < layerExtensionNames.Length - 1; i++)
 				for (int j = i + 1; j < layerExtensionNames.Length; j++)
 					if (layerExtensionNames[i] == layerExtensionNames[j])
