@@ -1540,7 +1540,7 @@ namespace JPFITS
 			return first;
 		}       
 
-		/// <summary></summary>
+		/// <summary>If a primary image unit is a layered cube, pull out each layer of the cube as a FITSImage and return them all as a FITSImageSet.</summary>
 		/// <param name="sourceFullFileName"></param>
 		public static FITSImageSet ReadPrimaryImageCubeAsSet(string sourceFullFileName)
 		{
@@ -1585,35 +1585,8 @@ namespace JPFITS
 			}
 
 			return set;
-
-
-			//double[] cube = FITSImage.ReadPrimaryNDimensionalData(sourceFullFileName, out int[] axesN);
-
-			//if (axesN.Length != 3)
-			//	throw new Exception("File does not contain a data cube: NAXIS = " + axesN.Length);
-			//if (axesN[3] == 1)
-			//	throw new Exception("File does not contain a data cube: NAXIS3 = 1");
-
-			//string destFullFileName = sourceFullFileName.Substring(0, sourceFullFileName.LastIndexOf("\\")) + "\\";
-
-			//FITSImageSet set = new FITSImageSet();
-
-			//for (int z = 0; z < axesN[2]; z++)//z is each layer of the cube
-			//{
-			//	double[,] layer = new double[axesN[0], axesN[1]];
-
-			//	Parallel.For(0, axesN[1], y =>
-			//	{
-			//		for (int x = 0; x < axesN[0]; x++)
-			//			layer[x, y] = cube[z * axesN[1] * axesN[0] + y * axesN[0] + x];
-			//	});
-
-			//	FITSImage fi = new FITSImage(destFullFileName + z.ToString("000000000") + ".fits", layer, false, true);
-			//	set.Add(fi);
-			//}
-
-			//return set;
 		}
+
 		#endregion
 	}
 }

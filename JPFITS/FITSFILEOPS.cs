@@ -3,6 +3,11 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
 using System.Runtime.CompilerServices;
+using static alglib;
+using System.Data.Linq;
+using System.Windows.Forms;
+
+
 #nullable enable
 
 namespace JPFITS
@@ -10,7 +15,7 @@ namespace JPFITS
 	///<summary>FITSFILEOPS static class for facilitating interaction with FITS data on disk.</summary>
 	public class FITSFILEOPS
 	{
-		#region FITS bzero integer mapping
+		#region FITS unsigned integer mapping
 
 		[MethodImpl(256)]/*256 = agressive inlining*/
 		public static long MapUlongToLong(ulong ulongValue)
@@ -54,7 +59,7 @@ namespace JPFITS
 		public enum RankFormat
 		{
 			/// <summary>
-			/// The Array is returned as the rank indicated by the NAXIS keyword
+			/// The Array is returned as the rank indicated by the NAXIS keyword, up to rank = 3 (data cube).
 			/// </summary>
 			Default,
 
@@ -392,7 +397,7 @@ namespace JPFITS
 			int bpix = Math.Abs(bitpix);
 			int NBytes = (int)JPMath.Product(naxisn) * (bpix / 8);
 			byte[] arr = new byte[NBytes];
-			fs.Read(arr, 0, NBytes);//fastest to just read the entire data even if only subimage will be used - though this may needs to be checked with new m2 faster drives!!!!!!!!!!!!!!
+			fs.Read(arr, 0, NBytes);//fastest to just read the entire data even if only subimage will be used - though this may needs to be checked with new m2 faster drives!?
 
 			ParallelOptions opts = new ParallelOptions();
 			if (doParallel)
@@ -411,30 +416,34 @@ namespace JPFITS
 							if (returnRankFormat == RankFormat.Default)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
+								naxisn = new int[1] { dvector.Length };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
-									dvector[i - range[0]] = ((double)arr[i]) * bscale + bzero;
+									dvector[i - range[0]] = arr[i] * bscale + bzero;
 								});
 								return dvector;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 							{
 								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
-									dtable[i - range[0], 0] = ((double)arr[i]) * bscale + bzero;
+									dtable[i - range[0], 0] = arr[i] * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 							{
 								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
-									dtable[0, i - range[0]] = ((double)arr[i]) * bscale + bzero;
+									dtable[0, i - range[0]] = arr[i] * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							break;
@@ -445,36 +454,40 @@ namespace JPFITS
 							if (returnRankFormat == RankFormat.Default)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
+								naxisn = new int[1] { dvector.Length };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 2;
 									short val = (short)((arr[cc] << 8) | arr[cc + 1]);
-									dvector[i - range[0]] = ((double)val) * bscale + bzero;
+									dvector[i - range[0]] = val * bscale + bzero;
 								});
 								return dvector;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 							{
 								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 2;
 									short val = (short)((arr[cc] << 8) | arr[cc + 1]);
-									dtable[i - range[0], 0] = ((double)val) * bscale + bzero;
+									dtable[i - range[0], 0] = val * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 							{
 								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 2;
 									short val = (short)((arr[cc] << 8) | arr[cc + 1]);
-									dtable[0, i - range[0]] = ((double)val) * bscale + bzero;
+									dtable[0, i - range[0]] = val * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							break;
@@ -485,36 +498,40 @@ namespace JPFITS
 							if (returnRankFormat == RankFormat.Default)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
+								naxisn = new int[1] { dvector.Length };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 4;
 									int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-									dvector[i - range[0]] = ((double)val) * bscale + bzero;
+									dvector[i - range[0]] = val * bscale + bzero;
 								});
 								return dvector;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 							{
 								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 4;
 									int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-									dtable[i - range[0], 0] = ((double)val) * bscale + bzero;
+									dtable[i - range[0], 0] = val * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 							{
 								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 4;
 									int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-									dtable[0, i - range[0]] = ((double)val) * bscale + bzero;
+									dtable[0, i - range[0]] = val * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							break;
@@ -525,6 +542,8 @@ namespace JPFITS
 							if (returnRankFormat == RankFormat.Default)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
+								naxisn = new int[1] { dvector.Length };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 8;
@@ -537,13 +556,15 @@ namespace JPFITS
 									dbl[2] = arr[cc + 5];
 									dbl[1] = arr[cc + 6];
 									dbl[0] = arr[cc + 7];
-									dvector[i - range[0]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
+									dvector[i - range[0]] = BitConverter.ToInt64(dbl, 0) * bscale + bzero;
 								});
 								return dvector;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 							{
 								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 8;
@@ -556,14 +577,15 @@ namespace JPFITS
 									dbl[2] = arr[cc + 5];
 									dbl[1] = arr[cc + 6];
 									dbl[0] = arr[cc + 7];
-									dtable[i - range[0], 0] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
+									dtable[i - range[0], 0] = BitConverter.ToInt64(dbl, 0) * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 							{
 								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 8;
@@ -576,9 +598,8 @@ namespace JPFITS
 									dbl[2] = arr[cc + 5];
 									dbl[1] = arr[cc + 6];
 									dbl[0] = arr[cc + 7];
-									dtable[0, i - range[0]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
+									dtable[0, i - range[0]] = BitConverter.ToInt64(dbl, 0) * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							break;
@@ -589,6 +610,8 @@ namespace JPFITS
 							if (returnRankFormat == RankFormat.Default)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
+								naxisn = new int[1] { dvector.Length };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 4;
@@ -597,13 +620,15 @@ namespace JPFITS
 									flt[2] = arr[cc + 1];
 									flt[1] = arr[cc + 2];
 									flt[0] = arr[cc + 3];
-									dvector[i - range[0]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
+									dvector[i - range[0]] = BitConverter.ToSingle(flt, 0) * bscale + bzero;
 								});
 								return dvector;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 							{
 								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 4;
@@ -612,14 +637,15 @@ namespace JPFITS
 									flt[2] = arr[cc + 1];
 									flt[1] = arr[cc + 2];
 									flt[0] = arr[cc + 3];
-									dtable[i - range[0], 0] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
+									dtable[i - range[0], 0] = BitConverter.ToSingle(flt, 0) * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 							{
 								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 4;
@@ -628,9 +654,8 @@ namespace JPFITS
 									flt[2] = arr[cc + 1];
 									flt[1] = arr[cc + 2];
 									flt[0] = arr[cc + 3];
-									dtable[0, i - range[0]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
+									dtable[0, i - range[0]] = BitConverter.ToSingle(flt, 0) * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							break;
@@ -641,6 +666,8 @@ namespace JPFITS
 							if (returnRankFormat == RankFormat.Default)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
+								naxisn = new int[1] { dvector.Length };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 8;
@@ -660,6 +687,8 @@ namespace JPFITS
 							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 							{
 								double[,] dtable = new double[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 8;
@@ -674,12 +703,13 @@ namespace JPFITS
 									dbl[0] = arr[cc + 7];
 									dtable[i - range[0], 0] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 							{
 								double[,] dtable = new double[1, range[1] - range[0] + 1];
+								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 8;
@@ -694,7 +724,6 @@ namespace JPFITS
 									dbl[0] = arr[cc + 7];
 									dtable[0, i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
 								});
-								naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 								return dtable;
 							}
 							break;
@@ -704,8 +733,9 @@ namespace JPFITS
 
 				else if (naxisn.Length == 2)//then a table or image return
 				{
-					double[,] dimage = new double[range[1] - range[0] + 1, range[3] - range[2] + 1];
 					int naxis0 = naxisn[0];
+					double[,] dtable = new double[range[1] - range[0] + 1, range[3] - range[2] + 1];
+					naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
 
 					switch (bitpix)
 					{
@@ -715,7 +745,7 @@ namespace JPFITS
 							{
 								int cc = j * naxis0 + range[0];
 								for (int i = range[0]; i <= range[1]; i++)
-									dimage[i - range[0], j - range[2]] = ((double)arr[cc + i]) * bscale + bzero;
+									dtable[i - range[0], j - range[2]] = arr[cc + i] * bscale + bzero;
 							});
 							break;
 						}
@@ -729,7 +759,7 @@ namespace JPFITS
 								for (int i = range[0]; i <= range[1]; i++)
 								{
 									val = (short)((arr[cc] << 8) | arr[cc + 1]);
-									dimage[i - range[0], j - range[2]] = ((double)val) * bscale + bzero;
+									dtable[i - range[0], j - range[2]] = val * bscale + bzero;
 									cc += 2;
 								}
 							});
@@ -745,7 +775,7 @@ namespace JPFITS
 								for (int i = range[0]; i <= range[1]; i++)
 								{
 									val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-									dimage[i - range[0], j - range[2]] = ((double)val) * bscale + bzero;
+									dtable[i - range[0], j - range[2]] = val * bscale + bzero;
 									cc += 4;
 								}
 							});
@@ -768,7 +798,7 @@ namespace JPFITS
 									dbl[2] = arr[cc + 5];
 									dbl[1] = arr[cc + 6];
 									dbl[0] = arr[cc + 7];
-									dimage[i - range[0], j - range[2]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
+									dtable[i - range[0], j - range[2]] = BitConverter.ToInt64(dbl, 0) * bscale + bzero;
 									cc += 8;
 								}
 							});
@@ -787,7 +817,7 @@ namespace JPFITS
 									flt[2] = arr[cc + 1];
 									flt[1] = arr[cc + 2];
 									flt[0] = arr[cc + 3];
-									dimage[i - range[0], j - range[2]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
+									dtable[i - range[0], j - range[2]] = BitConverter.ToSingle(flt, 0) * bscale + bzero;
 									cc += 4;
 								}
 							});
@@ -810,7 +840,7 @@ namespace JPFITS
 									dbl[2] = arr[cc + 5];
 									dbl[1] = arr[cc + 6];
 									dbl[0] = arr[cc + 7];
-									dimage[i - range[0], j - range[2]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
+									dtable[i - range[0], j - range[2]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
 									cc += 8;
 								}
 							});
@@ -819,19 +849,17 @@ namespace JPFITS
 					}
 
 					if (returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
-						return dimage;
+						return dtable;
 					else if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0)
-						return dimage;
+						return dtable;
 					else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 					{
 						double[] dvector = new double[(range[1] - range[0] + 1) * (range[3] - range[2] + 1)];
 
-						//System.Buffer.BlockCopy(dimage, 0, dvector, 0, dvector.Length * 8);
-
 						int cc = 0;
-						for (int i = 0; i < dimage.GetLength(0); i++)
-							for (int j = 0; j < dimage.GetLength(1); j++)
-								dvector[cc++] = dimage[i, j];
+						for (int i = 0; i < dtable.GetLength(0); i++)
+							for (int j = 0; j < dtable.GetLength(1); j++)
+								dvector[cc++] = dtable[i, j];
 
 						naxisn = new int[1] { dvector.Length };
 						return dvector;
@@ -840,8 +868,9 @@ namespace JPFITS
 
 				else if (naxisn.Length == 3)//then a data cube
 				{
-					double[,,] dcube = new double[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
 					int naxis0 = naxisn[0], naxis1 = naxisn[1];
+					double[,,] dcube = new double[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+					naxisn = new int[3] { dcube.GetLength(0), dcube.GetLength(1), dcube.GetLength(2) };
 
 					switch (bitpix)
 					{
@@ -853,7 +882,7 @@ namespace JPFITS
 
 								for (int j = range[2]; j <= range[3]; j++)
 									for (int i = range[0]; i <= range[1]; i++)
-										dcube[i - range[0], j - range[2], k - range[4]] = ((double)arr[cc + i]) * bscale + bzero;
+										dcube[i - range[0], j - range[2], k - range[4]] = arr[cc + i] * bscale + bzero;
 							});
 							break;
 						}
@@ -869,7 +898,7 @@ namespace JPFITS
 									for (int i = range[0]; i <= range[1]; i++)
 									{
 										val = (short)((arr[cc] << 8) | arr[cc + 1]);
-										dcube[i - range[0], j - range[2], k - range[4]] = ((double)val) * bscale + bzero;
+										dcube[i - range[0], j - range[2], k - range[4]] = val * bscale + bzero;
 										cc += 2;
 									}
 							});
@@ -887,7 +916,7 @@ namespace JPFITS
 									for (int i = range[0]; i <= range[1]; i++)
 									{
 										val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-										dcube[i - range[0], j - range[2], k - range[4]] = ((double)val) * bscale + bzero;
+										dcube[i - range[0], j - range[2], k - range[4]] = val * bscale + bzero;
 										cc += 4;
 									}
 							});
@@ -912,7 +941,7 @@ namespace JPFITS
 										dbl[2] = arr[cc + 5];
 										dbl[1] = arr[cc + 6];
 										dbl[0] = arr[cc + 7];
-										dcube[i - range[0], j - range[2], k - range[4]] = ((double)BitConverter.ToInt64(dbl, 0)) * bscale + bzero;
+										dcube[i - range[0], j - range[2], k - range[4]] = BitConverter.ToInt64(dbl, 0) * bscale + bzero;
 										cc += 8;
 									}
 							});
@@ -933,7 +962,7 @@ namespace JPFITS
 										flt[2] = arr[cc + 1];
 										flt[1] = arr[cc + 2];
 										flt[0] = arr[cc + 3];
-										dcube[i - range[0], j - range[2], k - range[4]] = ((double)BitConverter.ToSingle(flt, 0)) * bscale + bzero;
+										dcube[i - range[0], j - range[2], k - range[4]] = BitConverter.ToSingle(flt, 0) * bscale + bzero;
 										cc += 4;
 									}
 							});
@@ -958,7 +987,7 @@ namespace JPFITS
 										dbl[2] = arr[cc + 5];
 										dbl[1] = arr[cc + 6];
 										dbl[0] = arr[cc + 7];
-										dcube[i - range[0], j - range[2], k - range[4]] = ((double)BitConverter.ToDouble(dbl, 0)) * bscale + bzero;
+										dcube[i - range[0], j - range[2], k - range[4]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
 										cc += 8;
 									}
 							});
@@ -987,37 +1016,38 @@ namespace JPFITS
 						}
 						else//must be 2d if gotten here
 						{
-							double[,] dimage;
+							double[,] dtable;
 							if ((range[1] - range[0]) == 0)
 							{
-								dimage = new double[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
-								for (int i = 0; i < dimage.GetLength(0); i++)
-									for (int j = 0; j < dimage.GetLength(1); j++)
-										dimage[i, j] = dcube[0, i, j];
+								dtable = new double[(range[3] - range[2] + 1), (range[5] - range[4] + 1)];
+								for (int i = 0; i < dtable.GetLength(0); i++)
+									for (int j = 0; j < dtable.GetLength(1); j++)
+										dtable[i, j] = dcube[0, i, j];
 							}
 							else if ((range[3] - range[2]) == 0)
 							{
-								dimage = new double[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
-								for (int i = 0; i < dimage.GetLength(0); i++)
-									for (int j = 0; j < dimage.GetLength(1); j++)
-										dimage[i, j] = dcube[i, 0, j];
+								dtable = new double[(range[1] - range[0] + 1), (range[5] - range[4] + 1)];
+								for (int i = 0; i < dtable.GetLength(0); i++)
+									for (int j = 0; j < dtable.GetLength(1); j++)
+										dtable[i, j] = dcube[i, 0, j];
 							}
 							else
 							{
-								dimage = new double[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
-								for (int i = 0; i < dimage.GetLength(0); i++)
-									for (int j = 0; j < dimage.GetLength(1); j++)
-										dimage[i, j] = dcube[i, j, 0];
+								dtable = new double[(range[1] - range[0] + 1), (range[3] - range[2] + 1)];
+								for (int i = 0; i < dtable.GetLength(0); i++)
+									for (int j = 0; j < dtable.GetLength(1); j++)
+										dtable[i, j] = dcube[i, j, 0];
 							}
 
-							naxisn = new int[2] { dimage.GetLength(0), dimage.GetLength(1) };
-							return dimage;
+							naxisn = new int[2] { dtable.GetLength(0), dtable.GetLength(1) };
+							return dtable;
 						}
 					}
 					else
 						throw new Exception("DataUnitReturn option DataUnitReturn.VectorAsTable is not valid for a 3D cube.");
 				}
 			}
+
 			else if (returnPrecision == DataPrecision.Native)
 			{
 				if (naxisn.Length == 1)//then a vector return
@@ -1031,31 +1061,34 @@ namespace JPFITS
 								if (returnRankFormat == RankFormat.Default)
 								{
 									sbyte[] vector = new sbyte[range[1] - range[0] + 1];
+									naxisn = new int[1] { vector.Length };
 
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
-										vector[i - range[0]] = (sbyte)((sbyte)arr[i] * bscale);
+										vector[i - range[0]] = (sbyte)(arr[i] * bscale + bzero);
 									});
 									return vector;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 								{
 									sbyte[,] table = new sbyte[range[1] - range[0] + 1, 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
-										table[i - range[0], 0] = (sbyte)((sbyte)arr[i] * bscale);
+										table[i - range[0], 0] = (sbyte)(arr[i] * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 								{
 									sbyte[,] table = new sbyte[1, range[1] - range[0] + 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
-										table[0, i - range[0]] = (sbyte)((sbyte)arr[i] * bscale);
+										table[0, i - range[0]] = (sbyte)(arr[i] * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 							}
@@ -1064,30 +1097,34 @@ namespace JPFITS
 								if (returnRankFormat == RankFormat.Default)
 								{
 									byte[] vector = new byte[range[1] - range[0] + 1];
+									naxisn = new int[1] { vector.Length };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
-										vector[i - range[0]] = (byte)((byte)arr[i] * bscale);
+										vector[i - range[0]] = (byte)(arr[i] * bscale + bzero);
 									});
 									return vector;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 								{
 									byte[,] table = new byte[range[1] - range[0] + 1, 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
-										table[i - range[0], 0] = (byte)((byte)arr[i] * bscale);
+										table[i - range[0], 0] = (byte)(arr[i] * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 								{
 									byte[,] table = new byte[1, range[1] - range[0] + 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
-										table[0, i - range[0]] = (byte)((byte)arr[i] * bscale);
+										table[0, i - range[0]] = (byte)(arr[i] * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 							}
@@ -1102,42 +1139,46 @@ namespace JPFITS
 								if (returnRankFormat == RankFormat.Default)
 								{
 									short[] vector = new short[range[1] - range[0] + 1];
+									naxisn = new int[1] { vector.Length };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 2;
 										byte[] bytes = new byte[2];
 										bytes[1] = arr[cc];
 										bytes[0] = arr[cc + 1];
-										vector[i - range[0]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale);
+										vector[i - range[0]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
 									});
 									return vector;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 								{
 									short[,] table = new short[range[1] - range[0] + 1, 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 2;
 										byte[] bytes = new byte[2];
 										bytes[1] = arr[cc];
 										bytes[0] = arr[cc + 1];
-										table[i - range[0], 0] = (short)(BitConverter.ToInt16(bytes, 0) * bscale);
+										table[i - range[0], 0] = (short)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 								{
 									short[,] table = new short[1, range[1] - range[0] + 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 2;
 										byte[] bytes = new byte[2];
 										bytes[1] = arr[cc];
 										bytes[0] = arr[cc + 1];
-										table[0, i - range[0]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale);
+										table[0, i - range[0]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 							}
@@ -1146,42 +1187,46 @@ namespace JPFITS
 								if (returnRankFormat == RankFormat.Default)
 								{
 									ushort[] vector = new ushort[range[1] - range[0] + 1];
+									naxisn = new int[1] { vector.Length };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 2;
 										byte[] bytes = new byte[2];
 										bytes[1] = arr[cc];
 										bytes[0] = arr[cc + 1];
-										vector[i - range[0]] = (ushort)(FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(bytes, 0)) * bscale);
+										vector[i - range[0]] = (ushort)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
 									});
 									return vector;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 								{
 									ushort[,] table = new ushort[range[1] - range[0] + 1, 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 2;
 										byte[] bytes = new byte[2];
 										bytes[1] = arr[cc];
 										bytes[0] = arr[cc + 1];
-										table[i - range[0], 0] = (ushort)(FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(bytes, 0)) * bscale);
+										table[i - range[0], 0] = (ushort)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 								{
 									ushort[,] table = new ushort[1, range[1] - range[0] + 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 2;
 										byte[] bytes = new byte[2];
 										bytes[1] = arr[cc];
 										bytes[0] = arr[cc + 1];
-										table[0, i - range[0]] = (ushort)(FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(bytes, 0)) * bscale);
+										table[0, i - range[0]] = (ushort)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 							}
@@ -1196,6 +1241,8 @@ namespace JPFITS
 								if (returnRankFormat == RankFormat.Default)
 								{
 									int[] vector = new int[range[1] - range[0] + 1];
+									naxisn = new int[1] { vector.Length };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 4;
@@ -1204,13 +1251,15 @@ namespace JPFITS
 										bytes[2] = arr[cc + 1];
 										bytes[1] = arr[cc + 2];
 										bytes[0] = arr[cc + 3];
-										vector[i - range[0]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale);
+										vector[i - range[0]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
 									});
 									return vector;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 								{
 									int[,] table = new int[range[1] - range[0] + 1, 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 4;
@@ -1219,14 +1268,15 @@ namespace JPFITS
 										bytes[2] = arr[cc + 1];
 										bytes[1] = arr[cc + 2];
 										bytes[0] = arr[cc + 3];
-										table[i - range[0], 0] = (int)(BitConverter.ToInt32(bytes, 0) * bscale);
+										table[i - range[0], 0] = (int)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 								{
 									int[,] table = new int[1, range[1] - range[0] + 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 4;
@@ -1235,9 +1285,8 @@ namespace JPFITS
 										bytes[2] = arr[cc + 1];
 										bytes[1] = arr[cc + 2];
 										bytes[0] = arr[cc + 3];
-										table[0, i - range[0]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale);
+										table[0, i - range[0]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 							}
@@ -1246,6 +1295,8 @@ namespace JPFITS
 								if (returnRankFormat == RankFormat.Default)
 								{
 									uint[] vector = new uint[range[1] - range[0] + 1];
+									naxisn = new int[1] { vector.Length };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 4;
@@ -1254,13 +1305,15 @@ namespace JPFITS
 										bytes[2] = arr[cc + 1];
 										bytes[1] = arr[cc + 2];
 										bytes[0] = arr[cc + 3];
-										vector[i - range[0]] = (uint)(FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(bytes, 0)) * bscale);
+										vector[i - range[0]] = (uint)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
 									});
 									return vector;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 								{
 									uint[,] table = new uint[range[1] - range[0] + 1, 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 4;
@@ -1269,14 +1322,15 @@ namespace JPFITS
 										bytes[2] = arr[cc + 1];
 										bytes[1] = arr[cc + 2];
 										bytes[0] = arr[cc + 3];
-										table[i - range[0], 0] = (uint)(FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(bytes, 0)) * bscale);
+										table[i - range[0], 0] = (uint)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 								{
 									uint[,] table = new uint[1, range[1] - range[0] + 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 4;
@@ -1285,9 +1339,8 @@ namespace JPFITS
 										bytes[2] = arr[cc + 1];
 										bytes[1] = arr[cc + 2];
 										bytes[0] = arr[cc + 3];
-										table[0, i - range[0]] = (uint)(FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(bytes, 0)) * bscale);
+										table[0, i - range[0]] = (uint)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 							}
@@ -1302,6 +1355,8 @@ namespace JPFITS
 								if (returnRankFormat == RankFormat.Default)
 								{
 									long[] vector = new long[range[1] - range[0] + 1];
+									naxisn = new int[1] { vector.Length };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 8;
@@ -1314,13 +1369,15 @@ namespace JPFITS
 										bytes[2] = arr[cc + 5];
 										bytes[1] = arr[cc + 6];
 										bytes[0] = arr[cc + 7];
-										vector[i - range[0]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale);
+										vector[i - range[0]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
 									});
 									return vector;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 								{
 									long[,] table = new long[range[1] - range[0] + 1, 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 8;
@@ -1333,14 +1390,15 @@ namespace JPFITS
 										bytes[2] = arr[cc + 5];
 										bytes[1] = arr[cc + 6];
 										bytes[0] = arr[cc + 7];
-										table[i - range[0], 0] = (long)(BitConverter.ToInt64(bytes, 0) * bscale);
+										table[i - range[0], 0] = (long)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 								{
 									long[,] table = new long[1, range[1] - range[0] + 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 8;
@@ -1353,9 +1411,8 @@ namespace JPFITS
 										bytes[2] = arr[cc + 5];
 										bytes[1] = arr[cc + 6];
 										bytes[0] = arr[cc + 7];
-										table[0, i - range[0]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale);
+										table[0, i - range[0]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 							}
@@ -1364,6 +1421,8 @@ namespace JPFITS
 								if (returnRankFormat == RankFormat.Default)
 								{
 									ulong[] vector = new ulong[range[1] - range[0] + 1];
+									naxisn = new int[1] { vector.Length };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 8;
@@ -1376,13 +1435,15 @@ namespace JPFITS
 										bytes[2] = arr[cc + 5];
 										bytes[1] = arr[cc + 6];
 										bytes[0] = arr[cc + 7];
-										vector[i - range[0]] = (ulong)(FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(bytes, 0)) * bscale);
+										vector[i - range[0]] = (ulong)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
 									});
 									return vector;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 								{
 									ulong[,] table = new ulong[range[1] - range[0] + 1, 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 8;
@@ -1395,14 +1456,15 @@ namespace JPFITS
 										bytes[2] = arr[cc + 5];
 										bytes[1] = arr[cc + 6];
 										bytes[0] = arr[cc + 7];
-										table[i - range[0], 0] = (ulong)(FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(bytes, 0)) * bscale);
+										table[i - range[0], 0] = (ulong)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 								else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 								{
 									ulong[,] table = new ulong[1, range[1] - range[0] + 1];
+									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 									Parallel.For(range[0], range[1] + 1, opts, i =>
 									{
 										int cc = i * 8;
@@ -1415,9 +1477,8 @@ namespace JPFITS
 										bytes[2] = arr[cc + 5];
 										bytes[1] = arr[cc + 6];
 										bytes[0] = arr[cc + 7];
-										table[0, i - range[0]] = (ulong)(FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(bytes, 0)) * bscale);
+										table[0, i - range[0]] = (ulong)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
 									});
-									naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 									return table;
 								}
 							}
@@ -1430,6 +1491,8 @@ namespace JPFITS
 							if (returnRankFormat == RankFormat.Default)
 							{
 								float[] vector = new float[range[1] - range[0] + 1];
+								naxisn = new int[1] { vector.Length };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 4;
@@ -1438,13 +1501,15 @@ namespace JPFITS
 									flt[2] = arr[cc + 1];
 									flt[1] = arr[cc + 2];
 									flt[0] = arr[cc + 3];
-									vector[i - range[0]] = (float)(BitConverter.ToSingle(flt, 0) * bscale);
+									vector[i - range[0]] = (float)(BitConverter.ToSingle(flt, 0) * bscale + bzero);
 								});
 								return vector;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 							{
 								float[,] table = new float[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 4;
@@ -1453,14 +1518,15 @@ namespace JPFITS
 									flt[2] = arr[cc + 1];
 									flt[1] = arr[cc + 2];
 									flt[0] = arr[cc + 3];
-									table[i - range[0], 0] = (float)(BitConverter.ToSingle(flt, 0) * bscale);
+									table[i - range[0], 0] = (float)(BitConverter.ToSingle(flt, 0) * bscale + bzero);
 								});
-								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 								return table;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 							{
 								float[,] table = new float[1, range[1] - range[0] + 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 4;
@@ -1469,9 +1535,8 @@ namespace JPFITS
 									flt[2] = arr[cc + 1];
 									flt[1] = arr[cc + 2];
 									flt[0] = arr[cc + 3];
-									table[0, i - range[0]] = (float)(BitConverter.ToSingle(flt, 0) * bscale);
+									table[0, i - range[0]] = (float)(BitConverter.ToSingle(flt, 0) * bscale + bzero);
 								});
-								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 								return table;
 							}
 							break;
@@ -1482,6 +1547,8 @@ namespace JPFITS
 							if (returnRankFormat == RankFormat.Default)
 							{
 								double[] vector = new double[range[1] - range[0] + 1];
+								naxisn = new int[1] { vector.Length };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 8;
@@ -1494,13 +1561,15 @@ namespace JPFITS
 									dbl[2] = arr[cc + 5];
 									dbl[1] = arr[cc + 6];
 									dbl[0] = arr[cc + 7];
-									vector[i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale;
+									vector[i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
 								});
 								return vector;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 							{
 								double[,] table = new double[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 8;
@@ -1513,14 +1582,15 @@ namespace JPFITS
 									dbl[2] = arr[cc + 5];
 									dbl[1] = arr[cc + 6];
 									dbl[0] = arr[cc + 7];
-									table[i - range[0], 0] = BitConverter.ToDouble(dbl, 0) * bscale;
+									table[i - range[0], 0] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
 								});
-								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 								return table;
 							}
 							else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 							{
 								double[,] table = new double[1, range[1] - range[0] + 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 								Parallel.For(range[0], range[1] + 1, opts, i =>
 								{
 									int cc = i * 8;
@@ -1533,9 +1603,8 @@ namespace JPFITS
 									dbl[2] = arr[cc + 5];
 									dbl[1] = arr[cc + 6];
 									dbl[0] = arr[cc + 7];
-									table[0, i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale;
+									table[0, i - range[0]] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
 								});
-								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 								return table;
 							}
 							break;
@@ -1554,12 +1623,13 @@ namespace JPFITS
 							if (bzero == -128)//signed byte
 							{
 								sbyte[,] table = new sbyte[range[1] - range[0] + 1, range[3] - range[2] + 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 								Parallel.For(range[2], range[3] + 1, opts, j =>
 								{
 									int cc = j * naxis0 + range[0];
 									for (int i = range[0]; i <= range[1]; i++)
-										table[i - range[0], j - range[2]] = (sbyte)((sbyte)arr[cc + i] * bscale);
+										table[i - range[0], j - range[2]] = (sbyte)(arr[cc + i] * bscale + bzero);
 								});
 
 								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
@@ -1575,12 +1645,13 @@ namespace JPFITS
 							else if (bzero == 0)//unsigned byte
 							{
 								byte[,] table = new byte[range[1] - range[0] + 1, range[3] - range[2] + 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 								Parallel.For(range[2], range[3] + 1, opts, j =>
 								{
 									int cc = j * naxis0 + range[0];
 									for (int i = range[0]; i <= range[1]; i++)
-										table[i - range[0], j - range[2]] = (byte)((byte)arr[cc + i] * bscale);
+										table[i - range[0], j - range[2]] = (byte)(arr[cc + i] * bscale + bzero);
 								});
 
 								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
@@ -1601,6 +1672,7 @@ namespace JPFITS
 							if (bzero == 0)//signed int16
 							{
 								short[,] table = new short[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 								Parallel.For(range[2], range[3] + 1, opts, j =>
 								{
@@ -1610,7 +1682,7 @@ namespace JPFITS
 									{
 										bytes[1] = arr[cc];
 										bytes[0] = arr[cc + 1];
-										table[i - range[0], j - range[2]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale);
+										table[i - range[0], j - range[2]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
 										cc += 2;
 									}
 								});
@@ -1628,6 +1700,7 @@ namespace JPFITS
 							else if (bzero == 32768)//unsigned uint16
 							{
 								ushort[,] table = new ushort[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 								Parallel.For(range[2], range[3] + 1, opts, j =>
 								{
@@ -1637,7 +1710,7 @@ namespace JPFITS
 									{
 										bytes[1] = arr[cc];
 										bytes[0] = arr[cc + 1];
-										table[i - range[0], j - range[2]] = (ushort)(FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(bytes, 0)) * bscale);
+										table[i - range[0], j - range[2]] = (ushort)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
 										cc += 2;
 									}
 								});
@@ -1661,6 +1734,7 @@ namespace JPFITS
 							if (bzero == 0)//signed int32
 							{
 								int[,] table = new int[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 								Parallel.For(range[2], range[3] + 1, opts, j =>
 								{
@@ -1672,7 +1746,7 @@ namespace JPFITS
 										bytes[2] = arr[cc + 1];
 										bytes[1] = arr[cc + 2];
 										bytes[0] = arr[cc + 3];
-										table[i - range[0], j - range[2]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale);
+										table[i - range[0], j - range[2]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
 										cc += 4;
 									}
 								});
@@ -1690,6 +1764,7 @@ namespace JPFITS
 							else if (bzero == 2147483648)//unsigned uint32
 							{
 								uint[,] table = new uint[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 								Parallel.For(range[2], range[3] + 1, opts, j =>
 								{
@@ -1701,7 +1776,7 @@ namespace JPFITS
 										bytes[2] = arr[cc + 1];
 										bytes[1] = arr[cc + 2];
 										bytes[0] = arr[cc + 3];
-										table[i - range[0], j - range[2]] = (uint)(FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(bytes, 0)) * bscale);
+										table[i - range[0], j - range[2]] = (uint)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
 										cc += 4;
 									}
 								});
@@ -1725,6 +1800,7 @@ namespace JPFITS
 							if (bzero == 0)//signed int64
 							{
 								long[,] table = new long[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 								Parallel.For(range[2], range[3] + 1, opts, j =>
 								{
@@ -1740,7 +1816,7 @@ namespace JPFITS
 										bytes[2] = arr[cc + 5];
 										bytes[1] = arr[cc + 6];
 										bytes[0] = arr[cc + 7];
-										table[i - range[0], j - range[2]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale);
+										table[i - range[0], j - range[2]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
 										cc += 8;
 									}
 								});
@@ -1758,6 +1834,7 @@ namespace JPFITS
 							else if (bzero == 9223372036854775808)//unsigned uint64
 							{
 								ulong[,] table = new ulong[range[1] - range[0] + 1, 1];
+								naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 								Parallel.For(range[2], range[3] + 1, opts, j =>
 								{
@@ -1773,7 +1850,7 @@ namespace JPFITS
 										bytes[2] = arr[cc + 5];
 										bytes[1] = arr[cc + 6];
 										bytes[0] = arr[cc + 7];
-										table[i - range[0], j - range[2]] = (ulong)(FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(bytes, 0)) * bscale);
+										table[i - range[0], j - range[2]] = (ulong)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
 										cc += 8;
 									}
 								});
@@ -1795,6 +1872,7 @@ namespace JPFITS
 						case -32:
 						{
 							float[,] table = new float[range[1] - range[0] + 1, 1];
+							naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 							Parallel.For(range[2], range[3] + 1, opts, j =>
 							{
@@ -1806,7 +1884,7 @@ namespace JPFITS
 									bytes[2] = arr[cc + 1];
 									bytes[1] = arr[cc + 2];
 									bytes[0] = arr[cc + 3];
-									table[i - range[0], j - range[2]] = (float)(BitConverter.ToSingle(bytes, 0) * bscale);
+									table[i - range[0], j - range[2]] = (float)(BitConverter.ToSingle(bytes, 0) * bscale + bzero);
 									cc += 4;
 								}
 							});
@@ -1827,6 +1905,7 @@ namespace JPFITS
 						case -64:
 						{
 							double[,] table = new double[range[1] - range[0] + 1, 1];
+							naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 							Parallel.For(range[2], range[3] + 1, opts, j =>
 							{
@@ -1842,7 +1921,7 @@ namespace JPFITS
 									bytes[2] = arr[cc + 5];
 									bytes[1] = arr[cc + 6];
 									bytes[0] = arr[cc + 7];
-									table[i - range[0], j - range[2]] = BitConverter.ToDouble(bytes, 0) * bscale;
+									table[i - range[0], j - range[2]] = BitConverter.ToDouble(bytes, 0) * bscale + bzero;
 									cc += 8;
 								}
 							});
@@ -1873,6 +1952,7 @@ namespace JPFITS
 							if (bzero == -128)//signed byte
 							{
 								sbyte[,,] cube = new sbyte[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+								naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 								Parallel.For(range[4], range[5] + 1, opts, k =>
 								{
@@ -1880,7 +1960,7 @@ namespace JPFITS
 
 									for (int j = range[2]; j <= range[3]; j++)
 										for (int i = range[0]; i <= range[1]; i++)
-											cube[i - range[0], j - range[2], k - range[4]] = (sbyte)((sbyte)arr[cc + i] * bscale);
+											cube[i - range[0], j - range[2], k - range[4]] = (sbyte)(arr[cc + i] * bscale + bzero);
 								});
 
 								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
@@ -1933,6 +2013,7 @@ namespace JPFITS
 							else if (bzero == 0)//unsigned byte
 							{
 								byte[,,] cube = new byte[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+								naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 								Parallel.For(range[4], range[5] + 1, opts, k =>
 								{
@@ -1940,7 +2021,7 @@ namespace JPFITS
 
 									for (int j = range[2]; j <= range[3]; j++)
 										for (int i = range[0]; i <= range[1]; i++)
-											cube[i - range[0], j - range[2], k - range[4]] = (byte)((byte)arr[cc + i] * bscale);
+											cube[i - range[0], j - range[2], k - range[4]] = (byte)(arr[cc + i] * bscale + bzero);
 								});
 
 								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
@@ -1999,6 +2080,7 @@ namespace JPFITS
 							if (bzero == 0)//signed int16
 							{
 								short[,,] cube = new short[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+								naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 								Parallel.For(range[4], range[5] + 1, opts, k =>
 								{
@@ -2009,7 +2091,7 @@ namespace JPFITS
 										{
 											bytes[1] = arr[cc];
 											bytes[0] = arr[cc + 1];
-											cube[i - range[0], j - range[2], k - range[4]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale);
+											cube[i - range[0], j - range[2], k - range[4]] = (short)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
 											cc += 2;
 										}
 								});
@@ -2064,6 +2146,7 @@ namespace JPFITS
 							else if (bzero == 32768)//unsigned uint16
 							{
 								ushort[,,] cube = new ushort[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+								naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 								Parallel.For(range[4], range[5] + 1, opts, k =>
 								{
@@ -2074,7 +2157,7 @@ namespace JPFITS
 										{
 											bytes[1] = arr[cc];
 											bytes[0] = arr[cc + 1];
-											cube[i - range[0], j - range[2], k - range[4]] = (ushort)(FITSFILEOPS.MapShortToUshort(BitConverter.ToInt16(bytes, 0)) * bscale);
+											cube[i - range[0], j - range[2], k - range[4]] = (ushort)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
 											cc += 2;
 										}
 								});
@@ -2135,6 +2218,7 @@ namespace JPFITS
 							if (bzero == 0)//signed int32
 							{
 								int[,,] cube = new int[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+								naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 								Parallel.For(range[4], range[5] + 1, opts, k =>
 								{
@@ -2147,7 +2231,7 @@ namespace JPFITS
 											bytes[2] = arr[cc + 1];
 											bytes[1] = arr[cc + 2];
 											bytes[0] = arr[cc + 3];
-											cube[i - range[0], j - range[2], k - range[4]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale);
+											cube[i - range[0], j - range[2], k - range[4]] = (int)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
 											cc += 4;
 										}
 								});
@@ -2202,6 +2286,7 @@ namespace JPFITS
 							else if (bzero == 2147483648)//unsigned uint32
 							{
 								uint[,,] cube = new uint[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+								naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 								Parallel.For(range[4], range[5] + 1, opts, k =>
 								{
@@ -2214,7 +2299,7 @@ namespace JPFITS
 											bytes[2] = arr[cc + 1];
 											bytes[1] = arr[cc + 2];
 											bytes[0] = arr[cc + 3];
-											cube[i - range[0], j - range[2], k - range[4]] = (uint)(FITSFILEOPS.MapIntToUint(BitConverter.ToInt32(bytes, 0)) * bscale);
+											cube[i - range[0], j - range[2], k - range[4]] = (uint)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
 											cc += 4;
 										}
 								});
@@ -2275,6 +2360,7 @@ namespace JPFITS
 							if (bzero == 0)//signed int64
 							{
 								long[,,] cube = new long[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+								naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 								Parallel.For(range[4], range[5] + 1, opts, k =>
 								{
@@ -2291,7 +2377,7 @@ namespace JPFITS
 											bytes[2] = arr[cc + 5];
 											bytes[1] = arr[cc + 6];
 											bytes[0] = arr[cc + 7];
-											cube[i - range[0], j - range[2], k - range[4]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale);
+											cube[i - range[0], j - range[2], k - range[4]] = (long)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
 											cc += 8;
 										}
 								});
@@ -2346,6 +2432,7 @@ namespace JPFITS
 							else if (bzero == 9223372036854775808)//unsigned uint64
 							{
 								ulong[,,] cube = new ulong[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+								naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 								Parallel.For(range[4], range[5] + 1, opts, k =>
 								{
@@ -2362,7 +2449,7 @@ namespace JPFITS
 											bytes[2] = arr[cc + 5];
 											bytes[1] = arr[cc + 6];
 											bytes[0] = arr[cc + 7];
-											cube[i - range[0], j - range[2], k - range[4]] = (ulong)(FITSFILEOPS.MapLongToUlong(BitConverter.ToInt64(bytes, 0)) * bscale);
+											cube[i - range[0], j - range[2], k - range[4]] = (ulong)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
 											cc += 8;
 										}
 								});
@@ -2421,6 +2508,7 @@ namespace JPFITS
 						case -32:
 						{
 							float[,,] cube = new float[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+							naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 							Parallel.For(range[4], range[5] + 1, opts, k =>
 							{
@@ -2434,7 +2522,7 @@ namespace JPFITS
 										bytes[2] = arr[cc + 1];
 										bytes[1] = arr[cc + 2];
 										bytes[0] = arr[cc + 3];
-										cube[i - range[0], j - range[2], k - range[4]] = (float)(BitConverter.ToSingle(bytes, 0) * bscale);
+										cube[i - range[0], j - range[2], k - range[4]] = (float)(BitConverter.ToSingle(bytes, 0) * bscale + bzero);
 										cc += 4;
 									}
 							});
@@ -2492,6 +2580,7 @@ namespace JPFITS
 						case -64:
 						{
 							double[,,] cube = new double[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+							naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 							Parallel.For(range[4], range[5] + 1, opts, k =>
 							{
@@ -2509,7 +2598,7 @@ namespace JPFITS
 										bytes[2] = arr[cc + 5];
 										bytes[1] = arr[cc + 6];
 										bytes[0] = arr[cc + 7];
-										cube[i - range[0], j - range[2], k - range[4]] = BitConverter.ToDouble(bytes, 0) * bscale;
+										cube[i - range[0], j - range[2], k - range[4]] = BitConverter.ToDouble(bytes, 0) * bscale + bzero;
 										cc += 8;
 									}
 							});
@@ -2566,6 +2655,7 @@ namespace JPFITS
 					}
 				}
 			}
+			
 			else if (returnPrecision == DataPrecision.Boolean)
 			{
 				if (bitpix != 8 && bzero != 0)//unsigned byte
@@ -2576,6 +2666,8 @@ namespace JPFITS
 					if (returnRankFormat == RankFormat.Default)
 					{
 						bool[] vector = new bool[range[1] - range[0] + 1];
+						naxisn = new int[1] { vector.Length };
+
 						Parallel.For(range[0], range[1] + 1, opts, i =>
 						{
 							if (arr[i] == 1)
@@ -2586,23 +2678,25 @@ namespace JPFITS
 					else if (returnRankFormat == RankFormat.VectorAsHorizontalTable)
 					{
 						bool[,] table = new bool[range[1] - range[0] + 1, 1];
+						naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 						Parallel.For(range[0], range[1] + 1, opts, i =>
 						{
 							if (arr[i] == 1)
 								table[i - range[0], 0] = true;
 						});
-						naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 						return table;
 					}
 					else if (returnRankFormat == RankFormat.VectorAsVerticalTable)
 					{
 						bool[,] table = new bool[1, range[1] - range[0] + 1];
+						naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
+
 						Parallel.For(range[0], range[1] + 1, opts, i =>
 						{
 							if (arr[i] == 1)
 								table[0, i - range[0]] = true;
 						});
-						naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 						return table;
 					}
 				}
@@ -2612,6 +2706,7 @@ namespace JPFITS
 					int naxis0 = naxisn[0];
 
 					bool[,] table = new bool[range[1] - range[0] + 1, range[3] - range[2] + 1];
+					naxisn = new int[2] { table.GetLength(0), table.GetLength(1) };
 
 					Parallel.For(range[2], range[3] + 1, opts, j =>
 					{
@@ -2637,6 +2732,7 @@ namespace JPFITS
 					int naxis0 = naxisn[0], naxis1 = naxisn[1];
 
 					bool[,,] cube = new bool[range[1] - range[0] + 1, range[3] - range[2] + 1, range[5] - range[4] + 1];
+					naxisn = new int[3] { cube.GetLength(0), cube.GetLength(1), cube.GetLength(2) };
 
 					Parallel.For(range[4], range[5] + 1, opts, k =>
 					{

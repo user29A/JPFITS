@@ -1070,9 +1070,7 @@ namespace JPFITS
 								break;
 							}
 							default:
-							{
 								throw new Exception("Unrecognized TypeCode in EATRAWBINTABLEHEADER at TZERO analysis");
-							}
 						}
 					else
 						switch (HEAPTCODES[ttypeindex])
@@ -1102,9 +1100,7 @@ namespace JPFITS
 								break;
 							}
 							default:
-							{
 								throw new Exception("Unrecognized TypeCode in EATRAWBINTABLEHEADER at TZERO analysis");
-							}
 						}
 					continue;
 				}

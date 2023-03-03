@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Windows.Forms;
+
 #nullable enable
 
 namespace JPFITS
@@ -328,7 +330,7 @@ namespace JPFITS
 			if (STATS_POP)
 				StatsUpD(doParallel);
 
-			WORLDCOORDINATESOLUTION = new JPFITS.WorldCoordinateSolution();
+			WORLDCOORDINATESOLUTION = new JPFITS.WorldCoordinateSolution();			
 		}
 
 		/// <summary>Create a FITSImage object with extension image data loaded to RAM memory from disk.
@@ -1183,7 +1185,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Reads an N-dimensional array and returns the results as a double array. User may reorginize the array based on the return variable axis lengths vector nAxisN.</summary>
-		/// <param name="nAxisN">A declared, but not instantiated, int vector to return the axis lengths for each axis.</param>
+		/// <param name="nAxisN">int vector to return the axis lengths for each axis.</param>
 		public static double[] ReadPrimaryNDimensionalData(string fullFileName, out int[] nAxisN)
 		{
 			FileStream fs = new FileStream(fullFileName, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -1302,32 +1304,38 @@ namespace JPFITS
 			return result;
 		}
 
-		/// <summary>If a Primary data unit is saved as a layered image cube where each layer is unique, separate the layers into individual named extensions instead. The primary header will be copied into the new file.</summary>
-		/// <param name="sourceFullFileName">The file name of the FITS file with the layered primary data unit.</param>
-		/// <param name="destFullFileName">The file name to write the extensions to. If it is the same name as the source, the source file will be backed up with a bkp extension.</param>
+		/// <summary>If a Primary data unit is saved as a layered image cube where each layer is unique, separate the layers into individual named extensions instead. The primary header will be copied into the extensions.</summary>
+		/// <param name="sourceFullFileName">The file name of the FITS file with the layered primary data unit cube.</param>
+		/// <param name="destFullFileName">The file name to write the extensions to. If it is the same name as the source, the source file will be backed up with a _bkp extension, or pass empty string for this behaviour.</param>
 		/// <param name="layerExtensionNames">The names for each layer extension. Must be equal in length to the number of layers to pull out of the primary data unit; all extenions must have a unique name. Pass null for auto-naming.</param>
-		public static void ExtendizePrimaryImageLayerCube(string sourceFullFileName, string destFullFileName, string[]? layerExtensionNames)
+		public static void ExtendizePrimaryImageCube(string sourceFullFileName, string destFullFileName, string[]? layerExtensionNames)
 		{
-			if (layerExtensionNames == null)
-			{
-				//layerExtensionNames = new string[];
-			}
-
-			for (int i = 0; i < layerExtensionNames.Length - 1; i++)
-				for (int j = i + 1; j < layerExtensionNames.Length; j++)
-					if (layerExtensionNames[i] == layerExtensionNames[j])
-						throw new Exception("layerExtensionNames are not all unique: " + (i + 1) + ": " + layerExtensionNames[i] + "; " + (j + 1) + ": " + layerExtensionNames[j]);
-
-			for (int i = 0; i < layerExtensionNames.Length; i++)
-				if (layerExtensionNames[i] == "")
-					throw new Exception("layerExtensionNames cannot contain a nameless extension (empty string): " + (i + 1));
-
-			double[] cube = FITSImage.ReadPrimaryNDimensionalData(sourceFullFileName, out int[] axesN);
-
-			if (layerExtensionNames.Length != axesN[2])
-				throw new Exception("layerExtensionNames array not equal in length (" + layerExtensionNames.Length + ") to the number of layers (" + axesN[2] + ")");
+			if (destFullFileName == "")
+				destFullFileName = sourceFullFileName;
 
 			FITSHeader origheader = new FITSHeader(sourceFullFileName);
+			FITSImageSet set = FITSImageSet.ReadPrimaryImageCubeAsSet(sourceFullFileName);
+
+			if (layerExtensionNames == null)
+			{
+				layerExtensionNames = new string[set.Count];
+				for (int i = 0; i < layerExtensionNames.Length; i++)
+					layerExtensionNames[i] = i.ToString("00000");
+			}
+			else
+			{
+				if (layerExtensionNames.Length != set.Count)
+					throw new Exception("layerExtensionNames array not equal in length (" + layerExtensionNames.Length + ") to the number of layers (" + set.Count + ")");
+
+				for (int i = 0; i < layerExtensionNames.Length - 1; i++)
+					for (int j = i + 1; j < layerExtensionNames.Length; j++)
+						if (layerExtensionNames[i] == layerExtensionNames[j])
+							throw new Exception("layerExtensionNames are not all unique: " + (i + 1) + ": " + layerExtensionNames[i] + "; " + (j + 1) + ": " + layerExtensionNames[j]);
+
+				for (int i = 0; i < layerExtensionNames.Length; i++)
+					if (layerExtensionNames[i] == "")
+						throw new Exception("layerExtensionNames cannot contain a nameless extension (empty string): " + (i + 1));
+			}
 
 			if (destFullFileName == sourceFullFileName)
 			{
@@ -1335,23 +1343,7 @@ namespace JPFITS
 				File.Delete(destFullFileName);
 			}
 
-			FITSImageSet set = new FITSImageSet();
-
-			for (int z = 0; z < axesN[2]; z++)//z is each layer of the cube
-			{
-				double[,] layer = new double[axesN[0], axesN[1]];
-
-				Parallel.For(0, axesN[1], y =>
-				{
-					for (int x = 0; x < axesN[0]; x++)
-						layer[x, y] = cube[z * axesN[1] * axesN[0] + y * axesN[0] + x];
-				});
-
-				FITSImage fi = new FITSImage(destFullFileName, layer, false, true);//the filename isn't important since they're all going to extensions
-				set.Add(fi);
-			}
-
-			set.WriteAsExtensions(destFullFileName, false, false, origheader, layerExtensionNames, new TypeCode[1] { FITSHeader.GetHeaderTypeCode(origheader) });
+			set.WriteAsExtensions(destFullFileName, false, false, null, layerExtensionNames, new TypeCode[1] { FITSHeader.GetHeaderTypeCode(origheader) });
 		}
 		
 		/// <summary>Returns an array of all image table extension names in a FITS file. If there are no image table extensions, returns an empty array.</summary>

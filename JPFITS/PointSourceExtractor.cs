@@ -224,7 +224,7 @@ namespace JPFITS
 		/// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
 		/// <param name="show_waitbar">Show a cancellable wait bar. False equates to a syncronous call.</param>
 		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default is the same value as pix_saturation.</param>
-		public void Extract_Sources(double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar, double pix_saturation_mapmin = 0, bool reject_saturated = false)
+		public void Extract_Sources(double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar, double pix_saturation_mapmin = 0, bool reject_saturated = false, bool background_radius_as_source_separation = false)
 		{
 			IMAGE = image;
 			PIX_SAT = pix_saturation;
@@ -260,6 +260,7 @@ namespace JPFITS
 			ROI_REGION = ROI_region;
 			SHOWWAITBAR = show_waitbar;
 			REJECT_SATURATED = reject_saturated;
+			BACKGROUND_RAD_AS_SSEP = background_radius_as_source_separation;
 
 			if (SHOWWAITBAR)
 			{
@@ -1143,6 +1144,7 @@ namespace JPFITS
 		private double[]? CENTROIDS_SNR;
 		private bool[]? SATURATED;
 		private bool REJECT_SATURATED;
+		private bool BACKGROUND_RAD_AS_SSEP;
 
 		private double[]? FITS_X;
 		private double[]? FITS_Y;
@@ -1208,6 +1210,7 @@ namespace JPFITS
 				ArrayList Ps = new ArrayList();// pixel values
 				ArrayList Bs = new ArrayList();// background estimates
 				double KRAD2 = KERNEL_RADIUS * KERNEL_RADIUS;
+				double SSEP2 = BACKGROUND_RADIUS * BACKGROUND_RADIUS;
 				int src_index = 0;				
 
 				if (PIX_SAT > 0)//check for saturation islands
@@ -1348,68 +1351,73 @@ namespace JPFITS
 								continue;
 						}
 
-						bool brek = false;
-						for (int i = x - KERNEL_RADIUS; i <= x + KERNEL_RADIUS; i++)
+						#region OLD SOURCE_SEPARATION CHECK
+						if (BACKGROUND_RAD_AS_SSEP)
 						{
-							double sx2 = (double)(x - i);
-							sx2 *= sx2;
-							for (int j = y - KERNEL_RADIUS; j <= y + KERNEL_RADIUS; j++)
+							bool brek = false;
+							for (int i = x - BACKGROUND_RADIUS; i <= x + BACKGROUND_RADIUS; i++)
 							{
-								double sy = (double)(y - j);
-								double r2 = (sx2 + sy * sy) / KRAD2;
-
-								if (r2 > 1)//outside the source separation circle
-									continue;
-
-								if (IMAGE[i, j] - bg_est > pixel)// max failure, the pixel isn't the maximum in the kernel circle
+								double sx2 = (double)(x - i);
+								sx2 *= sx2;
+								for (int j = y - BACKGROUND_RADIUS; j <= y + BACKGROUND_RADIUS; j++)
 								{
-									brek = true;
-									break;
+									double sy = (double)(y - j);
+									double r2 = (sx2 + sy * sy) / SSEP2;
+
+									if (r2 > 1)//outside the source separation circle
+										continue;
+
+									if (IMAGE[i, j] - bg_est > pixel)// max failure, the pixel isn't the maximum in the source separation circle
+									{
+										brek = true;
+										break;
+									}
+
+									/*The minimum radial distance between two sources must be the SSR.
+									When another source is just over (one pixel, say) the SSR from[x, y], its Boolean map which is from the CKR will extend towards[x, y] so that its Boolean map extends within the SSR of[x, y].
+									Thus, it is OK to find some true values in the Boolean map from another source when exploring +-SSR from a given [x, y].
+									However, what wouldn’t be OK is if when exploring the SSR, another source’s Boolean/index map extends to within less than half of the SSR of[x, y], 
+									because then there would be no way that the radial distance between[x, y] and the other source-center would be at least SSR.*/
+									if (r2 < 0.25 && SOURCE_BOOLEAN_MAP[i, j]) //a source was already found within the source separation
+									{
+										brek = true;
+										break;
+									}
 								}
+								if (brek)
+									break;
 							}
 							if (brek)
-								break;
+								continue;
 						}
-						if (brek)
-							continue;
-						#region OLD SOURCE_SEPARATION CHECK
-						//bool brek = false;
-						//for (int i = x - SOURCE_SEPARATION; i <= x + SOURCE_SEPARATION; i++)
-						//{
-						//	double sx2 = (double)(x - i);
-						//	sx2 *= sx2;
-						//	for (int j = y - SOURCE_SEPARATION; j <= y + SOURCE_SEPARATION; j++)
-						//	{
-						//		double sy = (double)(y - j);
-						//		double r2 = (sx2 + sy * sy) / SSEP2;
-
-						//		if (r2 > 1)//outside the source separation circle
-						//			continue;
-
-						//		if (IMAGE[i, j] - bg_est > pixel)// max failure, the pixel isn't the maximum in the source separation circle
-						//		{
-						//			brek = true;
-						//			break;
-						//		}
-
-						//		/*The minimum radial distance between two sources must be the SSR.
-						//		When another source is just over (one pixel, say) the SSR from[x, y], its Boolean map which is from the CKR will extend towards[x, y] so that its Boolean map extends within the SSR of[x, y].
-						//		Thus, it is OK to find some true values in the Boolean map from another source when exploring +-SSR from a given [x, y].
-						//		However, what wouldn’t be OK is if when exploring the SSR, another source’s Boolean/index map extends to within less than half of the SSR of[x, y], 
-						//		because then there would be no way that the radial distance between[x, y] and the other source-center would be at least SSR.*/
-						//		if (r2 < 0.25 && SOURCE_BOOLEAN_MAP[i, j]) //a source was already found within the source separation
-						//		{
-						//			brek = true;
-						//			break;
-						//		}
-						//		//was is this even needed necessary?????
-						//	}
-						//	if (brek)
-						//		break;
-						//}
-						//if (brek)
-						//	continue;
 						#endregion
+						else
+						{
+							bool brek = false;
+							for (int i = x - KERNEL_RADIUS; i <= x + KERNEL_RADIUS; i++)
+							{
+								double sx2 = (double)(x - i);
+								sx2 *= sx2;
+								for (int j = y - KERNEL_RADIUS; j <= y + KERNEL_RADIUS; j++)
+								{
+									double sy = (double)(y - j);
+									double r2 = (sx2 + sy * sy) / KRAD2;
+
+									if (r2 > 1)//outside the source separation circle
+										continue;
+
+									if (IMAGE[i, j] - bg_est > pixel)// max failure, the pixel isn't the maximum in the kernel circle
+									{
+										brek = true;
+										break;
+									}
+								}
+								if (brek)
+									break;
+							}
+							if (brek)
+								continue;
+						}
 
 						//do PSF kernel sum
 						double kernel_psf_sum = 0, n_psf_pixels = 0;
@@ -1513,10 +1521,6 @@ namespace JPFITS
 				INITARRAYS();
 
 				double[] sigma = new double[N_SRC];
-				double rsq = KERNEL_RADIUS * KERNEL_RADIUS;
-				if (rsq == 0)
-					rsq = 1;
-
 				for (int i = 0; i < N_SRC; i++)
 				{
 					CENTROIDS_PIXEL_X[i] = Convert.ToInt32(XPIXs[i]);
@@ -1535,6 +1539,9 @@ namespace JPFITS
 					sigma[i] = sig;
 				}
 				double mediansigma = JPMath.Median(sigma);
+				double rsq = KERNEL_RADIUS * KERNEL_RADIUS;
+				if (rsq == 0)
+					rsq = 1;
 				double bg = rsq * mediansigma * mediansigma;
 				for (int i = 0; i < N_SRC; i++)
 					CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
@@ -2192,14 +2199,14 @@ namespace JPFITS
 			set { NAME = value; }
 		}
 
-		/// <summary>Returns the boolean source map.</summary>
+		/// <summary>Returns the source Boolean map. Returns whether or not a location in the image has an extracted source.</summary>
 		public bool[,] SourceBooleanMap
 		{
 			get { return SOURCE_BOOLEAN_MAP; }
 			set { SOURCE_BOOLEAN_MAP = value; }
 		}
 
-		/// <summary>Returns the integer index source map.</summary>
+		/// <summary>Returns the integer source index map. Locations in the PSE image which have an extracted kernel will return the index of the source in the various lists.</summary>
 		public int[,] SourceIndexMap
 		{
 			get { return SOURCE_INDEX_MAP; }
