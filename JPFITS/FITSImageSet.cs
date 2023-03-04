@@ -39,7 +39,7 @@ namespace JPFITS
 			if (op == "save")
 			{
 				bool do_parallel = (bool)(arg[1]);
-				TypeCode precision = (TypeCode)arg[2];
+				DiskPrecision precision = (DiskPrecision)arg[2];
 				string waitbar_message = (string)arg[3];
 				object countlock = new object();
 				object LOCKOBJECT = new object();
@@ -802,7 +802,7 @@ namespace JPFITS
 		/// <param name="precision">The precision at which to write the image data.</param>
 		/// <param name="doParallel">Write the images with parallelism. In the past with platter drives this would have been impossible, but fast solid state drives can handle it. If there's only a few images then don't bother, but useful when writing hundreds.</param>
 		/// <param name="waitbarMessage">Message to display on Waitbar progress if it is shown.</param>
-		public bool Write(TypeCode precision, bool doParallel, string waitbarMessage)
+		public bool Write(DiskPrecision precision, bool doParallel, string waitbarMessage)
 		{
 			SHOWWAITBAR = true;
 			WAITBAR = new WaitBar();
@@ -824,7 +824,7 @@ namespace JPFITS
 		/// <summary>Write the FITSImage objects from the FITSImageSet to disk.</summary>
 		/// <param name="precision">The precision at which to write the image data.</param>
 		/// <param name="doParallel">Write the images with parallelism. In the past with platter drives this would have been impossible, but fast solid state drives can handle it. If there's only a few images then don't bother, but useful when writing hundreds.</param>
-		public void Write(TypeCode precision, bool doParallel)
+		public void Write(DiskPrecision precision, bool doParallel)
 		{
 			ParallelOptions opts = new ParallelOptions();
 			if (doParallel)
@@ -845,7 +845,7 @@ namespace JPFITS
 		/// <param name="primaryHeader">If the first image is not to be written as the primary data block, then a header may be supplied for the primary block. Pass null for default header. Throws an exception if firstAsPrimary is true and primaryHeader is not null.</param>
 		/// <param name="extensionNames">The names of the extensions. No elements may be empty strings; all elements must be unique. Pass null for automatic incremenetal naming as number ######.</param>
 		/// <param name="imagePrecisions">The precisions at which to write the image data. If a single element array is passed then this precision is applied to all images.</param>
-		public bool WriteAsExtensions(string fileName, bool appendToExistingFile, bool firstAsPrimary, JPFITS.FITSHeader? primaryHeader, string[]? extensionNames, TypeCode[] imagePrecisions)
+		public bool WriteAsExtensions(string fileName, bool appendToExistingFile, bool firstAsPrimary, JPFITS.FITSHeader? primaryHeader, string[]? extensionNames, DiskPrecision[] imagePrecisions)
 		{
 			if (firstAsPrimary)
 				if (appendToExistingFile)
@@ -881,8 +881,8 @@ namespace JPFITS
 
 			if (imagePrecisions.Length == 1 && this.Count > 1)
 			{
-				TypeCode tc = imagePrecisions[0];
-				imagePrecisions = new TypeCode[this.Count];
+				DiskPrecision tc = imagePrecisions[0];
+				imagePrecisions = new DiskPrecision[this.Count];
 				for (int i = 0; i < this.Count; i++)
 					imagePrecisions[i] = tc;
 			}
@@ -1557,7 +1557,7 @@ namespace JPFITS
 
 			FITSHeader HEADER = new FITSHeader(header, true);
 
-			double[,,] cube = (double[,,])FITSFILEOPS.ReadImageDataUnit(fs, null, true, BITPIX, ref naxisn, BSCALE, BZERO, FITSFILEOPS.RankFormat.Default);
+			double[,,] cube = (double[,,])FITSFILEOPS.ReadImageDataUnit(fs, null, true, BITPIX, ref naxisn, BSCALE, BZERO, RankFormat.Default);
 
 			fs.Close();			
 

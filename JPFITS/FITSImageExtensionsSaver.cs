@@ -10,7 +10,7 @@ namespace JPFITS
 		public JPFITS.FITSImageSet IMAGESET;
 		public string FILENAME = "";
 		public string[]? EXTENSIONNAMES;
-		public System.TypeCode[]? PRECISIONTYPECODES;
+		public DiskPrecision[]? PRECISIONTYPECODES;
 		public JPFITS.FITSHeader? HEADER;
 
 		public FITSImageExtensionsSaver(JPFITS.FITSImageSet imageSet)
@@ -48,6 +48,14 @@ namespace JPFITS
 		{
 			switch (bitPix)
 			{
+				case (8):
+				{
+					if (bZero == -128)
+						return "sbyte";
+					else
+						return "byte";
+				}
+
 				case (16):
 				{
 					if (bZero == 0)
@@ -86,24 +94,32 @@ namespace JPFITS
 			return "double";
 		}
 
-		private TypeCode BITPIXStringToTYPECODE(string bitpixstr)
+		private DiskPrecision BITPIXStringToTYPECODE(string bitpixstr)
 		{
+			if (bitpixstr == "boolean")
+				return DiskPrecision.Boolean;
+			if (bitpixstr == "sbyte")
+				return DiskPrecision.SByte;
+			if (bitpixstr == "byte")
+				return DiskPrecision.Byte;
 			if (bitpixstr == "int16")
-				return TypeCode.Int16;
+				return DiskPrecision.Int16;
 			else if (bitpixstr == "uint16")
-				return TypeCode.UInt16;
+				return DiskPrecision.UInt16;
 			if (bitpixstr == "int32")
-				return TypeCode.Int32;
+				return DiskPrecision.Int32;
 			else if (bitpixstr == "uint32")
-				return TypeCode.UInt32;
+				return DiskPrecision.UInt32;
 			if (bitpixstr == "int64")
-				return TypeCode.Int64;
+				return DiskPrecision.Int64;
 			else if (bitpixstr == "uint64")
-				return TypeCode.UInt64;
+				return DiskPrecision.UInt64;
 			else if (bitpixstr == "float")
-				return TypeCode.Single;
+				return DiskPrecision.Single;
+			else if (bitpixstr == "double")
+				return DiskPrecision.Double;
 			else
-				return TypeCode.Double;
+				throw new Exception("Unsupported type at BITPIXStringToTYPECODE with '" + bitpixstr + "'");
 		}
 
 		private void FirstAsPrimaryChck_CheckedChanged(object sender, EventArgs e)
@@ -190,7 +206,7 @@ namespace JPFITS
 
 			FILENAME = sfd.FileName;
 			EXTENSIONNAMES = new string[extensionsGridView.RowCount];
-			PRECISIONTYPECODES = new TypeCode[extensionsGridView.RowCount];
+			PRECISIONTYPECODES = new DiskPrecision[extensionsGridView.RowCount];
 
 			for (int i = 0; i < extensionsGridView.RowCount; i++)
 			{

@@ -175,6 +175,9 @@
     <EmbeddedResource Include="FITSImageExtensionsLister.resx">
       <DependentUpon>FITSImageExtensionsLister.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="FITSImageExtensionsSaver.resx">
+      <DependentUpon>FITSImageExtensionsSaver.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="FITSImageSetSaver.resx">
       <DependentUpon>FITSImageSetSaver.cs</DependentUpon>
     </EmbeddedResource>

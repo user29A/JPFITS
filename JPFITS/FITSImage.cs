@@ -313,7 +313,7 @@ namespace JPFITS
 			HEADER = new JPFITS.FITSHeader(header, HEADER_POP);
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.RankFormat.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, RankFormat.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -383,7 +383,7 @@ namespace JPFITS
 			HEADER.SetKey(0, "SIMPLE", "T", "file conforms to FITS standard");
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.RankFormat.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, RankFormat.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -456,7 +456,7 @@ namespace JPFITS
 			this.FileName = this.FileName.Substring(0, this.FileName.LastIndexOf(".")) + "_" + EXTNAME + this.FileName.Substring(this.FileName.LastIndexOf("."));
 
 			if (DATA_POP)
-				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.RankFormat.VectorAsVerticalTable);
+				DIMAGE = (double[,])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, RankFormat.VectorAsVerticalTable);
 			else
 				if (NAXISN.Length == 0)
 					NAXISN = new int[2];
@@ -482,7 +482,7 @@ namespace JPFITS
 		/// <param name="Precision">Precision of the data stored in the disk char array.</param>
 		/// <param name="NAxis1">Length of the 1st axis (x-axis)</param>
 		/// <param name="NAxis2">Length of the 2nd axis (y-axis)</param>
-		public FITSImage(string fullFileName, string DiskUCharBufferName, TypeCode Precision, int NAxis1, int NAxis2)
+		public FITSImage(string fullFileName, string DiskUCharBufferName, DiskPrecision Precision, int NAxis1, int NAxis2)
 		{
 			ISEXTENSION = false;
 			EXTNAME = null;
@@ -520,7 +520,7 @@ namespace JPFITS
 			set { DIMAGE[x, y] = value; }
 		}
 
-		public TypeCode HeaderTypeCode
+		public DiskPrecision HeaderTypeCode
 		{
 			get { return FITSHeader.GetHeaderTypeCode(HEADER); }
 		}
@@ -920,7 +920,7 @@ namespace JPFITS
 		/// <br />If the file name already exists on disk, the primary unit will be overwritten, and any existing extensions will be appended to conserve the data file.</summary>
 		/// <param name="precision">Byte precision at which to write the image data.</param>
 		/// <param name="doParallel">Populate the underlying byte arrays for writing with parallelization.</param>
-		public void WriteImage(TypeCode precision, bool doParallel)
+		public void WriteImage(DiskPrecision precision, bool doParallel)
 		{
 			ISEXTENSION = false;
 			EXTNAME = null;
@@ -933,7 +933,7 @@ namespace JPFITS
 		/// <param name="fullFileName">File name.</param>
 		/// <param name="precision">Byte precision at which to write the image data.</param>
 		/// <param name="doParallel">Populate the underlying byte arrays for writing with parallelization.</param>
-		public void WriteImage(string fullFileName, TypeCode precision, bool doParallel)
+		public void WriteImage(string fullFileName, DiskPrecision precision, bool doParallel)
 		{
 			ISEXTENSION = false;
 			EXTNAME = null;
@@ -957,7 +957,7 @@ namespace JPFITS
 		/// <param name="overwriteExtensionIfExists">If the image extension already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
 		/// <param name="precision">Byte precision at which to write the image data.</param>
 		/// <param name="doParallel">Populate the underlying byte arrays for writing with parallelization.</param>
-		public void WriteImage(string fullFileName, string extensionName, bool overwriteExtensionIfExists, TypeCode precision, bool doParallel)
+		public void WriteImage(string fullFileName, string extensionName, bool overwriteExtensionIfExists, DiskPrecision precision, bool doParallel)
 		{
 			ISEXTENSION = true;
 			EXTNAME = extensionName;
@@ -1041,7 +1041,7 @@ namespace JPFITS
 		/// <param name="precision">TypeCode precision of the data stored in the disk raw byte data.</param>
 		/// <param name="NAxis1">Length of the 1st axis (x-axis)</param>
 		/// <param name="NAxis2">Length of the 2nd axis (y-axis)</param>
-		public static void RawDataToFITSImage(string diskRawDataFileName, string fitsFileWriteName, TypeCode precision, int NAxis1, int NAxis2)
+		public static void RawDataToFITSImage(string diskRawDataFileName, string fitsFileWriteName, DiskPrecision precision, int NAxis1, int NAxis2)
 		{
 			FileStream buff_fs = new FileStream(diskRawDataFileName, FileMode.Open, FileAccess.Read, FileShare.Read);
 			int NBytes = (int)buff_fs.Length;//size of disk data buffer
@@ -1177,7 +1177,7 @@ namespace JPFITS
 			ArrayList header = null;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out bool hasext, out int BITPIX, out int[] NAXISN, out double BSCALE, out double BZERO);
 
-			double[] result = (double[])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, FITSFILEOPS.RankFormat.ArrayAsRangeRank);
+			double[] result = (double[])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, RankFormat.ArrayAsRangeRank);
 
 			fs.Close();
 
@@ -1343,7 +1343,7 @@ namespace JPFITS
 				File.Delete(destFullFileName);
 			}
 
-			set.WriteAsExtensions(destFullFileName, false, false, null, layerExtensionNames, new TypeCode[1] { FITSHeader.GetHeaderTypeCode(origheader) });
+			set.WriteAsExtensions(destFullFileName, false, false, null, layerExtensionNames, new DiskPrecision[1] { FITSHeader.GetHeaderTypeCode(origheader) });
 		}
 		
 		/// <summary>Returns an array of all image table extension names in a FITS file. If there are no image table extensions, returns an empty array.</summary>
@@ -1617,7 +1617,7 @@ namespace JPFITS
 		//		}*/
 		//	}
 
-		private void WRITEIMAGE(TypeCode prec, bool do_parallel)
+		private void WRITEIMAGE(DiskPrecision precision, bool do_parallel)
 		{
 			FileStream fs = null;
 			bool filexists = File.Exists(FULLFILENAME);
@@ -1690,7 +1690,7 @@ namespace JPFITS
 			}
 
 			//set header BZERO and BCSALE key values depending on prec type.
-			SetBITPIXNAXISBSCZ(prec, DIMAGE, HEADER);
+			SetBITPIXNAXISBSCZ(precision, DIMAGE, HEADER);
 
 			FITSHeader.HeaderUnitType type = FITSHeader.HeaderUnitType.Primary;
 			if (ISEXTENSION)
@@ -1709,7 +1709,7 @@ namespace JPFITS
 			fs.Write(data, 0, data.Length);
 
 			//get formatted data block
-			data = FITSFILEOPS.GetByteFormattedImageDataUnit(prec, do_parallel, DIMAGE);
+			data = FITSFILEOPS.GetByteFormattedImageDataUnit(precision, do_parallel, DIMAGE);
 			fs.Write(data, 0, data.Length);
 			if (appenddata != null)
 				fs.Write(appenddata, 0, appenddata.Length);
@@ -1717,7 +1717,7 @@ namespace JPFITS
 		}		
 
 		/// <summary>This sets the BITPIX, NAXIS, NAXISn, BSCALE and BZERO keywords of the header given the TypeCode and the image. If the image is null then NAXIS = 0 and any NAXISn keywords are removed as well as BSCALE and BZERO.</summary>
-		private static void SetBITPIXNAXISBSCZ(TypeCode precision, double[,]? image, FITSHeader HEADER)
+		private static void SetBITPIXNAXISBSCZ(DiskPrecision precision, double[,]? image, FITSHeader HEADER)
 		{
 			FITSFILEOPS.GetBitpixNaxisnBscaleBzero(precision, image, out int bitpix, out int[] naxnisn, out double bscale, out double bzero);
 

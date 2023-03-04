@@ -575,7 +575,7 @@ namespace JPFITS
 		#endregion
 
 		#region STATIC HEADER INTERACTION
-		public static TypeCode GetHeaderTypeCode(FITSHeader header)
+		public static DiskPrecision GetHeaderTypeCode(FITSHeader header)
 		{
 			int BITPIX = Convert.ToInt32(header.GetKeyValue("BITPIX"));
 
@@ -588,35 +588,43 @@ namespace JPFITS
 
 			switch (BITPIX)
 			{
+				case 8:
+				{
+					if (BZERO == -128)
+						return DiskPrecision.SByte;
+					else
+						return DiskPrecision.Byte;
+				}
+
 				case 16:
 				{
 					if (BZERO == 0)
-						return TypeCode.Int16;
+						return DiskPrecision.Int16;
 					else
-						return TypeCode.UInt16;
+						return DiskPrecision.UInt16;
 				}
 
 				case 32:
 				{
 					if (BZERO == 0)
-						return TypeCode.Int32;
+						return DiskPrecision.Int32;
 					else
-						return TypeCode.UInt32;
+						return DiskPrecision.UInt32;
 				}
 
 				case 64:
 				{
 					if (BZERO == 0)
-						return TypeCode.Int64;
+						return DiskPrecision.Int64;
 					else
-						return TypeCode.UInt64;
+						return DiskPrecision.UInt64;
 				}
 
 				case -32:
-					return TypeCode.Single;
+					return DiskPrecision.Single;
 
 				case -64:
-					return TypeCode.Double;
+					return DiskPrecision.Double;
 
 				default:
 					throw new Exception(String.Format("Problem with BITPIX {0} or BZERO {1}", BITPIX, BZERO));
@@ -656,7 +664,7 @@ namespace JPFITS
 		/// <param name="dataUnit">The data unit array. Pass null for NAXIS = 0.</param>
 		private void MAKE_DEFAULT_HEADER(bool mayContainExtensions, Array? dataUnit)
 		{
-			FITSFILEOPS.GetBitpixNaxisnBscaleBzero(TypeCode.Double, dataUnit, out int BITPIX, out int[] NAXISN, out double BSCALE, out double BZERO);
+			FITSFILEOPS.GetBitpixNaxisnBscaleBzero(DiskPrecision.Double, dataUnit, out int BITPIX, out int[] NAXISN, out double BSCALE, out double BZERO);
 
 			if (mayContainExtensions && dataUnit == null)
 				HEADERKEYS = new FITSHeaderKey[5];

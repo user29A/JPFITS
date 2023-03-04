@@ -7,6 +7,74 @@ using System.Runtime.CompilerServices;
 
 namespace JPFITS
 {
+	public enum DiskPrecision
+	{
+		Boolean,
+
+		Byte,
+
+		SByte,
+
+		UInt16,
+
+		Int16,
+
+		UInt32,
+
+		Int32,
+
+		UInt64,
+
+		Int64,
+
+		Single,
+
+		Double
+	}
+
+	/// <summary>Array formatting options for the data unit returned by the ReadImageDataUnit method.</summary>
+	public enum RankFormat
+	{
+		/// <summary>
+		/// The Array is returned as the rank indicated by the NAXIS keyword, up to rank = 3 (data cube).
+		/// </summary>
+		Default,
+
+		/// <summary>
+		/// If the default Array would be a vector, return it as a 2D horizontal array. Indexing will then be [i, 0].
+		/// </summary>
+		VectorAsHorizontalTable,
+
+		/// <summary>
+		/// If the default Array would be a vector, return it as a 2D vertical array. Indexing will then be [0, i].
+		/// </summary>
+		VectorAsVerticalTable,
+
+		/// <summary>
+		/// If the range dimensions indicate a vector when reading from a table or cube, or a table when reading from a cube, then return the Array formatted as the range rank.
+		/// </summary>
+		ArrayAsRangeRank
+	}
+
+	/// <summary>Array precision options for the data unit returned by the ReadImageDataUnit method.</summary>
+	public enum ReadReturnPrecision
+	{
+		/// <summary>
+		/// Return the array at its native on-disk precision
+		/// </summary>
+		Native,
+
+		/// <summary>
+		/// Return the array at double-precision regardless of its precision on-disk.
+		/// </summary>
+		Double,
+
+		/// <summary>
+		/// Return the array as a Boolean. The on-disk data 1's are true, all else are false. The on-disk data must be unsigned bytes.
+		/// </summary>
+		Boolean
+	}
+
 	///<summary>FITSFILEOPS static class for facilitating interaction with FITS data on disk.</summary>
 	public class FITSFILEOPS
 	{
@@ -49,50 +117,7 @@ namespace JPFITS
 		}
 
 		#endregion
-
-		/// <summary>Array formatting options for the data unit returned by the ReadImageDataUnit method.</summary>
-		public enum RankFormat
-		{
-			/// <summary>
-			/// The Array is returned as the rank indicated by the NAXIS keyword, up to rank = 3 (data cube).
-			/// </summary>
-			Default,
-
-			/// <summary>
-			/// If the default Array would be a vector, return it as a 2D horizontal array. Indexing will then be [i, 0].
-			/// </summary>
-			VectorAsHorizontalTable,
-
-			/// <summary>
-			/// If the default Array would be a vector, return it as a 2D vertical array. Indexing will then be [0, i].
-			/// </summary>
-			VectorAsVerticalTable,
-
-			/// <summary>
-			/// If the range dimensions indicate a vector when reading from a table or cube, or a table when reading from a cube, then return the Array formatted as the range rank.
-			/// </summary>
-			ArrayAsRangeRank
-		}
-
-		/// <summary>Array precision options for the data unit returned by the ReadImageDataUnit method.</summary>
-		public enum DataPrecision
-		{
-			/// <summary>
-			/// Return the array at its native on-disk precision
-			/// </summary>
-			Native,
-
-			/// <summary>
-			/// Return the array at double-precision regardless of its precision on-disk.
-			/// </summary>
-			Double,
-
-			/// <summary>
-			/// Return the array as a Boolean. The on-disk data 1's are true, all else are false. The on-disk data must be unsigned bytes.
-			/// </summary>
-			Boolean
-		}
-
+		
 		/// <summary>Scans the primary unit of a FITS file. Returns false if the file is not a FITS file.</summary>
 		/// <param name="fs">The FileStream of the FITS file, positioned at the start of the stream.</param>
 		/// <param name="scanpastprimarydata">True to set the FileStream fs position to the end of the data block, otherwise the fs position will be at the end of the primary header block, i.e. at the beginning of the primary data.</param>
@@ -204,7 +229,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Scans an IMAGE unit of a FITS file. Returns false if the file is not a FITS file. Returns essential IMAGE keyword values. Can be used to scan the primary image unit or IMAGE extensions.</summary>
-		/// <param name="fs">The FileStream of the FITS file, positioned at the start of the stream, or, at the start of any IMAGE extension unit.</param>
+		/// <param name="fs">The FileStream of the FITS file, positioned at the start of the primary header block, or, at the start of any IMAGE extension unit.</param>
 		/// <param name="scanpastdataunit">True to set the FileStream fs position to the end of the data block, otherwise the fs position will be at the end of the header block, i.e. at the beginning of the data unit.</param>
 		/// <param name="header_return">Returns the header of the unit as an ArrayList with each 80-character header line being a String member of this list. Pass null if not required.</param>
 		/// <param name="has_extensions">Returns whether or not the FITS file may contain extensions. Returns true if the unit being scanned is itself an extension.</param>
@@ -359,7 +384,7 @@ namespace JPFITS
 		/// <param name="bzero">The BZERO keyword value of the data unit header.</param>
 		/// <param name="returnRankFormat">Options for formatting the return Array rank and dimensions.</param>
 		/// <param name="returnPrecision">Options for the precision type of the return Array.</param>
-		public static Array ReadImageDataUnit(FileStream fs, int[]? range, bool doParallel, int bitpix, ref int[] naxisn, double bscale, double bzero, RankFormat returnRankFormat = RankFormat.Default, DataPrecision returnPrecision = DataPrecision.Double)
+		public static Array ReadImageDataUnit(FileStream fs, int[]? range, bool doParallel, int bitpix, ref int[] naxisn, double bscale, double bzero, RankFormat returnRankFormat = RankFormat.Default, ReadReturnPrecision returnPrecision = ReadReturnPrecision.Double)
 		{
 			if (range == null || range[0] == -1)//then it is a full frame read
 				if (naxisn.Length == 1)
@@ -400,7 +425,7 @@ namespace JPFITS
 			else
 				opts.MaxDegreeOfParallelism = 1;
 
-			if (returnPrecision == DataPrecision.Double)
+			if (returnPrecision == ReadReturnPrecision.Double)
 			{
 				if (naxisn.Length == 1)//then a vector return
 				{
@@ -1043,7 +1068,7 @@ namespace JPFITS
 				}
 			}
 
-			else if (returnPrecision == DataPrecision.Native)
+			else if (returnPrecision == ReadReturnPrecision.Native)
 			{
 				if (naxisn.Length == 1)//then a vector return
 				{
@@ -2651,7 +2676,7 @@ namespace JPFITS
 				}
 			}
 			
-			else if (returnPrecision == DataPrecision.Boolean)
+			else if (returnPrecision == ReadReturnPrecision.Boolean)
 			{
 				if (bitpix != 8 && bzero != 0)//unsigned byte
 					throw new Exception("Boolean data must be unsigned bytes on disk.");
@@ -2792,10 +2817,10 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns a data unit as a byte array formatted at a specified precision. Useful for writing.</summary>
-		/// <param name="formatPrecision">The precision at which to format the byte array of the underlying double precision data unit. If double values of the data unit exceed the precision, the values are clipped.</param>
+		/// <param name="formatPrecision">The precision at which to format the byte array of the underlying data unit. If values of the data unit exceed the precision, the values are clipped.</param>
 		/// <param name="doParallel">Populate the byte array with parallelism over the data unit. Can speed things up when the data unit is very large.</param>
-		/// <param name="dataUnit">The data unit of up to rank three (data cube). Higher dimensional data than rank = 3 not supported.</param>
-		public static byte[] GetByteFormattedImageDataUnit(TypeCode formatPrecision, bool doParallel, Array? dataUnit)
+		/// <param name="dataUnit">The data unit of up to rank three (cube). Higher dimensional data than rank = 3 not supported.</param>
+		public static byte[] GetByteFormattedImageDataUnit(DiskPrecision formatPrecision, bool doParallel, Array? dataUnit)
 		{
 			if (dataUnit == null)
 				return new byte[] { };
@@ -2803,7 +2828,7 @@ namespace JPFITS
 			if (dataUnit.Rank > 3)
 				throw new Exception("Error: I can only handle up to 3-dimensional data units - SORRY!");
 
-			//if (Type.GetTypeCode(dataUnit.GetType().GetElementType()) != TypeCode.Double)
+			//if (Type.GetTypeCode(dataUnit.GetType().GetElementType()) != WritePrecision.Double)
 			//	throw new Exception("Error: Only double-precision arrays can be passed.");
 			TypeCode dataUnitType = Type.GetTypeCode(dataUnit.GetType().GetElementType());
 
@@ -2826,7 +2851,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -2869,8 +2894,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Byte:
-						case TypeCode.SByte:
+						case DiskPrecision.Byte:
+						case DiskPrecision.SByte:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -2915,8 +2940,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt16:
-						case TypeCode.Int16:
+						case DiskPrecision.UInt16:
+						case DiskPrecision.Int16:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -2965,8 +2990,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt32:
-						case TypeCode.Int32:
+						case DiskPrecision.UInt32:
+						case DiskPrecision.Int32:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3021,8 +3046,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
+						case DiskPrecision.UInt64:
+						case DiskPrecision.Int64:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3089,7 +3114,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Single:
+						case DiskPrecision.Single:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3144,7 +3169,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Double:
+						case DiskPrecision.Double:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3218,7 +3243,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3261,8 +3286,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Byte:
-						case TypeCode.SByte:
+						case DiskPrecision.Byte:
+						case DiskPrecision.SByte:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3307,8 +3332,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt16:
-						case TypeCode.Int16:
+						case DiskPrecision.UInt16:
+						case DiskPrecision.Int16:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3357,8 +3382,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt32:
-						case TypeCode.Int32:
+						case DiskPrecision.UInt32:
+						case DiskPrecision.Int32:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3413,8 +3438,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
+						case DiskPrecision.UInt64:
+						case DiskPrecision.Int64:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3481,7 +3506,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Single:
+						case DiskPrecision.Single:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3536,7 +3561,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Double:
+						case DiskPrecision.Double:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3610,7 +3635,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3653,8 +3678,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Byte:
-						case TypeCode.SByte:
+						case DiskPrecision.Byte:
+						case DiskPrecision.SByte:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3699,8 +3724,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt16:
-						case TypeCode.Int16:
+						case DiskPrecision.UInt16:
+						case DiskPrecision.Int16:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3749,8 +3774,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt32:
-						case TypeCode.Int32:
+						case DiskPrecision.UInt32:
+						case DiskPrecision.Int32:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3805,8 +3830,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
+						case DiskPrecision.UInt64:
+						case DiskPrecision.Int64:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3873,7 +3898,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Single:
+						case DiskPrecision.Single:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -3928,7 +3953,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Double:
+						case DiskPrecision.Double:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4002,7 +4027,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4045,8 +4070,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Byte:
-						case TypeCode.SByte:
+						case DiskPrecision.Byte:
+						case DiskPrecision.SByte:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4091,8 +4116,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt16:
-						case TypeCode.Int16:
+						case DiskPrecision.UInt16:
+						case DiskPrecision.Int16:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4141,8 +4166,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt32:
-						case TypeCode.Int32:
+						case DiskPrecision.UInt32:
+						case DiskPrecision.Int32:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4197,8 +4222,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
+						case DiskPrecision.UInt64:
+						case DiskPrecision.Int64:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4265,7 +4290,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Single:
+						case DiskPrecision.Single:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4320,7 +4345,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Double:
+						case DiskPrecision.Double:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4394,7 +4419,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4437,8 +4462,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Byte:
-						case TypeCode.SByte:
+						case DiskPrecision.Byte:
+						case DiskPrecision.SByte:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4483,8 +4508,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt16:
-						case TypeCode.Int16:
+						case DiskPrecision.UInt16:
+						case DiskPrecision.Int16:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4533,8 +4558,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt32:
-						case TypeCode.Int32:
+						case DiskPrecision.UInt32:
+						case DiskPrecision.Int32:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4589,8 +4614,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
+						case DiskPrecision.UInt64:
+						case DiskPrecision.Int64:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4657,7 +4682,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Single:
+						case DiskPrecision.Single:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4712,7 +4737,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Double:
+						case DiskPrecision.Double:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4786,7 +4811,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4829,8 +4854,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Byte:
-						case TypeCode.SByte:
+						case DiskPrecision.Byte:
+						case DiskPrecision.SByte:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4875,8 +4900,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt16:
-						case TypeCode.Int16:
+						case DiskPrecision.UInt16:
+						case DiskPrecision.Int16:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4925,8 +4950,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt32:
-						case TypeCode.Int32:
+						case DiskPrecision.UInt32:
+						case DiskPrecision.Int32:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -4981,8 +5006,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
+						case DiskPrecision.UInt64:
+						case DiskPrecision.Int64:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5049,7 +5074,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Single:
+						case DiskPrecision.Single:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5104,7 +5129,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Double:
+						case DiskPrecision.Double:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5178,7 +5203,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5221,8 +5246,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Byte:
-						case TypeCode.SByte:
+						case DiskPrecision.Byte:
+						case DiskPrecision.SByte:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5267,8 +5292,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt16:
-						case TypeCode.Int16:
+						case DiskPrecision.UInt16:
+						case DiskPrecision.Int16:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5317,8 +5342,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt32:
-						case TypeCode.Int32:
+						case DiskPrecision.UInt32:
+						case DiskPrecision.Int32:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5373,8 +5398,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
+						case DiskPrecision.UInt64:
+						case DiskPrecision.Int64:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5441,7 +5466,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Single:
+						case DiskPrecision.Single:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5496,7 +5521,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Double:
+						case DiskPrecision.Double:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5570,7 +5595,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5613,8 +5638,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Byte:
-						case TypeCode.SByte:
+						case DiskPrecision.Byte:
+						case DiskPrecision.SByte:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5659,8 +5684,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt16:
-						case TypeCode.Int16:
+						case DiskPrecision.UInt16:
+						case DiskPrecision.Int16:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5709,8 +5734,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt32:
-						case TypeCode.Int32:
+						case DiskPrecision.UInt32:
+						case DiskPrecision.Int32:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5765,8 +5790,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
+						case DiskPrecision.UInt64:
+						case DiskPrecision.Int64:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5833,7 +5858,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Single:
+						case DiskPrecision.Single:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5888,7 +5913,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Double:
+						case DiskPrecision.Double:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -5962,7 +5987,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6005,8 +6030,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Byte:
-						case TypeCode.SByte:
+						case DiskPrecision.Byte:
+						case DiskPrecision.SByte:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6051,8 +6076,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt16:
-						case TypeCode.Int16:
+						case DiskPrecision.UInt16:
+						case DiskPrecision.Int16:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6101,8 +6126,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt32:
-						case TypeCode.Int32:
+						case DiskPrecision.UInt32:
+						case DiskPrecision.Int32:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6157,8 +6182,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
+						case DiskPrecision.UInt64:
+						case DiskPrecision.Int64:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6225,7 +6250,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Single:
+						case DiskPrecision.Single:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6280,7 +6305,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Double:
+						case DiskPrecision.Double:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6354,7 +6379,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6397,8 +6422,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Byte:
-						case TypeCode.SByte:
+						case DiskPrecision.Byte:
+						case DiskPrecision.SByte:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6443,8 +6468,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt16:
-						case TypeCode.Int16:
+						case DiskPrecision.UInt16:
+						case DiskPrecision.Int16:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6493,8 +6518,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt32:
-						case TypeCode.Int32:
+						case DiskPrecision.UInt32:
+						case DiskPrecision.Int32:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6549,8 +6574,8 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.UInt64:
-						case TypeCode.Int64:
+						case DiskPrecision.UInt64:
+						case DiskPrecision.Int64:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6617,7 +6642,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Single:
+						case DiskPrecision.Single:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6672,7 +6697,7 @@ namespace JPFITS
 							break;
 						}
 
-						case TypeCode.Double:
+						case DiskPrecision.Double:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6746,7 +6771,7 @@ namespace JPFITS
 				{
 					switch (formatPrecision)
 					{
-						case TypeCode.Boolean:
+						case DiskPrecision.Boolean:
 						{
 							if (dataUnit.Rank == 1)
 							{
@@ -6801,28 +6826,28 @@ namespace JPFITS
 
 		/// <summary>Outputs essential header keywords for a given precision and data unit.</summary>
 		/// <param name="precision">The intended precision of the data unit.</param>
-		/// <param name="doubleDataUnit">The data unit.</param>
+		/// <param name="dataUnit">The data unit.</param>
 		/// <param name="bitpix">BITPIX keyword value.</param>
 		/// <param name="naxisn">The length of this array provides the NAXIS keyword value. The elements of this array provide the NAXISn keyword values.</param>
 		/// <param name="bscale">BSCALE keyword value.</param>
 		/// <param name="bzero">BZERO keyword value.</param>
-		public static void GetBitpixNaxisnBscaleBzero(TypeCode precision, Array? doubleDataUnit, out int bitpix, out int[] naxisn, out double bscale, out double bzero)
+		public static void GetBitpixNaxisnBscaleBzero(DiskPrecision precision, Array? dataUnit, out int bitpix, out int[] naxisn, out double bscale, out double bzero)
 		{
-			if (doubleDataUnit == null || doubleDataUnit.Length == 0)
+			if (dataUnit == null || dataUnit.Length == 0)
 			{
 				bitpix = 8;
 				naxisn = new int[0];
 			}
 			else
 			{
-				naxisn = new int[doubleDataUnit.Rank];
+				naxisn = new int[dataUnit.Rank];
 				for (int i = 0; i < naxisn.Length; i++)
-					naxisn[i] = doubleDataUnit.GetLength(i);
+					naxisn[i] = dataUnit.GetLength(i);
 			}
 
 			switch (precision)
 			{
-				case TypeCode.SByte:
+				case DiskPrecision.SByte:
 				{
 					bitpix = 8;
 					bzero = -128;
@@ -6830,8 +6855,8 @@ namespace JPFITS
 					break;
 				}
 
-				case TypeCode.Boolean:
-				case TypeCode.Byte:
+				case DiskPrecision.Boolean:
+				case DiskPrecision.Byte:
 				{
 					bitpix = 8;
 					bzero = 0;
@@ -6839,7 +6864,7 @@ namespace JPFITS
 					break;
 				}
 
-				case TypeCode.Int16:
+				case DiskPrecision.Int16:
 				{
 					bitpix = 16;
 					bzero = 0;
@@ -6847,7 +6872,7 @@ namespace JPFITS
 					break;
 				}
 
-				case TypeCode.UInt16:
+				case DiskPrecision.UInt16:
 				{
 					bitpix = 16;
 					bzero = 32768;
@@ -6855,7 +6880,7 @@ namespace JPFITS
 					break;
 				}
 
-				case TypeCode.Int32:
+				case DiskPrecision.Int32:
 				{
 					bitpix = 32;
 					bzero = 0;
@@ -6863,7 +6888,7 @@ namespace JPFITS
 					break;
 				}
 
-				case TypeCode.UInt32:
+				case DiskPrecision.UInt32:
 				{
 					bitpix = 32;
 					bzero = 2147483648;
@@ -6871,7 +6896,7 @@ namespace JPFITS
 					break;
 				}
 
-				case TypeCode.Int64:
+				case DiskPrecision.Int64:
 				{
 					bitpix = 64;
 					bzero = 0;
@@ -6879,7 +6904,7 @@ namespace JPFITS
 					break;
 				}
 
-				case TypeCode.UInt64:
+				case DiskPrecision.UInt64:
 				{
 					bitpix = 64;
 					bzero = 9223372036854775808;
@@ -6887,7 +6912,7 @@ namespace JPFITS
 					break;
 				}
 
-				case TypeCode.Single:
+				case DiskPrecision.Single:
 				{
 					bitpix = -32;
 					bzero = 0;
@@ -6895,7 +6920,7 @@ namespace JPFITS
 					break;
 				}
 
-				case TypeCode.Double:
+				case DiskPrecision.Double:
 				{
 					bitpix = -64;
 					bzero = 0;
@@ -6904,9 +6929,7 @@ namespace JPFITS
 				}
 
 				default:
-				{
-					throw new Exception("TypeCode '" + precision.ToString() + "' not recognized at GetBITPIXNAXISnBSCALEBZERO.");
-				}
+					throw new Exception("TypeCode '" + precision.ToString() + "' not recognized at GetBitpixNaxisnBscaleBzero.");
 			}
 		}
 

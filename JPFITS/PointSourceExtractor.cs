@@ -193,7 +193,7 @@ namespace JPFITS
 					file = String.Concat(file.Substring(0, ind), "_", (i + 1).ToString("00000000"), ".fits");
 
 					JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
-					f.WriteImage(TypeCode.Double, false);
+					f.WriteImage(DiskPrecision.Double, false);
 				}
 			}
 
@@ -395,7 +395,7 @@ namespace JPFITS
 					file = String.Concat(file.Substring(0, ind), "_", (i + 1).ToString("00000000"), ".fits");
 
 					JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
-					f.WriteImage(TypeCode.Double, false);
+					f.WriteImage(DiskPrecision.Double, false);
 				}
 			}
 
@@ -1011,14 +1011,14 @@ namespace JPFITS
 			if (this.SearchROI)
 			{
 				FITSImage roifits = new FITSImage(fileName, ROI_REGION, false, false);
-				roifits.WriteImage(fileName, extensionName + "_ROI", true, TypeCode.Boolean, false);
+				roifits.WriteImage(fileName, extensionName + "_ROI", true, DiskPrecision.Boolean, false);
 			}
 
 			FITSImage imapfits = new FITSImage(fileName, SOURCE_INDEX_MAP, false, false);
-			imapfits.WriteImage(fileName, extensionName + "_IMAP", true, TypeCode.Int32, false);
+			imapfits.WriteImage(fileName, extensionName + "_IMAP", true, DiskPrecision.Int32, false);
 
 			FITSImage bmapfits = new FITSImage(fileName, SOURCE_BOOLEAN_MAP, false, false);
-			bmapfits.WriteImage(fileName, extensionName + "_BMAP", true, TypeCode.Boolean, false);
+			bmapfits.WriteImage(fileName, extensionName + "_BMAP", true, DiskPrecision.Boolean, false);
 		}
 
 		/// <summary>The constructor for the class object based on a PointSourceExtractor saved from another session.</summary>
@@ -1046,7 +1046,7 @@ namespace JPFITS
 			FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_IMAP", ref header, out long start, out _, out _, out _, out _);
 			fs.Position = start;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
-			SOURCE_INDEX_MAP = (int[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, FITSFILEOPS.RankFormat.Default, FITSFILEOPS.DataPrecision.Native);
+			SOURCE_INDEX_MAP = (int[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.Default, ReadReturnPrecision.Native);
 			fs.Close();
 
 			fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
@@ -1054,7 +1054,7 @@ namespace JPFITS
 			FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_BMAP", ref header, out start, out _, out _, out _, out _);
 			fs.Position = start;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
-			SOURCE_BOOLEAN_MAP = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, FITSFILEOPS.RankFormat.Default, FITSFILEOPS.DataPrecision.Boolean);
+			SOURCE_BOOLEAN_MAP = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.Default, ReadReturnPrecision.Boolean);
 			fs.Close();
 
 			if (this.SearchROI)
@@ -1064,7 +1064,7 @@ namespace JPFITS
 				FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_ROI", ref header, out start, out _, out _, out _, out _);
 				fs.Position = start;
 				FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
-				ROI_REGION = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, FITSFILEOPS.RankFormat.Default, FITSFILEOPS.DataPrecision.Boolean);
+				ROI_REGION = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.Default, ReadReturnPrecision.Boolean);
 				fs.Close();
 			}
 
@@ -1292,7 +1292,7 @@ namespace JPFITS
 									file = String.Concat(file.Substring(0, ind), "_", Xs.Count.ToString("00000000"), ".fits");
 
 									JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
-									f.WriteImage(TypeCode.Double, false);
+									f.WriteImage(DiskPrecision.Double, false);
 								}
 							}
 						}
@@ -1484,7 +1484,7 @@ namespace JPFITS
 								file = string.Concat(file.Substring(0, ind), "_", Xs.Count.ToString("00000000"), ".fits");
 
 								FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
-								f.WriteImage(TypeCode.Double, false);
+								f.WriteImage(DiskPrecision.Double, false);
 							}
 						}
 					}

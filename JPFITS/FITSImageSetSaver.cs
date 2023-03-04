@@ -214,7 +214,7 @@ namespace JPFITS
 			}
 
 			if (FileExtension.SelectedIndex <= 2)//extension == ".fts" || extension == ".fits" || extension == ".fit")
-				IMAGESET.Write(TypeCode.Double, true, "Saving image set");
+				IMAGESET.Write(DiskPrecision.Double, true, "Saving image set");
 			else if (FileExtension.SelectedIndex == 3 /*(extension == ".jpg"*/)
 			{
 				for (int i = 0; i < IMAGESET.Count; i++)
@@ -229,7 +229,7 @@ namespace JPFITS
 					for (int i = 0; i < IMAGESET.Count; i++)
 					{
 						string name = IMAGESET[i].FullFileName;
-						IMAGESET[i].WriteImage(IMAGESET[i].FullFileName + "tozip.fits", TypeCode.Double, true);
+						IMAGESET[i].WriteImage(IMAGESET[i].FullFileName + "tozip.fits", DiskPrecision.Double, true);
 
 						string ziplist = IMAGESET[i].FilePath + "//tozip.txt";
 						StreamWriter sw = new StreamWriter(ziplist);

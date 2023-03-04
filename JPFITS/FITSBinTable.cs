@@ -4391,7 +4391,7 @@ namespace JPFITS
 			if (!File.Exists(FILENAME))//then write a new file, otherwise check the existing file for existing table, etc.
 			{
 				JPFITS.FITSImage ff = new FITSImage(FILENAME, true);
-				ff.WriteImage(TypeCode.Double, true);
+				ff.WriteImage(DiskPrecision.Double, true);
 			}
 
 			FileStream fs = new FileStream(FILENAME, FileMode.Open);
