@@ -3,11 +3,6 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
 using System.Runtime.CompilerServices;
-using static alglib;
-using System.Data.Linq;
-using System.Windows.Forms;
-
-
 #nullable enable
 
 namespace JPFITS
@@ -93,7 +88,7 @@ namespace JPFITS
 			Double,
 
 			/// <summary>
-			/// Return the array as a Boolean. The on-disk data ones are true, all else are false. The on-disk data must be as unsigned bytes.
+			/// Return the array as a Boolean. The on-disk data 1's are true, all else are false. The on-disk data must be unsigned bytes.
 			/// </summary>
 			Boolean
 		}
@@ -2799,21 +2794,22 @@ namespace JPFITS
 		/// <summary>Returns a data unit as a byte array formatted at a specified precision. Useful for writing.</summary>
 		/// <param name="formatPrecision">The precision at which to format the byte array of the underlying double precision data unit. If double values of the data unit exceed the precision, the values are clipped.</param>
 		/// <param name="doParallel">Populate the byte array with parallelism over the data unit. Can speed things up when the data unit is very large.</param>
-		/// <param name="doubleDataUnit">The data unit of up to rank three (data cube). Higher dimensional data than rank = 3 not supported.</param>
-		public static byte[] GetByteFormattedImageDataUnit(TypeCode formatPrecision, bool doParallel, Array? doubleDataUnit)
+		/// <param name="dataUnit">The data unit of up to rank three (data cube). Higher dimensional data than rank = 3 not supported.</param>
+		public static byte[] GetByteFormattedImageDataUnit(TypeCode formatPrecision, bool doParallel, Array? dataUnit)
 		{
-			if (doubleDataUnit == null)
+			if (dataUnit == null)
 				return new byte[] { };
 
-			if (doubleDataUnit.Rank > 3)
+			if (dataUnit.Rank > 3)
 				throw new Exception("Error: I can only handle up to 3-dimensional data units - SORRY!");
 
-			if (Type.GetTypeCode(doubleDataUnit.GetType().GetElementType()) != TypeCode.Double)
-				throw new Exception("Error: Only double-precision arrays can be passed.");
+			//if (Type.GetTypeCode(dataUnit.GetType().GetElementType()) != TypeCode.Double)
+			//	throw new Exception("Error: Only double-precision arrays can be passed.");
+			TypeCode dataUnitType = Type.GetTypeCode(dataUnit.GetType().GetElementType());
 
-			GetBitpixNaxisnBscaleBzero(formatPrecision, doubleDataUnit, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
+			GetBitpixNaxisnBscaleBzero(formatPrecision, dataUnit, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
 
-			long Ndatabytes = doubleDataUnit.Length * Math.Abs(bitpix) / 8;
+			long Ndatabytes = dataUnit.Length * Math.Abs(bitpix) / 8;
 			int NBlocks = (int)(Math.Ceiling((double)(Ndatabytes) / 2880.0));
 			int NBytesTot = NBlocks * 2880;
 			byte[] bytearray = new byte[NBytesTot];
@@ -2824,255 +2820,216 @@ namespace JPFITS
 			else
 				opts.MaxDegreeOfParallelism = 1;
 
-			switch (formatPrecision)
+			switch (dataUnitType)
 			{
-				case TypeCode.Boolean:
+				case TypeCode.Double:
 				{
-					if (doubleDataUnit.Rank == 1)
+					switch (formatPrecision)
 					{
-						Parallel.For(0, naxisn[0], opts, i =>
+						case TypeCode.Boolean:
 						{
-							if (((double[])doubleDataUnit)[i] == 1)
-								bytearray[i] = 1;
-						});
-					}
-					else if (doubleDataUnit.Rank == 2)
-					{
-						Parallel.For(0, naxisn[1], opts, j =>
-						{
-							int cc = j * naxisn[0];
-							for (int i = 0; i < naxisn[0]; i++)
+							if (dataUnit.Rank == 1)
 							{
-								if (((double[,])doubleDataUnit)[i, j] == 1)
-									bytearray[cc] = 1;
-								cc += 1;
-							}
-						});
-					}
-					else if (doubleDataUnit.Rank == 3)
-					{
-						Parallel.For(0, naxisn[2], opts, k =>
-						{
-							int cc = k * naxisn[0] * naxisn[1];
-							for (int j = 0; j < naxisn[1]; j++)
-							{
-								cc += j * naxisn[0];
-								for (int i = 0; i < naxisn[0]; i++)
+								Parallel.For(0, naxisn[0], opts, i =>
 								{
-									if (((double[,,])doubleDataUnit)[i, j, k] == 1);
-										bytearray[cc] = 1;
-									cc += 1;
-								}
+									if (((double[])dataUnit)[i] == 1)
+										bytearray[i] = 1;
+								});
 							}
-						});
-					}
-					break;
-				}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((double[,])dataUnit)[i, j] == 1)
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((double[,,])dataUnit)[i, j, k] == 1) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
 
-				case TypeCode.Byte:
-				case TypeCode.SByte:
-				{
-					if (doubleDataUnit.Rank == 1)
-					{
-						Parallel.For(0, naxisn[0], opts, i =>
+						case TypeCode.Byte:
+						case TypeCode.SByte:
 						{
-							byte val = (byte)((((double[])doubleDataUnit)[i] - bzero) / bscale);
-							bytearray[i] = val;
-						});
-					}
-					else if (doubleDataUnit.Rank == 2)
-					{
-						Parallel.For(0, naxisn[1], opts, j =>
-						{
-							int cc = j * naxisn[0];
-							byte val;
-							for (int i = 0; i < naxisn[0]; i++)
+							if (dataUnit.Rank == 1)
 							{
-								val = (byte)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-								bytearray[cc] = val;
-								cc += 1;
-							}
-						});
-					}
-					else if (doubleDataUnit.Rank == 3)
-					{
-						Parallel.For(0, naxisn[2], opts, k =>
-						{
-							int cc = k * naxisn[0] * naxisn[1];
-							byte val;
-							for (int j = 0; j < naxisn[1]; j++)
-							{
-								cc += j * naxisn[0];
-								for (int i = 0; i < naxisn[0]; i++)
+								Parallel.For(0, naxisn[0], opts, i =>
 								{
-									val = (byte)((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale);
-									bytearray[cc] = val;
-									cc += 1;
-								}
+									byte val = (byte)((((double[])dataUnit)[i] - bzero) / bscale);
+									bytearray[i] = val;
+								});
 							}
-						});
-					}
-					break;
-				}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									byte val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (byte)((((double[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = val;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									byte val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (byte)((((double[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = val;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
 
-				case TypeCode.UInt16:
-				case TypeCode.Int16:
-				{
-					if (doubleDataUnit.Rank == 1)
-					{
-						Parallel.For(0, naxisn[0], opts, i =>
+						case TypeCode.UInt16:
+						case TypeCode.Int16:
 						{
-							int cc = i * 2;
-							short val = (short)((((double[])doubleDataUnit)[i] - bzero) / bscale);
-							bytearray[cc] = (byte)((val >> 8) & 0xff);
-							bytearray[cc + 1] = (byte)(val & 0xff);
-						});
-					}
-					else if (doubleDataUnit.Rank == 2)
-					{
-						Parallel.For(0, naxisn[1], opts, j =>
-						{
-							int cc = j * naxisn[0] * 2;
-							short val;
-							for (int i = 0; i < naxisn[0]; i++)
+							if (dataUnit.Rank == 1)
 							{
-								val = (short)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-								bytearray[cc] = (byte)((val >> 8) & 0xff);
-								bytearray[cc + 1] = (byte)(val & 0xff);
-								cc += 2;
-							}
-						});
-					}
-					else if (doubleDataUnit.Rank == 3)
-					{
-						Parallel.For(0, naxisn[2], opts, k =>
-						{
-							int cc = (k * naxisn[0] * naxisn[1]) * 2;
-							short val;
-							for (int j = 0; j < naxisn[1]; j++)
-							{
-								cc += (j * naxisn[0]) * 2;
-								for (int i = 0; i < naxisn[0]; i++)
+								Parallel.For(0, naxisn[0], opts, i =>
 								{
-									val = (short)((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale);
+									int cc = i * 2;
+									short val = (short)((((double[])dataUnit)[i] - bzero) / bscale);
 									bytearray[cc] = (byte)((val >> 8) & 0xff);
 									bytearray[cc + 1] = (byte)(val & 0xff);
-									cc += 2;
-								}
+								});
 							}
-						});
-					}
-					break;
-				}
-
-				case TypeCode.UInt32:
-				case TypeCode.Int32:
-				{
-					if (doubleDataUnit.Rank == 1)
-					{
-						Parallel.For(0, naxisn[0], opts, i =>
-						{
-							int cc = i * 4;
-							int val = (int)((((double[])doubleDataUnit)[i] - bzero) / bscale);
-							bytearray[cc] = (byte)((val >> 24) & 0xff);
-							bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
-							bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
-							bytearray[cc + 3] = (byte)(val & 0xff);
-						});
-					}
-					else if (doubleDataUnit.Rank == 2)
-					{
-						Parallel.For(0, naxisn[1], opts, j =>
-						{
-							int cc = j * naxisn[0] * 4;
-							int val;
-							for (int i = 0; i < naxisn[0]; i++)
+							else if (dataUnit.Rank == 2)
 							{
-								val = (int)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-								bytearray[cc] = (byte)((val >> 24) & 0xff);
-								bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
-								bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
-								bytearray[cc + 3] = (byte)(val & 0xff);
-								cc += 4;
-							}
-						});
-					}
-					else if (doubleDataUnit.Rank == 3)
-					{
-						Parallel.For(0, naxisn[2], opts, k =>
-						{
-							int cc = (k * naxisn[0] * naxisn[1]) * 4;
-							int val;
-							for (int j = 0; j < naxisn[1]; j++)
-							{
-								cc += (j * naxisn[0]) * 4;
-								for (int i = 0; i < naxisn[0]; i++)
+								Parallel.For(0, naxisn[1], opts, j =>
 								{
-									val = (int)((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale);
+									int cc = j * naxisn[0] * 2;
+									short val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (short)((((double[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 1] = (byte)(val & 0xff);
+										cc += 2;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 2;
+									short val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 2;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (short)((((double[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 1] = (byte)(val & 0xff);
+											cc += 2;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt32:
+						case TypeCode.Int32:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									int val = (int)((((double[])dataUnit)[i] - bzero) / bscale);
 									bytearray[cc] = (byte)((val >> 24) & 0xff);
 									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
 									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
 									bytearray[cc + 3] = (byte)(val & 0xff);
-									cc += 4;
-								}
+								});
 							}
-						});
-					}
-					break;
-				}
-
-				case TypeCode.UInt64:
-				case TypeCode.Int64:
-				{
-					if (doubleDataUnit.Rank == 1)
-					{
-						Parallel.For(0, naxisn[0], opts, i =>
-						{
-								int cc = i * 8;
-								long val = (long)((((double[])doubleDataUnit)[i] - bzero) / bscale);
-								bytearray[cc] = (byte)((val >> 56) & 0xff);
-								bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
-								bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
-								bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
-								bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
-								bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
-								bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
-								bytearray[cc + 7] = (byte)(val & 0xff);
-						});
-					}
-					else if (doubleDataUnit.Rank == 2)
-					{
-						Parallel.For(0, naxisn[1], opts, j =>
-						{
-							int cc = j * naxisn[0] * 8;
-							long val;
-							for (int i = 0; i < naxisn[0]; i++)
+							else if (dataUnit.Rank == 2)
 							{
-								val = (long)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-								bytearray[cc] = (byte)((val >> 56) & 0xff);
-								bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
-								bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
-								bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
-								bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
-								bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
-								bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
-								bytearray[cc + 7] = (byte)(val & 0xff);
-								cc += 8;
-							}
-						});
-					}
-					else if (doubleDataUnit.Rank == 3)
-					{
-						Parallel.For(0, naxisn[2], opts, k =>
-						{
-							int cc = (k * naxisn[0] * naxisn[1]) * 8;
-							long val;
-							for (int j = 0; j < naxisn[1]; j++)
-							{
-								cc += (j * naxisn[0]) * 8;
-								for (int i = 0; i < naxisn[0]; i++)
+								Parallel.For(0, naxisn[1], opts, j =>
 								{
-									val = (long)((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale);
+									int cc = j * naxisn[0] * 4;
+									int val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (int)((((double[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 3] = (byte)(val & 0xff);
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									int val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (int)((((double[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 3] = (byte)(val & 0xff);
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt64:
+						case TypeCode.Int64:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									long val = (long)((((double[])dataUnit)[i] - bzero) / bscale);
 									bytearray[cc] = (byte)((val >> 56) & 0xff);
 									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
 									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
@@ -3081,120 +3038,120 @@ namespace JPFITS
 									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
 									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
 									bytearray[cc + 7] = (byte)(val & 0xff);
-									cc += 8;
-								}
+								});
 							}
-						});
-					}
-					break;
-				}
-
-				case TypeCode.Single:
-				{
-					if (doubleDataUnit.Rank == 1)
-					{
-						Parallel.For(0, naxisn[0], opts, i =>
-						{
-							int cc = i * 4;
-							byte[] sng = BitConverter.GetBytes((float)((((double[])doubleDataUnit)[i] - bzero) / bscale));
-							bytearray[cc] = sng[3];
-							bytearray[cc + 1] = sng[2];
-							bytearray[cc + 2] = sng[1];
-							bytearray[cc + 3] = sng[0];
-						});
-					}
-					else if (doubleDataUnit.Rank == 2)
-					{
-						Parallel.For(0, naxisn[1], opts, j =>
-						{
-							int cc = j * naxisn[0] * 4;
-							byte[] sng = new byte[4];
-							for (int i = 0; i < naxisn[0]; i++)
+							else if (dataUnit.Rank == 2)
 							{
-								sng = BitConverter.GetBytes((float)((((double[,])doubleDataUnit)[i, j] - bzero) / bscale));
-								bytearray[cc] = sng[3];
-								bytearray[cc + 1] = sng[2];
-								bytearray[cc + 2] = sng[1];
-								bytearray[cc + 3] = sng[0];
-								cc += 4;
-							}
-						});
-					}
-					else if (doubleDataUnit.Rank == 3)
-					{
-						Parallel.For(0, naxisn[2], opts, k =>
-						{
-							int cc = (k * naxisn[0] * naxisn[1]) * 4;
-							byte[] sng = new byte[4];
-							for (int j = 0; j < naxisn[1]; j++)
-							{
-								cc += (j * naxisn[0]) * 4;
-								for (int i = 0; i < naxisn[0]; i++)
+								Parallel.For(0, naxisn[1], opts, j =>
 								{
-									sng = BitConverter.GetBytes((float)((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale));
+									int cc = j * naxisn[0] * 8;
+									long val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (long)((((double[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 56) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+										bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+										bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 7] = (byte)(val & 0xff);
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									long val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (long)((((double[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 56) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+											bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+											bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 7] = (byte)(val & 0xff);
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Single:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									byte[] sng = BitConverter.GetBytes((float)((((double[])dataUnit)[i] - bzero) / bscale));
 									bytearray[cc] = sng[3];
 									bytearray[cc + 1] = sng[2];
 									bytearray[cc + 2] = sng[1];
 									bytearray[cc + 3] = sng[0];
-									cc += 4;
-								}
+								});
 							}
-						});
-					}
-					break;
-				}
-
-				case TypeCode.Double:
-				{
-					if (doubleDataUnit.Rank == 1)
-					{
-						Parallel.For(0, naxisn[0], opts, i =>
-						{
-							int cc = i * 8;
-							byte[] dbl = BitConverter.GetBytes((((double[])doubleDataUnit)[i] - bzero) / bscale);
-							bytearray[cc] = dbl[7];
-							bytearray[cc + 1] = dbl[6];
-							bytearray[cc + 2] = dbl[5];
-							bytearray[cc + 3] = dbl[4];
-							bytearray[cc + 4] = dbl[3];
-							bytearray[cc + 5] = dbl[2];
-							bytearray[cc + 6] = dbl[1];
-							bytearray[cc + 7] = dbl[0];
-						});
-					}
-					else if (doubleDataUnit.Rank == 2)
-					{
-						Parallel.For(0, naxisn[1], opts, j =>
-						{
-							int cc = j * naxisn[0] * 8;
-							byte[] dbl = new byte[8];
-							for (int i = 0; i < naxisn[0]; i++)
+							else if (dataUnit.Rank == 2)
 							{
-								dbl = BitConverter.GetBytes((((double[,])doubleDataUnit)[i, j] - bzero) / bscale);
-								bytearray[cc] = dbl[7];
-								bytearray[cc + 1] = dbl[6];
-								bytearray[cc + 2] = dbl[5];
-								bytearray[cc + 3] = dbl[4];
-								bytearray[cc + 4] = dbl[3];
-								bytearray[cc + 5] = dbl[2];
-								bytearray[cc + 6] = dbl[1];
-								bytearray[cc + 7] = dbl[0];
-								cc += 8;
-							}
-						});
-					}
-					else if (doubleDataUnit.Rank == 3)
-					{
-						Parallel.For(0, naxisn[2], opts, k =>
-						{
-							int cc = (k * naxisn[0] * naxisn[1]) * 8;
-							byte[] dbl = new byte[8];
-							for (int j = 0; j < naxisn[1]; j++)
-							{
-								cc += (j * naxisn[0]) * 8;
-								for (int i = 0; i < naxisn[0]; i++)
+								Parallel.For(0, naxisn[1], opts, j =>
 								{
-									dbl = BitConverter.GetBytes((((double[,,])doubleDataUnit)[i, j, k] - bzero) / bscale);
+									int cc = j * naxisn[0] * 4;
+									byte[] sng = new byte[4];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										sng = BitConverter.GetBytes((float)((((double[,])dataUnit)[i, j] - bzero) / bscale));
+										bytearray[cc] = sng[3];
+										bytearray[cc + 1] = sng[2];
+										bytearray[cc + 2] = sng[1];
+										bytearray[cc + 3] = sng[0];
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									byte[] sng = new byte[4];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											sng = BitConverter.GetBytes((float)((((double[,,])dataUnit)[i, j, k] - bzero) / bscale));
+											bytearray[cc] = sng[3];
+											bytearray[cc + 1] = sng[2];
+											bytearray[cc + 2] = sng[1];
+											bytearray[cc + 3] = sng[0];
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Double:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = BitConverter.GetBytes((((double[])dataUnit)[i] - bzero) / bscale);
 									bytearray[cc] = dbl[7];
 									bytearray[cc + 1] = dbl[6];
 									bytearray[cc + 2] = dbl[5];
@@ -3203,17 +3160,3641 @@ namespace JPFITS
 									bytearray[cc + 5] = dbl[2];
 									bytearray[cc + 6] = dbl[1];
 									bytearray[cc + 7] = dbl[0];
-									cc += 8;
-								}
+								});
 							}
-						});
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									byte[] dbl = new byte[8];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										dbl = BitConverter.GetBytes((((double[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = dbl[7];
+										bytearray[cc + 1] = dbl[6];
+										bytearray[cc + 2] = dbl[5];
+										bytearray[cc + 3] = dbl[4];
+										bytearray[cc + 4] = dbl[3];
+										bytearray[cc + 5] = dbl[2];
+										bytearray[cc + 6] = dbl[1];
+										bytearray[cc + 7] = dbl[0];
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									byte[] dbl = new byte[8];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											dbl = BitConverter.GetBytes((((double[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = dbl[7];
+											bytearray[cc + 1] = dbl[6];
+											bytearray[cc + 2] = dbl[5];
+											bytearray[cc + 3] = dbl[4];
+											bytearray[cc + 4] = dbl[3];
+											bytearray[cc + 5] = dbl[2];
+											bytearray[cc + 6] = dbl[1];
+											bytearray[cc + 7] = dbl[0];
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+					}
+					break;
+				}
+
+				case TypeCode.Single:
+				{
+					switch (formatPrecision)
+					{
+						case TypeCode.Boolean:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									if (((float[])dataUnit)[i] == 1)
+										bytearray[i] = 1;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((float[,])dataUnit)[i, j] == 1)
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((float[,,])dataUnit)[i, j, k] == 1) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Byte:
+						case TypeCode.SByte:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									byte val = (byte)((((float[])dataUnit)[i] - bzero) / bscale);
+									bytearray[i] = val;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									byte val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (byte)((((float[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = val;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									byte val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (byte)((((float[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = val;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt16:
+						case TypeCode.Int16:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((((float[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 1] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 2;
+									short val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (short)((((float[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 1] = (byte)(val & 0xff);
+										cc += 2;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 2;
+									short val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 2;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (short)((((float[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 1] = (byte)(val & 0xff);
+											cc += 2;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt32:
+						case TypeCode.Int32:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									int val = (int)((((float[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 3] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									int val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (int)((((float[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 3] = (byte)(val & 0xff);
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									int val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (int)((((float[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 3] = (byte)(val & 0xff);
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt64:
+						case TypeCode.Int64:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									long val = (long)((((float[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 56) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+									bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+									bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 7] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									long val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (long)((((float[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 56) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+										bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+										bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 7] = (byte)(val & 0xff);
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									long val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (long)((((float[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 56) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+											bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+											bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 7] = (byte)(val & 0xff);
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Single:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									byte[] sng = BitConverter.GetBytes((float)((((float[])dataUnit)[i] - bzero) / bscale));
+									bytearray[cc] = sng[3];
+									bytearray[cc + 1] = sng[2];
+									bytearray[cc + 2] = sng[1];
+									bytearray[cc + 3] = sng[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									byte[] sng = new byte[4];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										sng = BitConverter.GetBytes((float)((((float[,])dataUnit)[i, j] - bzero) / bscale));
+										bytearray[cc] = sng[3];
+										bytearray[cc + 1] = sng[2];
+										bytearray[cc + 2] = sng[1];
+										bytearray[cc + 3] = sng[0];
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									byte[] sng = new byte[4];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											sng = BitConverter.GetBytes((float)((((float[,,])dataUnit)[i, j, k] - bzero) / bscale));
+											bytearray[cc] = sng[3];
+											bytearray[cc + 1] = sng[2];
+											bytearray[cc + 2] = sng[1];
+											bytearray[cc + 3] = sng[0];
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Double:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = BitConverter.GetBytes((((float[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = dbl[7];
+									bytearray[cc + 1] = dbl[6];
+									bytearray[cc + 2] = dbl[5];
+									bytearray[cc + 3] = dbl[4];
+									bytearray[cc + 4] = dbl[3];
+									bytearray[cc + 5] = dbl[2];
+									bytearray[cc + 6] = dbl[1];
+									bytearray[cc + 7] = dbl[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									byte[] dbl = new byte[8];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										dbl = BitConverter.GetBytes((((float[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = dbl[7];
+										bytearray[cc + 1] = dbl[6];
+										bytearray[cc + 2] = dbl[5];
+										bytearray[cc + 3] = dbl[4];
+										bytearray[cc + 4] = dbl[3];
+										bytearray[cc + 5] = dbl[2];
+										bytearray[cc + 6] = dbl[1];
+										bytearray[cc + 7] = dbl[0];
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									byte[] dbl = new byte[8];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											dbl = BitConverter.GetBytes((((float[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = dbl[7];
+											bytearray[cc + 1] = dbl[6];
+											bytearray[cc + 2] = dbl[5];
+											bytearray[cc + 3] = dbl[4];
+											bytearray[cc + 4] = dbl[3];
+											bytearray[cc + 5] = dbl[2];
+											bytearray[cc + 6] = dbl[1];
+											bytearray[cc + 7] = dbl[0];
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+					}
+					break;
+				}
+
+				case TypeCode.UInt64:
+				{
+					switch (formatPrecision)
+					{
+						case TypeCode.Boolean:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									if (((ulong[])dataUnit)[i] == 1)
+										bytearray[i] = 1;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((ulong[,])dataUnit)[i, j] == 1)
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((ulong[,,])dataUnit)[i, j, k] == 1) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Byte:
+						case TypeCode.SByte:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									byte val = (byte)((((ulong[])dataUnit)[i] - bzero) / bscale);
+									bytearray[i] = val;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									byte val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (byte)((((ulong[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = val;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									byte val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (byte)((((ulong[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = val;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt16:
+						case TypeCode.Int16:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((((ulong[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 1] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 2;
+									short val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (short)((((ulong[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 1] = (byte)(val & 0xff);
+										cc += 2;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 2;
+									short val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 2;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (short)((((ulong[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 1] = (byte)(val & 0xff);
+											cc += 2;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt32:
+						case TypeCode.Int32:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									int val = (int)((((ulong[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 3] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									int val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (int)((((ulong[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 3] = (byte)(val & 0xff);
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									int val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (int)((((ulong[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 3] = (byte)(val & 0xff);
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt64:
+						case TypeCode.Int64:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									long val = (long)((((ulong[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 56) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+									bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+									bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 7] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									long val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (long)((((ulong[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 56) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+										bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+										bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 7] = (byte)(val & 0xff);
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									long val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (long)((((ulong[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 56) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+											bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+											bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 7] = (byte)(val & 0xff);
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Single:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									byte[] sng = BitConverter.GetBytes((float)((((ulong[])dataUnit)[i] - bzero) / bscale));
+									bytearray[cc] = sng[3];
+									bytearray[cc + 1] = sng[2];
+									bytearray[cc + 2] = sng[1];
+									bytearray[cc + 3] = sng[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									byte[] sng = new byte[4];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										sng = BitConverter.GetBytes((float)((((ulong[,])dataUnit)[i, j] - bzero) / bscale));
+										bytearray[cc] = sng[3];
+										bytearray[cc + 1] = sng[2];
+										bytearray[cc + 2] = sng[1];
+										bytearray[cc + 3] = sng[0];
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									byte[] sng = new byte[4];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											sng = BitConverter.GetBytes((float)((((ulong[,,])dataUnit)[i, j, k] - bzero) / bscale));
+											bytearray[cc] = sng[3];
+											bytearray[cc + 1] = sng[2];
+											bytearray[cc + 2] = sng[1];
+											bytearray[cc + 3] = sng[0];
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Double:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = BitConverter.GetBytes((((ulong[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = dbl[7];
+									bytearray[cc + 1] = dbl[6];
+									bytearray[cc + 2] = dbl[5];
+									bytearray[cc + 3] = dbl[4];
+									bytearray[cc + 4] = dbl[3];
+									bytearray[cc + 5] = dbl[2];
+									bytearray[cc + 6] = dbl[1];
+									bytearray[cc + 7] = dbl[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									byte[] dbl = new byte[8];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										dbl = BitConverter.GetBytes((((ulong[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = dbl[7];
+										bytearray[cc + 1] = dbl[6];
+										bytearray[cc + 2] = dbl[5];
+										bytearray[cc + 3] = dbl[4];
+										bytearray[cc + 4] = dbl[3];
+										bytearray[cc + 5] = dbl[2];
+										bytearray[cc + 6] = dbl[1];
+										bytearray[cc + 7] = dbl[0];
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									byte[] dbl = new byte[8];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											dbl = BitConverter.GetBytes((((ulong[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = dbl[7];
+											bytearray[cc + 1] = dbl[6];
+											bytearray[cc + 2] = dbl[5];
+											bytearray[cc + 3] = dbl[4];
+											bytearray[cc + 4] = dbl[3];
+											bytearray[cc + 5] = dbl[2];
+											bytearray[cc + 6] = dbl[1];
+											bytearray[cc + 7] = dbl[0];
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+					}
+					break;
+				}
+
+				case TypeCode.Int64:
+				{
+					switch (formatPrecision)
+					{
+						case TypeCode.Boolean:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									if (((long[])dataUnit)[i] == 1)
+										bytearray[i] = 1;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((long[,])dataUnit)[i, j] == 1)
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((long[,,])dataUnit)[i, j, k] == 1) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Byte:
+						case TypeCode.SByte:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									byte val = (byte)((((long[])dataUnit)[i] - bzero) / bscale);
+									bytearray[i] = val;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									byte val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (byte)((((long[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = val;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									byte val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (byte)((((long[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = val;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt16:
+						case TypeCode.Int16:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((((long[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 1] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 2;
+									short val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (short)((((long[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 1] = (byte)(val & 0xff);
+										cc += 2;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 2;
+									short val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 2;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (short)((((long[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 1] = (byte)(val & 0xff);
+											cc += 2;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt32:
+						case TypeCode.Int32:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									int val = (int)((((long[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 3] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									int val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (int)((((long[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 3] = (byte)(val & 0xff);
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									int val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (int)((((long[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 3] = (byte)(val & 0xff);
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt64:
+						case TypeCode.Int64:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									long val = (long)((((long[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 56) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+									bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+									bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 7] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									long val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (long)((((long[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 56) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+										bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+										bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 7] = (byte)(val & 0xff);
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									long val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (long)((((long[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 56) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+											bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+											bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 7] = (byte)(val & 0xff);
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Single:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									byte[] sng = BitConverter.GetBytes((float)((((long[])dataUnit)[i] - bzero) / bscale));
+									bytearray[cc] = sng[3];
+									bytearray[cc + 1] = sng[2];
+									bytearray[cc + 2] = sng[1];
+									bytearray[cc + 3] = sng[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									byte[] sng = new byte[4];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										sng = BitConverter.GetBytes((float)((((long[,])dataUnit)[i, j] - bzero) / bscale));
+										bytearray[cc] = sng[3];
+										bytearray[cc + 1] = sng[2];
+										bytearray[cc + 2] = sng[1];
+										bytearray[cc + 3] = sng[0];
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									byte[] sng = new byte[4];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											sng = BitConverter.GetBytes((float)((((long[,,])dataUnit)[i, j, k] - bzero) / bscale));
+											bytearray[cc] = sng[3];
+											bytearray[cc + 1] = sng[2];
+											bytearray[cc + 2] = sng[1];
+											bytearray[cc + 3] = sng[0];
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Double:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = BitConverter.GetBytes((((long[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = dbl[7];
+									bytearray[cc + 1] = dbl[6];
+									bytearray[cc + 2] = dbl[5];
+									bytearray[cc + 3] = dbl[4];
+									bytearray[cc + 4] = dbl[3];
+									bytearray[cc + 5] = dbl[2];
+									bytearray[cc + 6] = dbl[1];
+									bytearray[cc + 7] = dbl[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									byte[] dbl = new byte[8];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										dbl = BitConverter.GetBytes((((long[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = dbl[7];
+										bytearray[cc + 1] = dbl[6];
+										bytearray[cc + 2] = dbl[5];
+										bytearray[cc + 3] = dbl[4];
+										bytearray[cc + 4] = dbl[3];
+										bytearray[cc + 5] = dbl[2];
+										bytearray[cc + 6] = dbl[1];
+										bytearray[cc + 7] = dbl[0];
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									byte[] dbl = new byte[8];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											dbl = BitConverter.GetBytes((((long[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = dbl[7];
+											bytearray[cc + 1] = dbl[6];
+											bytearray[cc + 2] = dbl[5];
+											bytearray[cc + 3] = dbl[4];
+											bytearray[cc + 4] = dbl[3];
+											bytearray[cc + 5] = dbl[2];
+											bytearray[cc + 6] = dbl[1];
+											bytearray[cc + 7] = dbl[0];
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+					}
+					break;
+				}
+
+				case TypeCode.UInt32:
+				{
+					switch (formatPrecision)
+					{
+						case TypeCode.Boolean:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									if (((uint[])dataUnit)[i] == 1)
+										bytearray[i] = 1;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((uint[,])dataUnit)[i, j] == 1)
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((uint[,,])dataUnit)[i, j, k] == 1) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Byte:
+						case TypeCode.SByte:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									byte val = (byte)((((uint[])dataUnit)[i] - bzero) / bscale);
+									bytearray[i] = val;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									byte val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (byte)((((uint[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = val;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									byte val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (byte)((((uint[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = val;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt16:
+						case TypeCode.Int16:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((((uint[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 1] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 2;
+									short val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (short)((((uint[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 1] = (byte)(val & 0xff);
+										cc += 2;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 2;
+									short val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 2;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (short)((((uint[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 1] = (byte)(val & 0xff);
+											cc += 2;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt32:
+						case TypeCode.Int32:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									int val = (int)((((uint[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 3] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									int val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (int)((((uint[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 3] = (byte)(val & 0xff);
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									int val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (int)((((uint[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 3] = (byte)(val & 0xff);
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt64:
+						case TypeCode.Int64:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									long val = (long)((((uint[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 56) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+									bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+									bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 7] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									long val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (long)((((uint[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 56) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+										bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+										bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 7] = (byte)(val & 0xff);
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									long val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (long)((((uint[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 56) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+											bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+											bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 7] = (byte)(val & 0xff);
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Single:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									byte[] sng = BitConverter.GetBytes((float)((((uint[])dataUnit)[i] - bzero) / bscale));
+									bytearray[cc] = sng[3];
+									bytearray[cc + 1] = sng[2];
+									bytearray[cc + 2] = sng[1];
+									bytearray[cc + 3] = sng[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									byte[] sng = new byte[4];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										sng = BitConverter.GetBytes((float)((((uint[,])dataUnit)[i, j] - bzero) / bscale));
+										bytearray[cc] = sng[3];
+										bytearray[cc + 1] = sng[2];
+										bytearray[cc + 2] = sng[1];
+										bytearray[cc + 3] = sng[0];
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									byte[] sng = new byte[4];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											sng = BitConverter.GetBytes((float)((((uint[,,])dataUnit)[i, j, k] - bzero) / bscale));
+											bytearray[cc] = sng[3];
+											bytearray[cc + 1] = sng[2];
+											bytearray[cc + 2] = sng[1];
+											bytearray[cc + 3] = sng[0];
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Double:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = BitConverter.GetBytes((((uint[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = dbl[7];
+									bytearray[cc + 1] = dbl[6];
+									bytearray[cc + 2] = dbl[5];
+									bytearray[cc + 3] = dbl[4];
+									bytearray[cc + 4] = dbl[3];
+									bytearray[cc + 5] = dbl[2];
+									bytearray[cc + 6] = dbl[1];
+									bytearray[cc + 7] = dbl[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									byte[] dbl = new byte[8];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										dbl = BitConverter.GetBytes((((uint[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = dbl[7];
+										bytearray[cc + 1] = dbl[6];
+										bytearray[cc + 2] = dbl[5];
+										bytearray[cc + 3] = dbl[4];
+										bytearray[cc + 4] = dbl[3];
+										bytearray[cc + 5] = dbl[2];
+										bytearray[cc + 6] = dbl[1];
+										bytearray[cc + 7] = dbl[0];
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									byte[] dbl = new byte[8];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											dbl = BitConverter.GetBytes((((uint[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = dbl[7];
+											bytearray[cc + 1] = dbl[6];
+											bytearray[cc + 2] = dbl[5];
+											bytearray[cc + 3] = dbl[4];
+											bytearray[cc + 4] = dbl[3];
+											bytearray[cc + 5] = dbl[2];
+											bytearray[cc + 6] = dbl[1];
+											bytearray[cc + 7] = dbl[0];
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+					}
+					break;
+				}
+
+				case TypeCode.Int32:
+				{
+					switch (formatPrecision)
+					{
+						case TypeCode.Boolean:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									if (((int[])dataUnit)[i] == 1)
+										bytearray[i] = 1;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((int[,])dataUnit)[i, j] == 1)
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((int[,,])dataUnit)[i, j, k] == 1) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Byte:
+						case TypeCode.SByte:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									byte val = (byte)((((int[])dataUnit)[i] - bzero) / bscale);
+									bytearray[i] = val;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									byte val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (byte)((((int[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = val;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									byte val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (byte)((((int[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = val;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt16:
+						case TypeCode.Int16:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((((int[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 1] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 2;
+									short val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (short)((((int[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 1] = (byte)(val & 0xff);
+										cc += 2;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 2;
+									short val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 2;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (short)((((int[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 1] = (byte)(val & 0xff);
+											cc += 2;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt32:
+						case TypeCode.Int32:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									int val = (int)((((int[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 3] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									int val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (int)((((int[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 3] = (byte)(val & 0xff);
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									int val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (int)((((int[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 3] = (byte)(val & 0xff);
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt64:
+						case TypeCode.Int64:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									long val = (long)((((int[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 56) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+									bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+									bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 7] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									long val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (long)((((int[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 56) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+										bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+										bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 7] = (byte)(val & 0xff);
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									long val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (long)((((int[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 56) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+											bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+											bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 7] = (byte)(val & 0xff);
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Single:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									byte[] sng = BitConverter.GetBytes((float)((((int[])dataUnit)[i] - bzero) / bscale));
+									bytearray[cc] = sng[3];
+									bytearray[cc + 1] = sng[2];
+									bytearray[cc + 2] = sng[1];
+									bytearray[cc + 3] = sng[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									byte[] sng = new byte[4];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										sng = BitConverter.GetBytes((float)((((int[,])dataUnit)[i, j] - bzero) / bscale));
+										bytearray[cc] = sng[3];
+										bytearray[cc + 1] = sng[2];
+										bytearray[cc + 2] = sng[1];
+										bytearray[cc + 3] = sng[0];
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									byte[] sng = new byte[4];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											sng = BitConverter.GetBytes((float)((((int[,,])dataUnit)[i, j, k] - bzero) / bscale));
+											bytearray[cc] = sng[3];
+											bytearray[cc + 1] = sng[2];
+											bytearray[cc + 2] = sng[1];
+											bytearray[cc + 3] = sng[0];
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Double:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = BitConverter.GetBytes((((int[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = dbl[7];
+									bytearray[cc + 1] = dbl[6];
+									bytearray[cc + 2] = dbl[5];
+									bytearray[cc + 3] = dbl[4];
+									bytearray[cc + 4] = dbl[3];
+									bytearray[cc + 5] = dbl[2];
+									bytearray[cc + 6] = dbl[1];
+									bytearray[cc + 7] = dbl[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									byte[] dbl = new byte[8];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										dbl = BitConverter.GetBytes((((int[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = dbl[7];
+										bytearray[cc + 1] = dbl[6];
+										bytearray[cc + 2] = dbl[5];
+										bytearray[cc + 3] = dbl[4];
+										bytearray[cc + 4] = dbl[3];
+										bytearray[cc + 5] = dbl[2];
+										bytearray[cc + 6] = dbl[1];
+										bytearray[cc + 7] = dbl[0];
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									byte[] dbl = new byte[8];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											dbl = BitConverter.GetBytes((((int[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = dbl[7];
+											bytearray[cc + 1] = dbl[6];
+											bytearray[cc + 2] = dbl[5];
+											bytearray[cc + 3] = dbl[4];
+											bytearray[cc + 4] = dbl[3];
+											bytearray[cc + 5] = dbl[2];
+											bytearray[cc + 6] = dbl[1];
+											bytearray[cc + 7] = dbl[0];
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+					}
+					break;
+				}
+
+				case TypeCode.UInt16:
+				{
+					switch (formatPrecision)
+					{
+						case TypeCode.Boolean:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									if (((ushort[])dataUnit)[i] == 1)
+										bytearray[i] = 1;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((ushort[,])dataUnit)[i, j] == 1)
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((ushort[,,])dataUnit)[i, j, k] == 1) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Byte:
+						case TypeCode.SByte:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									byte val = (byte)((((ushort[])dataUnit)[i] - bzero) / bscale);
+									bytearray[i] = val;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									byte val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (byte)((((ushort[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = val;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									byte val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (byte)((((ushort[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = val;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt16:
+						case TypeCode.Int16:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((((ushort[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 1] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 2;
+									short val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (short)((((ushort[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 1] = (byte)(val & 0xff);
+										cc += 2;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 2;
+									short val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 2;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (short)((((ushort[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 1] = (byte)(val & 0xff);
+											cc += 2;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt32:
+						case TypeCode.Int32:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									int val = (int)((((ushort[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 3] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									int val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (int)((((ushort[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 3] = (byte)(val & 0xff);
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									int val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (int)((((ushort[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 3] = (byte)(val & 0xff);
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt64:
+						case TypeCode.Int64:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									long val = (long)((((ushort[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 56) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+									bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+									bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 7] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									long val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (long)((((ushort[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 56) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+										bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+										bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 7] = (byte)(val & 0xff);
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									long val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (long)((((ushort[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 56) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+											bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+											bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 7] = (byte)(val & 0xff);
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Single:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									byte[] sng = BitConverter.GetBytes((float)((((ushort[])dataUnit)[i] - bzero) / bscale));
+									bytearray[cc] = sng[3];
+									bytearray[cc + 1] = sng[2];
+									bytearray[cc + 2] = sng[1];
+									bytearray[cc + 3] = sng[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									byte[] sng = new byte[4];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										sng = BitConverter.GetBytes((float)((((ushort[,])dataUnit)[i, j] - bzero) / bscale));
+										bytearray[cc] = sng[3];
+										bytearray[cc + 1] = sng[2];
+										bytearray[cc + 2] = sng[1];
+										bytearray[cc + 3] = sng[0];
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									byte[] sng = new byte[4];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											sng = BitConverter.GetBytes((float)((((ushort[,,])dataUnit)[i, j, k] - bzero) / bscale));
+											bytearray[cc] = sng[3];
+											bytearray[cc + 1] = sng[2];
+											bytearray[cc + 2] = sng[1];
+											bytearray[cc + 3] = sng[0];
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Double:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = BitConverter.GetBytes((((ushort[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = dbl[7];
+									bytearray[cc + 1] = dbl[6];
+									bytearray[cc + 2] = dbl[5];
+									bytearray[cc + 3] = dbl[4];
+									bytearray[cc + 4] = dbl[3];
+									bytearray[cc + 5] = dbl[2];
+									bytearray[cc + 6] = dbl[1];
+									bytearray[cc + 7] = dbl[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									byte[] dbl = new byte[8];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										dbl = BitConverter.GetBytes((((ushort[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = dbl[7];
+										bytearray[cc + 1] = dbl[6];
+										bytearray[cc + 2] = dbl[5];
+										bytearray[cc + 3] = dbl[4];
+										bytearray[cc + 4] = dbl[3];
+										bytearray[cc + 5] = dbl[2];
+										bytearray[cc + 6] = dbl[1];
+										bytearray[cc + 7] = dbl[0];
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									byte[] dbl = new byte[8];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											dbl = BitConverter.GetBytes((((ushort[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = dbl[7];
+											bytearray[cc + 1] = dbl[6];
+											bytearray[cc + 2] = dbl[5];
+											bytearray[cc + 3] = dbl[4];
+											bytearray[cc + 4] = dbl[3];
+											bytearray[cc + 5] = dbl[2];
+											bytearray[cc + 6] = dbl[1];
+											bytearray[cc + 7] = dbl[0];
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+					}
+					break;
+				}
+
+				case TypeCode.Int16:
+				{
+					switch (formatPrecision)
+					{
+						case TypeCode.Boolean:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									if (((short[])dataUnit)[i] == 1)
+										bytearray[i] = 1;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((short[,])dataUnit)[i, j] == 1)
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((short[,,])dataUnit)[i, j, k] == 1) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Byte:
+						case TypeCode.SByte:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									byte val = (byte)((((short[])dataUnit)[i] - bzero) / bscale);
+									bytearray[i] = val;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									byte val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (byte)((((short[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = val;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									byte val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (byte)((((short[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = val;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt16:
+						case TypeCode.Int16:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((((short[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 1] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 2;
+									short val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (short)((((short[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 1] = (byte)(val & 0xff);
+										cc += 2;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 2;
+									short val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 2;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (short)((((short[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 1] = (byte)(val & 0xff);
+											cc += 2;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt32:
+						case TypeCode.Int32:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									int val = (int)((((short[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 3] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									int val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (int)((((short[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 3] = (byte)(val & 0xff);
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									int val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (int)((((short[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 3] = (byte)(val & 0xff);
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt64:
+						case TypeCode.Int64:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									long val = (long)((((short[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 56) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+									bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+									bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 7] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									long val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (long)((((short[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 56) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+										bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+										bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 7] = (byte)(val & 0xff);
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									long val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (long)((((short[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 56) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+											bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+											bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 7] = (byte)(val & 0xff);
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Single:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									byte[] sng = BitConverter.GetBytes((float)((((short[])dataUnit)[i] - bzero) / bscale));
+									bytearray[cc] = sng[3];
+									bytearray[cc + 1] = sng[2];
+									bytearray[cc + 2] = sng[1];
+									bytearray[cc + 3] = sng[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									byte[] sng = new byte[4];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										sng = BitConverter.GetBytes((float)((((short[,])dataUnit)[i, j] - bzero) / bscale));
+										bytearray[cc] = sng[3];
+										bytearray[cc + 1] = sng[2];
+										bytearray[cc + 2] = sng[1];
+										bytearray[cc + 3] = sng[0];
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									byte[] sng = new byte[4];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											sng = BitConverter.GetBytes((float)((((short[,,])dataUnit)[i, j, k] - bzero) / bscale));
+											bytearray[cc] = sng[3];
+											bytearray[cc + 1] = sng[2];
+											bytearray[cc + 2] = sng[1];
+											bytearray[cc + 3] = sng[0];
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Double:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = BitConverter.GetBytes((((short[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = dbl[7];
+									bytearray[cc + 1] = dbl[6];
+									bytearray[cc + 2] = dbl[5];
+									bytearray[cc + 3] = dbl[4];
+									bytearray[cc + 4] = dbl[3];
+									bytearray[cc + 5] = dbl[2];
+									bytearray[cc + 6] = dbl[1];
+									bytearray[cc + 7] = dbl[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									byte[] dbl = new byte[8];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										dbl = BitConverter.GetBytes((((short[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = dbl[7];
+										bytearray[cc + 1] = dbl[6];
+										bytearray[cc + 2] = dbl[5];
+										bytearray[cc + 3] = dbl[4];
+										bytearray[cc + 4] = dbl[3];
+										bytearray[cc + 5] = dbl[2];
+										bytearray[cc + 6] = dbl[1];
+										bytearray[cc + 7] = dbl[0];
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									byte[] dbl = new byte[8];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											dbl = BitConverter.GetBytes((((short[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = dbl[7];
+											bytearray[cc + 1] = dbl[6];
+											bytearray[cc + 2] = dbl[5];
+											bytearray[cc + 3] = dbl[4];
+											bytearray[cc + 4] = dbl[3];
+											bytearray[cc + 5] = dbl[2];
+											bytearray[cc + 6] = dbl[1];
+											bytearray[cc + 7] = dbl[0];
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+					}
+					break;
+				}
+
+				case TypeCode.Byte:
+				{
+					switch (formatPrecision)
+					{
+						case TypeCode.Boolean:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									if (((byte[])dataUnit)[i] == 1)
+										bytearray[i] = 1;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((byte[,])dataUnit)[i, j] == 1)
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((byte[,,])dataUnit)[i, j, k] == 1) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Byte:
+						case TypeCode.SByte:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									byte val = (byte)((((byte[])dataUnit)[i] - bzero) / bscale);
+									bytearray[i] = val;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									byte val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (byte)((((byte[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = val;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									byte val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (byte)((((byte[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = val;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt16:
+						case TypeCode.Int16:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((((byte[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 1] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 2;
+									short val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (short)((((byte[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 1] = (byte)(val & 0xff);
+										cc += 2;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 2;
+									short val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 2;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (short)((((byte[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 1] = (byte)(val & 0xff);
+											cc += 2;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt32:
+						case TypeCode.Int32:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									int val = (int)((((byte[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 3] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									int val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (int)((((byte[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 3] = (byte)(val & 0xff);
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									int val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (int)((((byte[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 3] = (byte)(val & 0xff);
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt64:
+						case TypeCode.Int64:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									long val = (long)((((byte[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 56) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+									bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+									bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 7] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									long val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (long)((((byte[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 56) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+										bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+										bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 7] = (byte)(val & 0xff);
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									long val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (long)((((byte[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 56) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+											bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+											bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 7] = (byte)(val & 0xff);
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Single:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									byte[] sng = BitConverter.GetBytes((float)((((byte[])dataUnit)[i] - bzero) / bscale));
+									bytearray[cc] = sng[3];
+									bytearray[cc + 1] = sng[2];
+									bytearray[cc + 2] = sng[1];
+									bytearray[cc + 3] = sng[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									byte[] sng = new byte[4];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										sng = BitConverter.GetBytes((float)((((byte[,])dataUnit)[i, j] - bzero) / bscale));
+										bytearray[cc] = sng[3];
+										bytearray[cc + 1] = sng[2];
+										bytearray[cc + 2] = sng[1];
+										bytearray[cc + 3] = sng[0];
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									byte[] sng = new byte[4];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											sng = BitConverter.GetBytes((float)((((byte[,,])dataUnit)[i, j, k] - bzero) / bscale));
+											bytearray[cc] = sng[3];
+											bytearray[cc + 1] = sng[2];
+											bytearray[cc + 2] = sng[1];
+											bytearray[cc + 3] = sng[0];
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Double:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = BitConverter.GetBytes((((byte[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = dbl[7];
+									bytearray[cc + 1] = dbl[6];
+									bytearray[cc + 2] = dbl[5];
+									bytearray[cc + 3] = dbl[4];
+									bytearray[cc + 4] = dbl[3];
+									bytearray[cc + 5] = dbl[2];
+									bytearray[cc + 6] = dbl[1];
+									bytearray[cc + 7] = dbl[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									byte[] dbl = new byte[8];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										dbl = BitConverter.GetBytes((((byte[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = dbl[7];
+										bytearray[cc + 1] = dbl[6];
+										bytearray[cc + 2] = dbl[5];
+										bytearray[cc + 3] = dbl[4];
+										bytearray[cc + 4] = dbl[3];
+										bytearray[cc + 5] = dbl[2];
+										bytearray[cc + 6] = dbl[1];
+										bytearray[cc + 7] = dbl[0];
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									byte[] dbl = new byte[8];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											dbl = BitConverter.GetBytes((((byte[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = dbl[7];
+											bytearray[cc + 1] = dbl[6];
+											bytearray[cc + 2] = dbl[5];
+											bytearray[cc + 3] = dbl[4];
+											bytearray[cc + 4] = dbl[3];
+											bytearray[cc + 5] = dbl[2];
+											bytearray[cc + 6] = dbl[1];
+											bytearray[cc + 7] = dbl[0];
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+					}
+					break;
+				}
+
+				case TypeCode.SByte:
+				{
+					switch (formatPrecision)
+					{
+						case TypeCode.Boolean:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									if (((sbyte[])dataUnit)[i] == 1)
+										bytearray[i] = 1;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((sbyte[,])dataUnit)[i, j] == 1)
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((sbyte[,,])dataUnit)[i, j, k] == 1) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Byte:
+						case TypeCode.SByte:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									byte val = (byte)((((sbyte[])dataUnit)[i] - bzero) / bscale);
+									bytearray[i] = val;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									byte val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (byte)((((sbyte[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = val;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									byte val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (byte)((((sbyte[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = val;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt16:
+						case TypeCode.Int16:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 2;
+									short val = (short)((((sbyte[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 1] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 2;
+									short val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (short)((((sbyte[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 1] = (byte)(val & 0xff);
+										cc += 2;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 2;
+									short val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 2;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (short)((((sbyte[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 1] = (byte)(val & 0xff);
+											cc += 2;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt32:
+						case TypeCode.Int32:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									int val = (int)((((sbyte[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 3] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									int val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (int)((((sbyte[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 3] = (byte)(val & 0xff);
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									int val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (int)((((sbyte[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 3] = (byte)(val & 0xff);
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.UInt64:
+						case TypeCode.Int64:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									long val = (long)((((sbyte[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = (byte)((val >> 56) & 0xff);
+									bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+									bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+									bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+									bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+									bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+									bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+									bytearray[cc + 7] = (byte)(val & 0xff);
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									long val;
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										val = (long)((((sbyte[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = (byte)((val >> 56) & 0xff);
+										bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+										bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+										bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+										bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+										bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+										bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+										bytearray[cc + 7] = (byte)(val & 0xff);
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									long val;
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											val = (long)((((sbyte[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = (byte)((val >> 56) & 0xff);
+											bytearray[cc + 1] = (byte)((val >> 48) & 0xff);
+											bytearray[cc + 2] = (byte)((val >> 40) & 0xff);
+											bytearray[cc + 3] = (byte)((val >> 32) & 0xff);
+											bytearray[cc + 4] = (byte)((val >> 24) & 0xff);
+											bytearray[cc + 5] = (byte)((val >> 16) & 0xff);
+											bytearray[cc + 6] = (byte)((val >> 8) & 0xff);
+											bytearray[cc + 7] = (byte)(val & 0xff);
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Single:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 4;
+									byte[] sng = BitConverter.GetBytes((float)((((sbyte[])dataUnit)[i] - bzero) / bscale));
+									bytearray[cc] = sng[3];
+									bytearray[cc + 1] = sng[2];
+									bytearray[cc + 2] = sng[1];
+									bytearray[cc + 3] = sng[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 4;
+									byte[] sng = new byte[4];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										sng = BitConverter.GetBytes((float)((((sbyte[,])dataUnit)[i, j] - bzero) / bscale));
+										bytearray[cc] = sng[3];
+										bytearray[cc + 1] = sng[2];
+										bytearray[cc + 2] = sng[1];
+										bytearray[cc + 3] = sng[0];
+										cc += 4;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 4;
+									byte[] sng = new byte[4];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 4;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											sng = BitConverter.GetBytes((float)((((sbyte[,,])dataUnit)[i, j, k] - bzero) / bscale));
+											bytearray[cc] = sng[3];
+											bytearray[cc + 1] = sng[2];
+											bytearray[cc + 2] = sng[1];
+											bytearray[cc + 3] = sng[0];
+											cc += 4;
+										}
+									}
+								});
+							}
+							break;
+						}
+
+						case TypeCode.Double:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									int cc = i * 8;
+									byte[] dbl = BitConverter.GetBytes((((sbyte[])dataUnit)[i] - bzero) / bscale);
+									bytearray[cc] = dbl[7];
+									bytearray[cc + 1] = dbl[6];
+									bytearray[cc + 2] = dbl[5];
+									bytearray[cc + 3] = dbl[4];
+									bytearray[cc + 4] = dbl[3];
+									bytearray[cc + 5] = dbl[2];
+									bytearray[cc + 6] = dbl[1];
+									bytearray[cc + 7] = dbl[0];
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0] * 8;
+									byte[] dbl = new byte[8];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										dbl = BitConverter.GetBytes((((sbyte[,])dataUnit)[i, j] - bzero) / bscale);
+										bytearray[cc] = dbl[7];
+										bytearray[cc + 1] = dbl[6];
+										bytearray[cc + 2] = dbl[5];
+										bytearray[cc + 3] = dbl[4];
+										bytearray[cc + 4] = dbl[3];
+										bytearray[cc + 5] = dbl[2];
+										bytearray[cc + 6] = dbl[1];
+										bytearray[cc + 7] = dbl[0];
+										cc += 8;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = (k * naxisn[0] * naxisn[1]) * 8;
+									byte[] dbl = new byte[8];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += (j * naxisn[0]) * 8;
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											dbl = BitConverter.GetBytes((((sbyte[,,])dataUnit)[i, j, k] - bzero) / bscale);
+											bytearray[cc] = dbl[7];
+											bytearray[cc + 1] = dbl[6];
+											bytearray[cc + 2] = dbl[5];
+											bytearray[cc + 3] = dbl[4];
+											bytearray[cc + 4] = dbl[3];
+											bytearray[cc + 5] = dbl[2];
+											bytearray[cc + 6] = dbl[1];
+											bytearray[cc + 7] = dbl[0];
+											cc += 8;
+										}
+									}
+								});
+							}
+							break;
+						}
+					}
+					break;
+				}
+
+				case TypeCode.Boolean:
+				{
+					switch (formatPrecision)
+					{
+						case TypeCode.Boolean:
+						{
+							if (dataUnit.Rank == 1)
+							{
+								Parallel.For(0, naxisn[0], opts, i =>
+								{
+									if (((bool[])dataUnit)[i])
+										bytearray[i] = 1;
+								});
+							}
+							else if (dataUnit.Rank == 2)
+							{
+								Parallel.For(0, naxisn[1], opts, j =>
+								{
+									int cc = j * naxisn[0];
+									for (int i = 0; i < naxisn[0]; i++)
+									{
+										if (((bool[,])dataUnit)[i, j])
+											bytearray[cc] = 1;
+										cc += 1;
+									}
+								});
+							}
+							else if (dataUnit.Rank == 3)
+							{
+								Parallel.For(0, naxisn[2], opts, k =>
+								{
+									int cc = k * naxisn[0] * naxisn[1];
+									for (int j = 0; j < naxisn[1]; j++)
+									{
+										cc += j * naxisn[0];
+										for (int i = 0; i < naxisn[0]; i++)
+										{
+											if (((bool[,,])dataUnit)[i, j, k]) ;
+											bytearray[cc] = 1;
+											cc += 1;
+										}
+									}
+								});
+							}
+							break;
+						}
 					}
 					break;
 				}
 
 				default:
-					throw new Exception("TypeCode '" + formatPrecision + "' not acceptable in GetByteFormattedImageDataUnit.");
-			}
+					throw new Exception("TypeCode '" + formatPrecision + "' not acceptable in GetByteFormattedImageDataUnit for dataUnit type " + dataUnitType + ".");
+			}			
 
 			return bytearray;
 		}
