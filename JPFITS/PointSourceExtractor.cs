@@ -1046,7 +1046,7 @@ namespace JPFITS
 			FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_IMAP", ref header, out long start, out _, out _, out _, out _);
 			fs.Position = start;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
-			SOURCE_INDEX_MAP = (int[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.Default, ReadReturnPrecision.Native);
+			SOURCE_INDEX_MAP = (int[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.NAXIS, ReadReturnPrecision.Native);
 			fs.Close();
 
 			fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
@@ -1054,7 +1054,7 @@ namespace JPFITS
 			FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_BMAP", ref header, out start, out _, out _, out _, out _);
 			fs.Position = start;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
-			SOURCE_BOOLEAN_MAP = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.Default, ReadReturnPrecision.Boolean);
+			SOURCE_BOOLEAN_MAP = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.NAXIS, ReadReturnPrecision.Boolean);
 			fs.Close();
 
 			if (this.SearchROI)
@@ -1064,7 +1064,7 @@ namespace JPFITS
 				FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName + "_ROI", ref header, out start, out _, out _, out _, out _);
 				fs.Position = start;
 				FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
-				ROI_REGION = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.Default, ReadReturnPrecision.Boolean);
+				ROI_REGION = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.NAXIS, ReadReturnPrecision.Boolean);
 				fs.Close();
 			}
 

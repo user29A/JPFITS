@@ -1557,7 +1557,7 @@ namespace JPFITS
 
 			FITSHeader HEADER = new FITSHeader(header, true);
 
-			double[,,] cube = (double[,,])FITSFILEOPS.ReadImageDataUnit(fs, null, true, BITPIX, ref naxisn, BSCALE, BZERO, RankFormat.Default);
+			double[,,] cube = (double[,,])FITSFILEOPS.ReadImageDataUnit(fs, null, true, BITPIX, ref naxisn, BSCALE, BZERO, RankFormat.NAXIS);
 
 			fs.Close();			
 

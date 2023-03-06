@@ -38,7 +38,7 @@ namespace JPFITS
 		/// <summary>
 		/// The Array is returned as the rank indicated by the NAXIS keyword, up to rank = 3 (data cube).
 		/// </summary>
-		Default,
+		NAXIS,
 
 		/// <summary>
 		/// If the default Array would be a vector, return it as a 2D horizontal array. Indexing will then be [i, 0].
@@ -384,7 +384,7 @@ namespace JPFITS
 		/// <param name="bzero">The BZERO keyword value of the data unit header.</param>
 		/// <param name="returnRankFormat">Options for formatting the return Array rank and dimensions.</param>
 		/// <param name="returnPrecision">Options for the precision type of the return Array.</param>
-		public static Array ReadImageDataUnit(FileStream fs, int[]? range, bool doParallel, int bitpix, ref int[] naxisn, double bscale, double bzero, RankFormat returnRankFormat = RankFormat.Default, ReadReturnPrecision returnPrecision = ReadReturnPrecision.Double)
+		public static Array ReadImageDataUnit(FileStream fs, int[]? range, bool doParallel, int bitpix, ref int[] naxisn, double bscale, double bzero, RankFormat returnRankFormat = RankFormat.NAXIS, ReadReturnPrecision returnPrecision = ReadReturnPrecision.Double)
 		{
 			if (range == null || range[0] == -1)//then it is a full frame read
 				if (naxisn.Length == 1)
@@ -433,7 +433,7 @@ namespace JPFITS
 					{
 						case 8:
 						{
-							if (returnRankFormat == RankFormat.Default)
+							if (returnRankFormat == RankFormat.NAXIS)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
 								naxisn = new int[1] { dvector.Length };
@@ -471,7 +471,7 @@ namespace JPFITS
 
 						case 16:
 						{
-							if (returnRankFormat == RankFormat.Default)
+							if (returnRankFormat == RankFormat.NAXIS)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
 								naxisn = new int[1] { dvector.Length };
@@ -515,7 +515,7 @@ namespace JPFITS
 
 						case 32:
 						{
-							if (returnRankFormat == RankFormat.Default)
+							if (returnRankFormat == RankFormat.NAXIS)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
 								naxisn = new int[1] { dvector.Length };
@@ -559,7 +559,7 @@ namespace JPFITS
 
 						case 64:
 						{
-							if (returnRankFormat == RankFormat.Default)
+							if (returnRankFormat == RankFormat.NAXIS)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
 								naxisn = new int[1] { dvector.Length };
@@ -627,7 +627,7 @@ namespace JPFITS
 
 						case -32:
 						{
-							if (returnRankFormat == RankFormat.Default)
+							if (returnRankFormat == RankFormat.NAXIS)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
 								naxisn = new int[1] { dvector.Length };
@@ -683,7 +683,7 @@ namespace JPFITS
 
 						case -64:
 						{
-							if (returnRankFormat == RankFormat.Default)
+							if (returnRankFormat == RankFormat.NAXIS)
 							{
 								double[] dvector = new double[range[1] - range[0] + 1];
 								naxisn = new int[1] { dvector.Length };
@@ -868,7 +868,7 @@ namespace JPFITS
 						}
 					}
 
-					if (returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+					if (returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 						return dtable;
 					else if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0)
 						return dtable;
@@ -1015,7 +1015,7 @@ namespace JPFITS
 						}
 					}
 
-					if (returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+					if (returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 						return dcube;
 					else if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0)
 						return dcube;
@@ -1078,7 +1078,7 @@ namespace JPFITS
 						{
 							if (bzero == -128)//signed byte
 							{
-								if (returnRankFormat == RankFormat.Default)
+								if (returnRankFormat == RankFormat.NAXIS)
 								{
 									sbyte[] vector = new sbyte[range[1] - range[0] + 1];
 									naxisn = new int[1] { vector.Length };
@@ -1114,7 +1114,7 @@ namespace JPFITS
 							}
 							else if (bzero == 0)//unsigned byte
 							{
-								if (returnRankFormat == RankFormat.Default)
+								if (returnRankFormat == RankFormat.NAXIS)
 								{
 									byte[] vector = new byte[range[1] - range[0] + 1];
 									naxisn = new int[1] { vector.Length };
@@ -1156,7 +1156,7 @@ namespace JPFITS
 						{
 							if (bzero == 0)//signed int16
 							{
-								if (returnRankFormat == RankFormat.Default)
+								if (returnRankFormat == RankFormat.NAXIS)
 								{
 									short[] vector = new short[range[1] - range[0] + 1];
 									naxisn = new int[1] { vector.Length };
@@ -1204,7 +1204,7 @@ namespace JPFITS
 							}
 							else if (bzero == 32768)//unsigned uint16
 							{
-								if (returnRankFormat == RankFormat.Default)
+								if (returnRankFormat == RankFormat.NAXIS)
 								{
 									ushort[] vector = new ushort[range[1] - range[0] + 1];
 									naxisn = new int[1] { vector.Length };
@@ -1258,7 +1258,7 @@ namespace JPFITS
 						{
 							if (bzero == 0)//signed int32
 							{
-								if (returnRankFormat == RankFormat.Default)
+								if (returnRankFormat == RankFormat.NAXIS)
 								{
 									int[] vector = new int[range[1] - range[0] + 1];
 									naxisn = new int[1] { vector.Length };
@@ -1312,7 +1312,7 @@ namespace JPFITS
 							}
 							else if (bzero == 2147483648)//unsigned uint32
 							{
-								if (returnRankFormat == RankFormat.Default)
+								if (returnRankFormat == RankFormat.NAXIS)
 								{
 									uint[] vector = new uint[range[1] - range[0] + 1];
 									naxisn = new int[1] { vector.Length };
@@ -1372,7 +1372,7 @@ namespace JPFITS
 						{
 							if (bzero == 0)//signed int64
 							{
-								if (returnRankFormat == RankFormat.Default)
+								if (returnRankFormat == RankFormat.NAXIS)
 								{
 									long[] vector = new long[range[1] - range[0] + 1];
 									naxisn = new int[1] { vector.Length };
@@ -1438,7 +1438,7 @@ namespace JPFITS
 							}
 							else if (bzero == 9223372036854775808)//unsigned uint64
 							{
-								if (returnRankFormat == RankFormat.Default)
+								if (returnRankFormat == RankFormat.NAXIS)
 								{
 									ulong[] vector = new ulong[range[1] - range[0] + 1];
 									naxisn = new int[1] { vector.Length };
@@ -1508,7 +1508,7 @@ namespace JPFITS
 
 						case -32://single precision float
 						{
-							if (returnRankFormat == RankFormat.Default)
+							if (returnRankFormat == RankFormat.NAXIS)
 							{
 								float[] vector = new float[range[1] - range[0] + 1];
 								naxisn = new int[1] { vector.Length };
@@ -1564,7 +1564,7 @@ namespace JPFITS
 
 						case -64://double precision float
 						{
-							if (returnRankFormat == RankFormat.Default)
+							if (returnRankFormat == RankFormat.NAXIS)
 							{
 								double[] vector = new double[range[1] - range[0] + 1];
 								naxisn = new int[1] { vector.Length };
@@ -1652,7 +1652,7 @@ namespace JPFITS
 										table[i - range[0], j - range[2]] = (sbyte)(arr[cc + i] * bscale + bzero);
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 									return table;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 								{
@@ -1674,7 +1674,7 @@ namespace JPFITS
 										table[i - range[0], j - range[2]] = (byte)(arr[cc + i] * bscale + bzero);
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 									return table;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 								{
@@ -1707,7 +1707,7 @@ namespace JPFITS
 									}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 									return table;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 								{
@@ -1735,7 +1735,7 @@ namespace JPFITS
 									}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 									return table;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 								{
@@ -1771,7 +1771,7 @@ namespace JPFITS
 									}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 									return table;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 								{
@@ -1801,7 +1801,7 @@ namespace JPFITS
 									}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 									return table;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 								{
@@ -1841,7 +1841,7 @@ namespace JPFITS
 									}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 									return table;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 								{
@@ -1875,7 +1875,7 @@ namespace JPFITS
 									}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 									return table;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 								{
@@ -1909,7 +1909,7 @@ namespace JPFITS
 								}
 							});
 
-							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 								return table;
 							else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 							{
@@ -1946,7 +1946,7 @@ namespace JPFITS
 								}
 							});
 
-							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 								return table;
 							else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 							{
@@ -1983,7 +1983,7 @@ namespace JPFITS
 											cube[i - range[0], j - range[2], k - range[4]] = (sbyte)(arr[cc + i] * bscale + bzero);
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 									return cube;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 								{
@@ -2044,7 +2044,7 @@ namespace JPFITS
 											cube[i - range[0], j - range[2], k - range[4]] = (byte)(arr[cc + i] * bscale + bzero);
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 									return cube;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 								{
@@ -2116,7 +2116,7 @@ namespace JPFITS
 										}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 									return cube;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 								{
@@ -2182,7 +2182,7 @@ namespace JPFITS
 										}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 									return cube;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 								{
@@ -2256,7 +2256,7 @@ namespace JPFITS
 										}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 									return cube;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 								{
@@ -2324,7 +2324,7 @@ namespace JPFITS
 										}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 									return cube;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 								{
@@ -2402,7 +2402,7 @@ namespace JPFITS
 										}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 									return cube;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 								{
@@ -2474,7 +2474,7 @@ namespace JPFITS
 										}
 								});
 
-								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+								if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 									return cube;
 								else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 								{
@@ -2547,7 +2547,7 @@ namespace JPFITS
 									}
 							});
 
-							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 								return cube;
 							else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 							{
@@ -2623,7 +2623,7 @@ namespace JPFITS
 									}
 							});
 
-							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+							if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 								return cube;
 							else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 							{
@@ -2683,7 +2683,7 @@ namespace JPFITS
 
 				if (naxisn.Length == 1)//then a vector return
 				{
-					if (returnRankFormat == RankFormat.Default)
+					if (returnRankFormat == RankFormat.NAXIS)
 					{
 						bool[] vector = new bool[range[1] - range[0] + 1];
 						naxisn = new int[1] { vector.Length };
@@ -2736,7 +2736,7 @@ namespace JPFITS
 								table[i - range[0], j - range[2]] = true;
 					});
 
-					if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
+					if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)//must be a table
 						return table;
 					else if (returnRankFormat == RankFormat.ArrayAsRangeRank)//must be a vector if gotten to here
 					{
@@ -2764,7 +2764,7 @@ namespace JPFITS
 									cube[i - range[0], j - range[2], k - range[4]] = true;
 					});
 
-					if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.Default || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
+					if ((range[1] - range[0]) > 0 && (range[3] - range[2]) > 0 && (range[5] - range[4]) > 0 || returnRankFormat == RankFormat.NAXIS || returnRankFormat == RankFormat.VectorAsVerticalTable || returnRankFormat == RankFormat.VectorAsHorizontalTable)
 						return cube;
 					else if (returnRankFormat == RankFormat.ArrayAsRangeRank)
 					{
