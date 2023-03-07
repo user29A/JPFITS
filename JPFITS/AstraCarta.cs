@@ -547,7 +547,7 @@ namespace JPFITS
 					//plot.jpChart1.Series[0].XAxisType = AxisType.Secondary;
 
 					if (imageout)
-						plot.ChartGraph.SaveImage(imagefilename, System.Windows.Forms.DataVisualization.Charting.ChartImageFormat.Jpeg);
+						plot.ChartGraph.SaveImage(imagefilename, ChartImageFormat.Jpeg);
 				}
 
 				if (notableout)

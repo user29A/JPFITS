@@ -323,8 +323,6 @@ namespace JPFITS
 					NAXISN = new int[2] { 1, n };
 				}
 
-			fs.Close();
-
 			if (!DATA_POP)
 				STATS_POP = false;
 			if (STATS_POP)
@@ -392,8 +390,6 @@ namespace JPFITS
 					int n = NAXISN[0];
 					NAXISN = new int[2] { 1, n };
 				}
-
-			fs.Close();
 
 			if (!DATA_POP)
 				STATS_POP = false;
@@ -465,8 +461,6 @@ namespace JPFITS
 					int n = NAXISN[0];
 					NAXISN = new int[2] { 1, n };
 				}
-
-			fs.Close();
 
 			if (!DATA_POP)
 				STATS_POP = false;
@@ -1177,131 +1171,47 @@ namespace JPFITS
 			ArrayList header = null;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out bool hasext, out int BITPIX, out int[] NAXISN, out double BSCALE, out double BZERO);
 
-			double[] result = (double[])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, RankFormat.ArrayAsRangeRank);
-
-			fs.Close();
-
-			return result;
+			return (double[])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, RankFormat.ArrayAsRangeRank);
 		}
 
-		/// <summary>Reads an N-dimensional array and returns the results as a double array. User may reorginize the array based on the return variable axis lengths vector nAxisN.</summary>
+		/// <summary>Reads an N-dimensional array and returns the results at its native on-disk precision by default. User may reorginize the array based on the return variable axis lengths vector nAxisN.</summary>
 		/// <param name="nAxisN">int vector to return the axis lengths for each axis.</param>
-		public static double[] ReadPrimaryNDimensionalData(string fullFileName, out int[] nAxisN)
+		public static Array ReadPrimaryNDimensionalData(string fullFileName, out int[] nAxisN, ReadReturnPrecision returnPrecision = ReadReturnPrecision.Native)
 		{
 			FileStream fs = new FileStream(fullFileName, FileMode.Open, FileAccess.Read, FileShare.Read);
-			ArrayList header = new ArrayList();
-			if (!FITSFILEOPS.ScanPrimaryUnit(fs, false, ref header, out bool hasext))
+			ArrayList header = null;
+
+			if (!FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out int bitpix, out nAxisN, out double bscale, out double bzero))
 			{
 				fs.Close();
 				throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
 			}
 
-			nAxisN = new int[0];
+			return FITSFILEOPS.ReadImageDataUnit(fs, null, true, bitpix, ref nAxisN, bscale, bzero, RankFormat.Vector, returnPrecision);
+		}
 
-			int bitpix = -1, nAxis = -1, nAxisn = 1;
-			double bscale = 1, bzero = 0;
-			for (int i = 0; i < header.Count; i++)
+		/// <summary>Reads an N-dimensional array and returns the results at its native on-disk precision by default. User may reorginize the array based on the return variable axis lengths vector nAxisN.</summary>
+		/// <param name="nAxisN">int vector to return the axis lengths for each axis.</param>
+		public static Array ReadExtensionNDimensionalData(string fullFileName, string extensionName, out int[] nAxisN, ReadReturnPrecision returnPrecision = ReadReturnPrecision.Native)
+		{
+			FileStream fs = new FileStream(fullFileName, FileMode.Open, FileAccess.Read, FileShare.Read);
+			ArrayList header = null;
+
+			if (!FITSFILEOPS.SeekExtension(fs, "IMAGE", extensionName, ref header, out long startpos, out _, out _, out _, out _))
 			{
-				string line = (string)header[i];
-
-				if (bitpix == -1)
-					if (line.Substring(0, 8).Trim() == "BITPIX")
-						bitpix = Convert.ToInt32(line.Substring(10, 20));
-
-				if (nAxis == -1)
-					if (line.Substring(0, 8).Trim() == "NAXIS")
-					{
-						nAxis = Convert.ToInt32(line.Substring(10, 20));
-						nAxisN = new int[nAxis];
-					}
-
-				if (nAxisn <= nAxis)
-					if (line.Substring(0, 8).Trim() == ("NAXIS" + nAxisn.ToString()))
-					{
-						nAxisN[nAxisn - 1] = Convert.ToInt32(line.Substring(10, 20));
-						nAxisn++;
-					}
-
-				if (line.Substring(0, 8) == "BZERO   ")
-					bzero = Convert.ToDouble(line.Substring(10, 20));
-
-				if (line.Substring(0, 8) == "BSCALE  ")
-					bscale = Convert.ToDouble(line.Substring(10, 20));
+				fs.Close();
+				throw new Exception("Extension " + extensionName + " not found.");
 			}
 
-			int NBytes = Math.Abs(bitpix) / 8;
-			for (int i = 0; i < nAxisN.Length; i++)
-				NBytes *= nAxisN[i];
+			fs.Position = startpos;
 
-			byte[] arr = new byte[NBytes];
-			fs.Read(arr, 0, NBytes);
-			fs.Close();
-
-			double[] result = new double[NBytes / Math.Abs(bitpix)];
-
-			if (bitpix == 8)
+			if (!FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out int bitpix, out nAxisN, out double bscale, out double bzero))
 			{
-				Parallel.For(0, result.Length, i =>
-				{
-					result[i] = (double)arr[i] * bscale + bzero;
-				});
+				fs.Close();
+				throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
 			}
 
-			if (bitpix == 16)
-			{
-				Parallel.For(0, result.Length, i =>
-				{
-					int cc = i * 2;
-					short val = (short)((arr[cc] << 8) | arr[cc + 1]);
-					result[i] = (double)val * bscale + bzero;
-				});
-			}
-
-			if (bitpix == 32)
-			{
-				Parallel.For(0, result.Length, i =>
-				{
-					int cc = i * 4;
-					int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
-					result[i] = (double)(val) * bscale + bzero;
-				});
-			}
-
-			if (bitpix == -32)
-			{
-				Parallel.For(0, result.Length, i =>
-				{
-					byte[] flt = new byte[4];
-					int cc = i * 4;
-					flt[3] = arr[cc];
-					flt[2] = arr[cc + 1];
-					flt[1] = arr[cc + 2];
-					flt[0] = arr[cc + 3];
-					float val = BitConverter.ToSingle(flt, 0);
-					result[i] = (double)(val) * bscale + bzero;
-				});
-			}
-
-			if (bitpix == -64)
-			{
-				Parallel.For(0, result.Length, i =>
-				{
-					int cc = i * 8;
-					byte[] dbl = new byte[8];
-					dbl[7] = arr[cc];
-					dbl[6] = arr[cc + 1];
-					dbl[5] = arr[cc + 2];
-					dbl[4] = arr[cc + 3];
-					dbl[3] = arr[cc + 4];
-					dbl[2] = arr[cc + 5];
-					dbl[1] = arr[cc + 6];
-					dbl[0] = arr[cc + 7];
-					double val = BitConverter.ToDouble(dbl, 0);
-					result[i] = val * bscale + bzero;
-				});
-			}
-
-			return result;
+			return FITSFILEOPS.ReadImageDataUnit(fs, null, true, bitpix, ref nAxisN, bscale, bzero, RankFormat.Vector, returnPrecision);
 		}
 
 		/// <summary>If a Primary data unit is saved as a layered image cube where each layer is unique, separate the layers into individual named extensions instead. The primary header will be copied into the extensions.</summary>

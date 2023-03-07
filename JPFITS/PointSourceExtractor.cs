@@ -1047,7 +1047,6 @@ namespace JPFITS
 			fs.Position = start;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
 			SOURCE_INDEX_MAP = (int[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.NAXIS, ReadReturnPrecision.Native);
-			fs.Close();
 
 			fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
 			header = null;
@@ -1055,7 +1054,6 @@ namespace JPFITS
 			fs.Position = start;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
 			SOURCE_BOOLEAN_MAP = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.NAXIS, ReadReturnPrecision.Boolean);
-			fs.Close();
 
 			if (this.SearchROI)
 			{
@@ -1065,7 +1063,6 @@ namespace JPFITS
 				fs.Position = start;
 				FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
 				ROI_REGION = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.NAXIS, ReadReturnPrecision.Boolean);
-				fs.Close();
 			}
 
 			N_SRC = BinTablePSE.Naxis2;

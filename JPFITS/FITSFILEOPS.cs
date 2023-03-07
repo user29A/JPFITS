@@ -53,7 +53,12 @@ namespace JPFITS
 		/// <summary>
 		/// If the range dimensions indicate a vector when reading from a table or cube, or a table when reading from a cube, then return the Array formatted as the range rank.
 		/// </summary>
-		ArrayAsRangeRank
+		ArrayAsRangeRank,
+
+		/// <summary>
+		/// Will return the image data as a vector. Useful for retreiving data of rank greater than 3. naxisn will contain the header NAXISn values. The range parameter argument does not apply with this option.
+		/// </summary>
+		Vector
 	}
 
 	/// <summary>Array precision options for the data unit returned by the ReadImageDataUnit method.</summary>
@@ -374,12 +379,12 @@ namespace JPFITS
 			return true;
 		}
 
-		/// <summary>Reads the image data unit from a FITS file and returns its Array at native or alternative precisions. Supports image data units with up to 3 axes. May return either a vector, table, or cube.</summary>
+		/// <summary>Reads the image data unit from a FITS file and returns its Array at native or alternative precisions. Supports image data units with up to 3 axes. May return either a vector, table, or cube. Closes the file stream.</summary>
 		/// <param name="fs">The FileStream of the FITS file, positioned at the start of the primary or image extension data unit.</param>
 		/// <param name="range">Pass null or range[0] = -1 to default to full data unit size. Otherwise range is ZERO BASED 1-D int array [xmin xmax] or [xmin xmax ymin ymax]  or [xmin xmax ymin ymax zmin zmax] to return a sub-array.</param>
 		/// <param name="doParallel">Populate the Array object with parallelization after serial disk read.</param>
 		/// <param name="bitpix">The BITPIX keyword value of the data unit header.</param>
-		/// <param name="naxisn">An array containing the values of the NAXISn keywords from the data unit header. Specifies the rank of the return Array, i.e., if naxisn.Length == 1, then it is a vector, if 2 then a table, if 3 then a cube. The value may change from the input given the ImageDataUnitFormatting options.</param>
+		/// <param name="naxisn">An array containing the values of the NAXISn keywords from the data unit header. Specifies the rank of the return Array, i.e., if naxisn.Length == 1, then it is a vector, if 2 then a table, if 3 then a cube. The value may change from the input given the RankFormat options.</param>
 		/// <param name="bscale">The BSCALE keyword value of the data unit header.</param>
 		/// <param name="bzero">The BZERO keyword value of the data unit header.</param>
 		/// <param name="returnRankFormat">Options for formatting the return Array rank and dimensions.</param>
@@ -418,12 +423,311 @@ namespace JPFITS
 			int NBytes = (int)JPMath.Product(naxisn) * (bpix / 8);
 			byte[] arr = new byte[NBytes];
 			fs.Read(arr, 0, NBytes);//fastest to just read the entire data even if only subimage will be used - though this may needs to be checked with new m2 faster drives!?
+			fs.Close();
 
 			ParallelOptions opts = new ParallelOptions();
 			if (doParallel)
 				opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
 			else
 				opts.MaxDegreeOfParallelism = 1;
+
+			if (returnRankFormat == RankFormat.Vector)
+			{
+				int nelements = (int)JPMath.Product(naxisn);
+
+				if (returnPrecision == ReadReturnPrecision.Double)
+				{
+					double[] vector = new double[nelements];
+
+					switch (bitpix)
+					{
+						case 8:
+						{
+							Parallel.For(0, nelements, opts, i =>
+							{
+								vector[i] = arr[i] * bscale + bzero;
+							});
+							return vector;
+						}
+
+						case 16:
+						{
+							Parallel.For(0, nelements, opts, i =>
+							{
+								int cc = i * 2;
+								short val = (short)((arr[cc] << 8) | arr[cc + 1]);
+								vector[i] = val * bscale + bzero;
+							});
+							return vector;
+						}
+
+						case 32:
+						{
+							Parallel.For(0, nelements, opts, i =>
+							{
+								int cc = i * 4;
+								int val = (arr[cc] << 24) | (arr[cc + 1] << 16) | (arr[cc + 2] << 8) | arr[cc + 3];
+								vector[i] = val * bscale + bzero;
+							});
+							return vector;
+						}
+
+						case 64:
+						{
+							Parallel.For(0, nelements, opts, i =>
+							{
+								int cc = i * 8;
+								byte[] dbl = new byte[8];
+								dbl[7] = arr[cc];
+								dbl[6] = arr[cc + 1];
+								dbl[5] = arr[cc + 2];
+								dbl[4] = arr[cc + 3];
+								dbl[3] = arr[cc + 4];
+								dbl[2] = arr[cc + 5];
+								dbl[1] = arr[cc + 6];
+								dbl[0] = arr[cc + 7];
+								vector[i] = BitConverter.ToInt64(dbl, 0) * bscale + bzero;
+							});
+							return vector;
+						}
+
+						case -32:
+						{
+							Parallel.For(0, nelements, opts, i =>
+							{
+								int cc = i * 4;
+								byte[] flt = new byte[4];
+								flt[3] = arr[cc];
+								flt[2] = arr[cc + 1];
+								flt[1] = arr[cc + 2];
+								flt[0] = arr[cc + 3];
+								vector[i] = BitConverter.ToSingle(flt, 0) * bscale + bzero;
+							});
+							return vector;
+						}
+
+						case -64:
+						{
+							Parallel.For(0, nelements, opts, i =>
+							{
+								int cc = i * 8;
+								byte[] dbl = new byte[8];
+								dbl[7] = arr[cc];
+								dbl[6] = arr[cc + 1];
+								dbl[5] = arr[cc + 2];
+								dbl[4] = arr[cc + 3];
+								dbl[3] = arr[cc + 4];
+								dbl[2] = arr[cc + 5];
+								dbl[1] = arr[cc + 6];
+								dbl[0] = arr[cc + 7];
+								vector[i] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
+							});
+							return vector;
+						}
+					}
+				}
+
+				else if (returnPrecision == ReadReturnPrecision.Native)
+				{
+					switch (bitpix)
+					{
+						case 8:
+						{
+							if (bzero == -128)//signed byte
+							{
+								sbyte[] vector = new sbyte[nelements];
+
+								Parallel.For(0, nelements, opts, i =>
+								{
+									vector[i] = (sbyte)(arr[i] * bscale + bzero);
+								});
+								return vector;
+							}
+							else if (bzero == 0)//unsigned byte
+							{
+								byte[] vector = new byte[nelements];
+
+								Parallel.For(0, nelements, opts, i =>
+								{
+									vector[i] = (byte)(arr[i] * bscale + bzero);
+								});
+								return vector;
+							}
+							break;
+						}
+
+						case 16:
+						{
+							if (bzero == 0)//signed int16
+							{
+								short[] vector = new short[nelements];
+
+								Parallel.For(0, nelements, opts, i =>
+								{
+									int cc = i * 2;
+									byte[] bytes = new byte[2];
+									bytes[1] = arr[cc];
+									bytes[0] = arr[cc + 1];
+									vector[i] = (short)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
+								});
+								return vector;
+							}
+							else if (bzero == 32768)//unsigned uint16
+							{
+								ushort[] vector = new ushort[nelements];
+
+								Parallel.For(0, nelements, opts, i =>
+								{
+									int cc = i * 2;
+									byte[] bytes = new byte[2];
+									bytes[1] = arr[cc];
+									bytes[0] = arr[cc + 1];
+									vector[i] = (ushort)(BitConverter.ToInt16(bytes, 0) * bscale + bzero);
+								});
+								return vector;
+							}
+							break;
+						}
+
+						case 32:
+						{
+							if (bzero == 0)//signed int32
+							{
+								int[] vector = new int[nelements];
+
+								Parallel.For(0, nelements, opts, i =>
+								{
+									int cc = i * 4;
+									byte[] bytes = new byte[4];
+									bytes[3] = arr[cc];
+									bytes[2] = arr[cc + 1];
+									bytes[1] = arr[cc + 2];
+									bytes[0] = arr[cc + 3];
+									vector[i] = (int)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
+								});
+								return vector;								
+							}
+							else if (bzero == 2147483648)//unsigned uint32
+							{
+								uint[] vector = new uint[nelements];
+
+								Parallel.For(0, nelements, opts, i =>
+								{
+									int cc = i * 4;
+									byte[] bytes = new byte[4];
+									bytes[3] = arr[cc];
+									bytes[2] = arr[cc + 1];
+									bytes[1] = arr[cc + 2];
+									bytes[0] = arr[cc + 3];
+									vector[i] = (uint)(BitConverter.ToInt32(bytes, 0) * bscale + bzero);
+								});
+								return vector;								
+							}
+							break;
+						}
+
+						case 64:
+						{
+							if (bzero == 0)//signed int64
+							{
+								long[] vector = new long[nelements];
+
+								Parallel.For(0, nelements, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] bytes = new byte[8];
+									bytes[7] = arr[cc];
+									bytes[6] = arr[cc + 1];
+									bytes[5] = arr[cc + 2];
+									bytes[4] = arr[cc + 3];
+									bytes[3] = arr[cc + 4];
+									bytes[2] = arr[cc + 5];
+									bytes[1] = arr[cc + 6];
+									bytes[0] = arr[cc + 7];
+									vector[i] = (long)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
+								});
+								return vector;
+							}
+							else if (bzero == 9223372036854775808)//unsigned uint64
+							{
+								ulong[] vector = new ulong[nelements];
+
+								Parallel.For(0, nelements, opts, i =>
+								{
+									int cc = i * 8;
+									byte[] bytes = new byte[8];
+									bytes[7] = arr[cc];
+									bytes[6] = arr[cc + 1];
+									bytes[5] = arr[cc + 2];
+									bytes[4] = arr[cc + 3];
+									bytes[3] = arr[cc + 4];
+									bytes[2] = arr[cc + 5];
+									bytes[1] = arr[cc + 6];
+									bytes[0] = arr[cc + 7];
+									vector[i] = (ulong)(BitConverter.ToInt64(bytes, 0) * bscale + bzero);
+								});
+								return vector;
+							}
+							break;
+						}
+
+						case -32://single precision float
+						{
+							float[] vector = new float[nelements];
+
+							Parallel.For(0, nelements, opts, i =>
+							{
+								int cc = i * 4;
+								byte[] flt = new byte[4];
+								flt[3] = arr[cc];
+								flt[2] = arr[cc + 1];
+								flt[1] = arr[cc + 2];
+								flt[0] = arr[cc + 3];
+								vector[i] = (float)(BitConverter.ToSingle(flt, 0) * bscale + bzero);
+							});
+							return vector;
+						}
+
+						case -64://double precision float
+						{
+							double[] vector = new double[nelements];
+
+							Parallel.For(0, nelements, opts, i =>
+							{
+								int cc = i * 8;
+								byte[] dbl = new byte[8];
+								dbl[7] = arr[cc];
+								dbl[6] = arr[cc + 1];
+								dbl[5] = arr[cc + 2];
+								dbl[4] = arr[cc + 3];
+								dbl[3] = arr[cc + 4];
+								dbl[2] = arr[cc + 5];
+								dbl[1] = arr[cc + 6];
+								dbl[0] = arr[cc + 7];
+								vector[i] = BitConverter.ToDouble(dbl, 0) * bscale + bzero;
+							});
+							return vector;
+						}
+					}
+				}
+
+				else if (returnPrecision == ReadReturnPrecision.Boolean)
+				{
+					if (bitpix != 8 && bzero != 0)//unsigned byte
+						throw new Exception("Boolean data must be unsigned bytes on disk.");
+
+					bool[] vector = new bool[nelements];
+
+					Parallel.For(0, nelements, opts, i =>
+					{
+						if (arr[i] == 1)
+							vector[i] = true;
+					});
+					return vector;
+				}
+
+				throw new Exception("Made it to end of ReadImageDataUnit returnRankFormat == RankFormat.Vector without returning data.");
+			}
 
 			if (returnPrecision == ReadReturnPrecision.Double)
 			{
