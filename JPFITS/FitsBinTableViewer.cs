@@ -345,7 +345,7 @@ namespace JPFITS
 			if (XDrop.Enabled)
 				title += " vs. " + xlabel;
 
-			plot.ChartGraph.PlotXYData(x, y, title, xlabel, ylabel, JPChart.JPChartControl.SeriesType.FastPoint, title.Replace(" ", ""), null);
+			plot.ChartGraph.PlotXYData(x, y, title, xlabel, ylabel, JPChart.SeriesType.FastPoint, title.Replace(" ", ""), null);
 			plot.Text = title;
 			plot.Show();
 		}

@@ -18,16 +18,27 @@ namespace JPFITS
 		{
 			private ArrayList PSESET = new ArrayList();
 
+			/// <summary>
+			/// Add an existing PointSourceExtractor instance to the set. 
+			/// </summary>
+			/// <param name="PSE"></param>
 			public void Add(PointSourceExtractor PSE)
 			{
 				PSESET.Add(PSE);
 			}
 
+			/// <summary>
+			/// Adds a new PointSourceExtractor instance to the set.
+			/// </summary>
 			public void Add()
 			{
 				PSESET.Add(new PointSourceExtractor());
 			}
 
+			/// <summary>
+			/// Removes the PointSourceExtractor instance at the given index.
+			/// </summary>
+			/// <param name="pseIndex"></param>
 			public void RemoveAt(int pseIndex)
 			{
 				PSESET.RemoveAt(pseIndex);
@@ -43,6 +54,11 @@ namespace JPFITS
 				get { return PSESET.Count; }
 			}
 
+			/// <summary>
+			/// Returns the PointSourceExtractor instance at the index.
+			/// </summary>
+			/// <param name="i"></param>
+			/// <returns></returns>
 			public PointSourceExtractor this[int i]
 			{
 				get { return ((PointSourceExtractor)(PSESET[i])); }
@@ -93,7 +109,7 @@ namespace JPFITS
 		/// <param name="kernel_radius">The radius (pixels) of the kernel to centroid.</param>
 		/// <param name="auto_background">Estimate the background at the sources.</param>
 		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
-		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default is the same value as pix_saturation.</param> 
+		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default of 0 results in the same value as pix_saturation.</param> 
 		public PointSourceExtractor(double[,] image, double[] XCoords, double[] YCoords, double pix_saturation, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, double pix_saturation_mapmin = 0)
 		{
 			this.BGWRKR = new BackgroundWorker();
@@ -223,7 +239,9 @@ namespace JPFITS
 		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
 		/// <param name="ROI_region">A boolean array of valid area to examine. Pass null or array of equal dimension to source image all true for entire image search.</param>
 		/// <param name="show_waitbar">Show a cancellable wait bar. False equates to a syncronous call.</param>
-		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default is the same value as pix_saturation.</param>
+		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default of 0 results in the same value as pix_saturation.</param>
+		/// <param name="reject_saturated">Option to reject saturated sources from the extraction results.</param>
+		/// <param name="background_radius_as_source_separation">The background radius will be used to isolate only the brightest sources within the radius as valid sources.</param>
 		public void Extract_Sources(double[,] image, double pix_saturation, double pix_min, double pix_max, double kernel_min, double kernel_max, bool threshholds_as_SN, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, bool[,]? ROI_region, bool show_waitbar, double pix_saturation_mapmin = 0, bool reject_saturated = false, bool background_radius_as_source_separation = false)
 		{
 			IMAGE = image;
@@ -289,7 +307,7 @@ namespace JPFITS
 		/// <param name="kernel_radius">The radius (pixels) of the kernel to centroid.</param>
 		/// <param name="auto_background">Automatically determine the local background for potential sources.  Not required if background is known to be zeroed, but should have no effect if used in this case.</param>
 		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
-		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default is the same value as pix_saturation.</param>
+		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default of 0 results in the same value as pix_saturation.</param>
 		public void Extract_Sources(double[,] image, double[] XCoords, double[] YCoords, double pix_saturation, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, double pix_saturation_mapmin = 0)
 		{
 			IMAGE = image;
@@ -1047,6 +1065,7 @@ namespace JPFITS
 			fs.Position = start;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
 			SOURCE_INDEX_MAP = (int[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.NAXIS, ReadReturnPrecision.Native);
+			fs.Close();
 
 			fs = new FileStream(fileName, FileMode.Open, FileAccess.Read);
 			header = null;
@@ -1054,6 +1073,7 @@ namespace JPFITS
 			fs.Position = start;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
 			SOURCE_BOOLEAN_MAP = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.NAXIS, ReadReturnPrecision.Boolean);
+			fs.Close();
 
 			if (this.SearchROI)
 			{
@@ -1063,6 +1083,7 @@ namespace JPFITS
 				fs.Position = start;
 				FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out _, out bitpix, out naxisn, out bscale, out bzero);
 				ROI_REGION = (bool[,])FITSFILEOPS.ReadImageDataUnit(fs, null, false, bitpix, ref naxisn, bscale, bzero, RankFormat.NAXIS, ReadReturnPrecision.Boolean);
+				fs.Close();
 			}
 
 			N_SRC = BinTablePSE.Naxis2;
@@ -1604,7 +1625,7 @@ namespace JPFITS
 					if (P0 == null)
 						P0 = new double[5];
 
-					JPMath.Fit_PointSource(JPMath.PointSourceModel.CircularGaussian, JPMath.FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
+					JPMath.Fit_PointSource(PointSourceModel.CircularGaussian, FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
 					FITS_VOLUME[k] = 2 * Math.PI * P0[0] * P0[3] * P0[3];
 					FITS_FWHM_X[k] = 2.355 * P0[3];
 					FITS_FWHM_Y[k] = FITS_FWHM_X[k];
@@ -1619,7 +1640,7 @@ namespace JPFITS
 					if (P0 == null)
 						P0 = new double[7];
 
-					JPMath.Fit_PointSource(JPMath.PointSourceModel.EllipticalGaussian, JPMath.FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
+					JPMath.Fit_PointSource(PointSourceModel.EllipticalGaussian, FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
 					FITS_VOLUME[k] = 2 * Math.PI * P0[0] * P0[4] * P0[5];
 					FITS_FWHM_X[k] = 2.355 * P0[4];
 					FITS_FWHM_Y[k] = 2.355 * P0[5];
@@ -1641,7 +1662,7 @@ namespace JPFITS
 					if (P0 == null)
 						P0 = new double[6];
 
-					JPMath.Fit_PointSource(JPMath.PointSourceModel.CircularMoffat, JPMath.FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
+					JPMath.Fit_PointSource(PointSourceModel.CircularMoffat, FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
 					FITS_VOLUME[k] = Math.PI * P0[3] * P0[3] * P0[0] / (P0[4] - 1);
 					FITS_FWHM_X[k] = 2 * P0[3] * Math.Sqrt(Math.Pow(2, 1 / (P0[4])) - 1);
 					FITS_FWHM_Y[k] = FITS_FWHM_X[k];
@@ -1656,7 +1677,7 @@ namespace JPFITS
 					if (P0 == null)
 						P0 = new double[8];
 
-					JPMath.Fit_PointSource(JPMath.PointSourceModel.EllipticalMoffat, JPMath.FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
+					JPMath.Fit_PointSource(PointSourceModel.EllipticalMoffat, FitMinimizationType.ChiSquared, xcoords, ycoords, kernel, ref P0, lb, ub, out _, out _, out chisq_norm, out _);
 					FITS_VOLUME[k] = Math.PI * P0[4] * P0[5] * P0[0] / (P0[6] - 1);
 					FITS_FWHM_X[k] = 2 * P0[4] * Math.Sqrt(Math.Pow(2, 1 / (P0[6])) - 1);
 					FITS_FWHM_Y[k] = 2 * P0[5] * Math.Sqrt(Math.Pow(2, 1 / (P0[6])) - 1);

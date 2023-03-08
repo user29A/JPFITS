@@ -9,27 +9,27 @@ namespace JPFITS
 {
 	public enum DiskPrecision
 	{
-		Boolean,
+		Boolean = TypeCode.Boolean,
 
-		Byte,
+		Byte = TypeCode.Byte,
 
-		SByte,
+		SByte = TypeCode.SByte,
 
-		UInt16,
+		UInt16 = TypeCode.UInt16,
 
-		Int16,
+		Int16 = TypeCode.Int16,
 
-		UInt32,
+		UInt32 = TypeCode.UInt32,
 
-		Int32,
+		Int32 = TypeCode.Int32,
 
-		UInt64,
+		UInt64 = TypeCode.UInt64,
 
-		Int64,
+		Int64 = TypeCode.Int64,
 
-		Single,
+		Single = TypeCode.Single,
 
-		Double
+		Double = TypeCode.Double
 	}
 
 	/// <summary>Array formatting options for the data unit returned by the ReadImageDataUnit method.</summary>
@@ -423,7 +423,6 @@ namespace JPFITS
 			int NBytes = (int)JPMath.Product(naxisn) * (bpix / 8);
 			byte[] arr = new byte[NBytes];
 			fs.Read(arr, 0, NBytes);//fastest to just read the entire data even if only subimage will be used - though this may needs to be checked with new m2 faster drives!?
-			fs.Close();
 
 			ParallelOptions opts = new ParallelOptions();
 			if (doParallel)

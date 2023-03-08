@@ -1557,7 +1557,8 @@ namespace JPFITS
 
 			FITSHeader HEADER = new FITSHeader(header, true);
 
-			double[,,] cube = (double[,,])FITSFILEOPS.ReadImageDataUnit(fs, null, true, BITPIX, ref naxisn, BSCALE, BZERO, RankFormat.NAXIS);	
+			double[,,] cube = (double[,,])FITSFILEOPS.ReadImageDataUnit(fs, null, true, BITPIX, ref naxisn, BSCALE, BZERO, RankFormat.NAXIS);
+			fs.Close();
 
 			string destFullFileName = sourceFullFileName.Substring(0, sourceFullFileName.LastIndexOf("\\")) + "\\";
 
@@ -1573,7 +1574,7 @@ namespace JPFITS
 						layer[x, y] = cube[x, y, z];
 				});
 
-				FITSImage fi = new FITSImage(destFullFileName + z.ToString("00000") + ".fits", layer, true, true);
+				FITSImage fi = new FITSImage(destFullFileName + (z + 1).ToString("00000") + ".fits", layer, true, true);
 				
 				for (int m = 0; m < HEADER.Length; m++)
 					if (FITSHeader.ValidKeyEdit(HEADER[m].Name, false))

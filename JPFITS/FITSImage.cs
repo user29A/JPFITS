@@ -322,6 +322,7 @@ namespace JPFITS
 					int n = NAXISN[0];
 					NAXISN = new int[2] { 1, n };
 				}
+			fs.Close();
 
 			if (!DATA_POP)
 				STATS_POP = false;
@@ -390,6 +391,7 @@ namespace JPFITS
 					int n = NAXISN[0];
 					NAXISN = new int[2] { 1, n };
 				}
+			fs.Close();
 
 			if (!DATA_POP)
 				STATS_POP = false;
@@ -461,6 +463,7 @@ namespace JPFITS
 					int n = NAXISN[0];
 					NAXISN = new int[2] { 1, n };
 				}
+			fs.Close();
 
 			if (!DATA_POP)
 				STATS_POP = false;
@@ -1030,7 +1033,7 @@ namespace JPFITS
 		#region STATICFILEIO
 
 		/// <summary>Create a FITSImage object from raw data on disk.</summary>
-		/// <param name="diskRawDataFileName">File name of the disk byte data.</param>
+		/// <param name="diskRawDataFileName">File name of the disk byte data in big-endian format.</param>
 		/// <param name="fitsFileWriteName">File name for the FITS image object to write to. Pass an empty string to use the same file name with .fits extension. If the destination file exists, it will be overwritten.</param>
 		/// <param name="precision">TypeCode precision of the data stored in the disk raw byte data.</param>
 		/// <param name="NAxis1">Length of the 1st axis (x-axis)</param>
@@ -1059,6 +1062,7 @@ namespace JPFITS
 			fits_fs.Write(byteHEADER, 0, byteHEADER.Length);//header is written
 
 			fits_fs.Write(buff_arr, 0, NBytes);
+
 			int resid = (int)(Math.Ceiling((double)fits_fs.Length / 2880.0)) * 2880 - (int)(fits_fs.Length);
 			fits_fs.Write(new byte[resid], 0, resid);
 			fits_fs.Close();
@@ -1171,7 +1175,9 @@ namespace JPFITS
 			ArrayList header = null;
 			FITSFILEOPS.ScanImageHeaderUnit(fs, false, ref header, out bool hasext, out int BITPIX, out int[] NAXISN, out double BSCALE, out double BZERO);
 
-			return (double[])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, RankFormat.ArrayAsRangeRank);
+			double[] result = (double[])FITSFILEOPS.ReadImageDataUnit(fs, range, doParallel, BITPIX, ref NAXISN, BSCALE, BZERO, RankFormat.ArrayAsRangeRank);
+			fs.Close();
+			return result;
 		}
 
 		/// <summary>Reads an N-dimensional array and returns the results at its native on-disk precision by default. User may reorginize the array based on the return variable axis lengths vector nAxisN.</summary>
@@ -1187,7 +1193,9 @@ namespace JPFITS
 				throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
 			}
 
-			return FITSFILEOPS.ReadImageDataUnit(fs, null, true, bitpix, ref nAxisN, bscale, bzero, RankFormat.Vector, returnPrecision);
+			Array result = FITSFILEOPS.ReadImageDataUnit(fs, null, true, bitpix, ref nAxisN, bscale, bzero, RankFormat.Vector, returnPrecision);
+			fs.Close();
+			return result;
 		}
 
 		/// <summary>Reads an N-dimensional array and returns the results at its native on-disk precision by default. User may reorginize the array based on the return variable axis lengths vector nAxisN.</summary>
@@ -1211,7 +1219,9 @@ namespace JPFITS
 				throw new Exception("File '" + fullFileName + "' not formatted as FITS file.");
 			}
 
-			return FITSFILEOPS.ReadImageDataUnit(fs, null, true, bitpix, ref nAxisN, bscale, bzero, RankFormat.Vector, returnPrecision);
+			Array result = FITSFILEOPS.ReadImageDataUnit(fs, null, true, bitpix, ref nAxisN, bscale, bzero, RankFormat.Vector, returnPrecision);
+			fs.Close();
+			return result;
 		}
 
 		/// <summary>If a Primary data unit is saved as a layered image cube where each layer is unique, separate the layers into individual named extensions instead. The primary header will be copied into the extensions.</summary>

@@ -9,6 +9,132 @@ using System.Collections.Concurrent;
 
 namespace JPFITS
 {
+	public enum FitMinimizationType
+	{
+		/// <summary>
+		/// 
+		/// </summary>
+		LeastSquares,
+
+		/// <summary>
+		/// 
+		/// </summary>
+		ChiSquared,
+
+		/// <summary>
+		/// 
+		/// </summary>
+		Robust,
+
+		/// <summary>
+		/// 
+		/// </summary>
+		CashStatistic
+	}
+
+	public enum PointSourceModel
+	{
+		/// <summary>
+		/// G(x,y|p) = p(0) * exp(-((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2)) + p(4)
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias 
+		/// </summary>
+		CircularGaussian,
+
+		/// <summary>
+		/// G(x,y|p) = p(0) * exp(-((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias. 
+		/// </summary>
+		EllipticalGaussian,
+
+		/// <summary>
+		/// M(x,y|p) = p(0) * ( 1 + { (x - p(1))^2 + (y - p(2))^2 } / p(3)^2 )^(-p(4)) + p(5)
+		/// </summary>
+		CircularMoffat,
+
+		/// <summary>
+		/// M(x,y|p) = p(0) * ( 1 + { ((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3)))^2 } / p(5)^2 )^(-p(6)) + p(7)
+		/// </summary>
+		EllipticalMoffat
+	}
+
+	public enum PointSourceCompoundModel
+	{
+		/// <summary>
+		/// G(x,y|p_n) = Sum[p_n(0) * exp(-((x - p_n(1))^2 + (y - p_n(2))^2) / (2*p_n(3)^2))] + p(4)
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias 
+		/// </summary>
+		CircularGaussian,
+
+		/// <summary>
+		/// G(x,y|p_n) =  Sum[p_n(0) * exp(-((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 / (2*p_n(4)^2) - (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3))).^2 / (2*p_n(5)^2) )] + p(6)
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias.  
+		/// </summary>
+		EllipticalGaussian,
+
+		/// <summary>
+		/// M(x,y|p_n) = sum[p_n(0) * ( 1 + { (x - p_n(1))^2 + (y - p_n(2))^2 } / p_n(3)^2 )^(-p_n(4))] + p(5)
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias
+		/// </summary>
+		CircularMoffat,
+
+		/// <summary>
+		/// M(x,y|p_n) = sum[p_n(0) * ( 1 + { ((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 } / p_n(4)^2 + { (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3)))^2 } / p_n(5)^2 )^(-p_n(6))] + p_n(7)
+		/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias
+		/// </summary>
+		EllipticalMoffat
+	}
+
+	public enum SmoothingMethod
+	{
+		/// <summary>
+		/// simple moving average
+		/// </summary>
+		Simple,
+
+		/// <summary>
+		/// centered moving average
+		/// </summary>
+		Centered,
+
+		/// <summary>
+		/// linear regresion moving average
+		/// </summary>
+		Linear,
+
+		/// <summary>
+		/// exponential moving average
+		/// </summary>
+		Exponential
+	}
+
+	public enum InterpolationType
+	{
+		/// <summary>
+		/// linear interpolation
+		/// </summary>
+		Linear,
+
+		/// <summary>
+		/// cubic spline interpolation
+		/// </summary>
+		Cublic,
+
+		/// <summary>
+		/// monotone cubic spline which preserves monoticity of the data
+		/// </summary>
+		Monotone,
+
+		/// <summary>
+		/// default Catmull-Rom spline
+		/// </summary>
+		CatmullRom,
+
+		/// <summary>
+		/// Akima is a cubic spline which is stable to the outliers, avoiding the oscillations of a cubic spline
+		/// </summary>
+		Akima
+	}
+
 	public class JPMath
 	{
 		public class PointD
@@ -692,55 +818,7 @@ namespace JPFITS
 						fit_residuals[i, j] = Mdata[i, j] - val;
 					}
 			}
-		}
-
-		public enum FitMinimizationType
-		{
-			/// <summary>
-			/// 
-			/// </summary>
-			LeastSquares,
-
-			/// <summary>
-			/// 
-			/// </summary>
-			ChiSquared,
-
-			/// <summary>
-			/// 
-			/// </summary>
-			Robust,
-
-			/// <summary>
-			/// 
-			/// </summary>
-			CashStatistic
-		}
-
-		public enum PointSourceModel
-		{
-			/// <summary>
-			/// G(x,y|p) = p(0) * exp(-((x - p(1))^2 + (y - p(2))^2) / (2*p(3)^2)) + p(4)
-			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias 
-			/// </summary>
-			CircularGaussian,
-
-			/// <summary>
-			/// G(x,y|p) = p(0) * exp(-((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 / (2*p(4)^2) - (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3))).^2 / (2*p(5)^2) ) + p(6)
-			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias. 
-			/// </summary>
-			EllipticalGaussian,
-
-			/// <summary>
-			/// M(x,y|p) = p(0) * ( 1 + { (x - p(1))^2 + (y - p(2))^2 } / p(3)^2 )^(-p(4)) + p(5)
-			/// </summary>
-			CircularMoffat,
-
-			/// <summary>
-			/// M(x,y|p) = p(0) * ( 1 + { ((x - p(1))*cosd(p(3)) + (y - p(2))*sind(p(3)))^2 } / p(4)^2 + { (-(x - p(1))*sind(p(3)) + (y - p(2))*cosd(p(3)))^2 } / p(5)^2 )^(-p(6)) + p(7)
-			/// </summary>
-			EllipticalMoffat
-		}
+		}		
 
 		public static void Fit_PointSource(PointSourceModel model_name, FitMinimizationType minimization_type, int[]? xdata, int[]? ydata, double[,] source, ref double[]? params_INIT, double[]? params_LB, double[]? params_UB, out double[] p_err, out double[,] fit_residuals, out double chi_sq_norm, out string termination_msg)
 		{
@@ -1002,33 +1080,7 @@ namespace JPFITS
 				}
 			chi_sq_norm /= (source.Length - params_INIT.Length);
 		}
-
-		public enum PointSourceCompoundModel
-		{
-			/// <summary>
-			/// G(x,y|p_n) = Sum[p_n(0) * exp(-((x - p_n(1))^2 + (y - p_n(2))^2) / (2*p_n(3)^2))] + p(4)
-			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = sigma; p[4] = bias 
-			/// </summary>
-			CircularGaussian,
-
-			/// <summary>
-			/// G(x,y|p_n) =  Sum[p_n(0) * exp(-((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 / (2*p_n(4)^2) - (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3))).^2 / (2*p_n(5)^2) )] + p(6)
-			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-sigma; p[5] = y-sigma; p[6] = bias.  
-			/// </summary>
-			EllipticalGaussian,
-
-			/// <summary>
-			/// M(x,y|p_n) = sum[p_n(0) * ( 1 + { (x - p_n(1))^2 + (y - p_n(2))^2 } / p_n(3)^2 )^(-p_n(4))] + p(5)
-			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = theta; p[4] = beta; p[5] = bias
-			/// </summary>
-			CircularMoffat,
-
-			/// <summary>
-			/// M(x,y|p_n) = sum[p_n(0) * ( 1 + { ((x - p_n(1))*cosd(p_n(3)) + (y - p_n(2))*sind(p_n(3)))^2 } / p_n(4)^2 + { (-(x - p_n(1))*sind(p_n(3)) + (y - p_n(2))*cosd(p_n(3)))^2 } / p_n(5)^2 )^(-p_n(6))] + p_n(7)
-			/// <br />p[0] = amplitude; p[1] = x-center; p[2] = y-center; p[3] = phi; p[4] = x-theta; p[5] = y-theta; p[6] = beta; p[7] = bias
-			/// </summary>
-			EllipticalMoffat
-		}
+			
 
 		public static void Fit_PointSource_Compound(PointSourceCompoundModel model_name, FitMinimizationType minimization_type, int[] xdata, int[] ydata, double[,] source, double[] xpositions, double[] ypositions, double position_radius, ref double[,] param, ref double[,] p_err, ref double[,] fit_residuals, out string termination_msg)
 		{
@@ -2083,30 +2135,7 @@ namespace JPFITS
 			result[2] = (x1 * x1 * (x2 * y3 - x3 * y2) - x2 * x2 * (x1 * y3 - x3 * y1) + x3 * x3 * (x1 * y2 - x2 * y1)) / det;
 
 			return result;
-		}
-
-		public enum SmoothingMethod
-		{
-			/// <summary>
-			/// simple moving average
-			/// </summary>
-			Simple,
-
-			/// <summary>
-			/// centered moving average
-			/// </summary>
-			Centered,
-
-			/// <summary>
-			/// linear regresion moving average
-			/// </summary>
-			Linear,
-
-			/// <summary>
-			/// exponential moving average
-			/// </summary>
-			Exponential
-		}
+		}		
 
 		/// <summary>Smooths a data series with optional methods.</summary>
 		/// <param name="data">The data to smooth.</param>
@@ -2196,35 +2225,7 @@ namespace JPFITS
 			}
 			return result;
 		}
-
-		public enum InterpolationType
-		{
-			/// <summary>
-			/// linear interpolation
-			/// </summary>
-			Linear,
-
-			/// <summary>
-			/// cubic spline interpolation
-			/// </summary>
-			Cublic,
-
-			/// <summary>
-			/// monotone cubic spline which preserves monoticity of the data
-			/// </summary>
-			Monotone,
-
-			/// <summary>
-			/// default Catmull-Rom spline
-			/// </summary>
-			CatmullRom,
-
-			/// <summary>
-			/// Akima is a cubic spline which is stable to the outliers, avoiding the oscillations of a cubic spline
-			/// </summary>
-			Akima
-		}
-
+		
 		/// <summary>Returns an interpolation of the specified data at the given interpolation points.</summary>
 		/// <param name="xdata">The x-positions of the ydata points to interpolate.</param>
 		/// <param name="ydata">The y-values of the data to interpolate.</param>
