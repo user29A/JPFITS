@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
 using System.Runtime.CompilerServices;
+using System.Windows.Forms;
 #nullable enable
 
 namespace JPFITS
@@ -3131,14 +3132,12 @@ namespace JPFITS
 			if (dataUnit.Rank > 3)
 				throw new Exception("Error: I can only handle up to 3-dimensional data units - SORRY!");
 
-			//if (Type.GetTypeCode(dataUnit.GetType().GetElementType()) != WritePrecision.Double)
-			//	throw new Exception("Error: Only double-precision arrays can be passed.");
 			TypeCode dataUnitType = Type.GetTypeCode(dataUnit.GetType().GetElementType());
 
 			GetBitpixNaxisnBscaleBzero(formatPrecision, dataUnit, out int bitpix, out int[] naxisn, out double bscale, out double bzero);
 
-			long Ndatabytes = dataUnit.Length * Math.Abs(bitpix) / 8;
-			int NBlocks = (int)(Math.Ceiling((double)(Ndatabytes) / 2880.0));
+			long Ndatabytes = ((long)dataUnit.Length) * ((long)Math.Abs(bitpix) / 8);
+			int NBlocks = (int)(Math.Ceiling((double)Ndatabytes / 2880.0));
 			int NBytesTot = NBlocks * 2880;
 			byte[] bytearray = new byte[NBytesTot];
 
