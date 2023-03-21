@@ -7,6 +7,8 @@ using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Drawing;
 using System.IO;
+using static alglib;
+
 #nullable enable
 
 namespace JPFITS
@@ -146,13 +148,13 @@ namespace JPFITS
 			FITTED = false;
 			WCS_GENERATED = false;
 			VALIDPSERECTS = false;
-			double sigma = -1, bg_est;
+			double bgstd = -1, bg_est;
 			double[,] kernel;
-			double[] sigmas = new double[N_SRC];
+			int npixels;
 
 			for (int i = 0; i < N_SRC; i++)
 			{
-				bg_est = ESTIMATELOCALBACKGROUND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), BACKGROUND_RADIUS, BackGroundEstimateStyle.Corners2ndMin, ref sigma);
+				bg_est = ESTIMATELOCALBACKGROUND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), BACKGROUND_RADIUS, BackGroundEstimateStyle.Corners2ndMin, ref bgstd);
 
 				if (PIX_SAT != 0 && IMAGE[(int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i])] >= PIX_SAT)
 				{
@@ -178,6 +180,7 @@ namespace JPFITS
 						if (ymax >= IMAGE.GetLength(1))
 							ymax = IMAGE.GetLength(1) - 1;
 					}
+					npixels = (xmax - xmin + 1) * (ymax - ymin + 1);
 
 					Centroid(xmin, xmax, ymin, ymax, bg_est, out _, out _, out kernel);
 				}
@@ -187,7 +190,7 @@ namespace JPFITS
 					if (bg_est != 0)
 						kernel = JPMath.MatrixAddScalar(kernel, -bg_est, false);
 
-					RADIALIZE_MAPS_KERNEL(xrange[KERNEL_RADIUS], yrange[KERNEL_RADIUS], i);
+					RADIALIZE_MAPS_KERNEL(xrange[KERNEL_RADIUS], yrange[KERNEL_RADIUS], i, out npixels);
 				}
 
 				CENTROIDS_PIXEL_X[i] = (int)Math.Round(XCoords[i]);
@@ -198,9 +201,10 @@ namespace JPFITS
 				CENTROIDS_VOLUME[i] = JPMath.Sum(kernel);
 				CENTROIDS_AUTOBGEST[i] = bg_est;
 				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
-				sigma = 0;
-				CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.BackgoundRadiusSquareAnnulus, ref sigma);
-				sigmas[i] = sigma;
+				bgstd = 0;
+				CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.AnnulusMedian, ref bgstd);
+				CENTROIDS_ANULMEDBGSTD[i] = bgstd;
+				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + CENTROIDS_ANULMEDBGEST[i] * npixels);
 
 				if (SAVE_PS)
 				{
@@ -211,15 +215,7 @@ namespace JPFITS
 					JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
 					f.WriteImage(DiskPrecision.Double, false);
 				}
-			}
-
-			double rsq = KERNEL_RADIUS * KERNEL_RADIUS;
-			if (rsq == 0)
-				rsq = 1;
-			double mediansigma = JPMath.Median(sigmas);
-			double bg = rsq * mediansigma * mediansigma;
-			for (int i = 0; i < N_SRC; i++)
-				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
+			}			
 		}
 
 		#endregion
@@ -336,14 +332,13 @@ namespace JPFITS
 			FITTED = false;
 			WCS_GENERATED = false;
 			VALIDPSERECTS = false;
-			double y_centroid, x_centroid, sigma = -1, bg_est;
-			int kernelxmax, kernelymax;
+			double y_centroid, x_centroid, bgstd = -1, bg_est;
+			int kernelxmax, kernelymax, npixels;
 			double[,] kernel;
-			double[] sigmas = new double[N_SRC];
 
 			for (int i = 0; i < N_SRC; i++)
 			{
-				bg_est = ESTIMATELOCALBACKGROUND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), BACKGROUND_RADIUS, BackGroundEstimateStyle.Corners2ndMin, ref sigma);
+				bg_est = ESTIMATELOCALBACKGROUND((int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i]), BACKGROUND_RADIUS, BackGroundEstimateStyle.Corners2ndMin, ref bgstd);
 
 				if (PIX_SAT != 0 && IMAGE[(int)Math.Round(XCoords[i]), (int)Math.Round(YCoords[i])] >= PIX_SAT)
 				{
@@ -369,6 +364,7 @@ namespace JPFITS
 						if (ymax >= IMAGE.GetLength(1))
 							ymax = IMAGE.GetLength(1) - 1;
 					}
+					npixels = (xmax - xmin + 1) * (ymax - ymin + 1);
 
 					kernelxmax = (xmin + xmax) / 2;
 					kernelymax = (ymin + ymax) / 2;
@@ -381,7 +377,7 @@ namespace JPFITS
 					if (bg_est != 0)
 						kernel = JPMath.MatrixAddScalar(kernel, -bg_est, false);
 
-					RADIALIZE_MAPS_KERNEL(xrange[KERNEL_RADIUS], yrange[KERNEL_RADIUS], i);
+					RADIALIZE_MAPS_KERNEL(xrange[KERNEL_RADIUS], yrange[KERNEL_RADIUS], i, out npixels);
 					Centroid(xrange, yrange, kernel, out x_centroid, out y_centroid);
 					JPMath.Max(kernel, out kernelxmax, out kernelymax);
 					kernelxmax += xrange[0];
@@ -402,9 +398,10 @@ namespace JPFITS
 				CENTROIDS_VOLUME[i] = JPMath.Sum(kernel);
 				CENTROIDS_AUTOBGEST[i] = bg_est;
 				CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
-				sigma = 0;
-				CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.BackgoundRadiusSquareAnnulus, ref sigma);
-				sigmas[i] = sigma;
+				bgstd = 0;
+				CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.AnnulusMedian, ref bgstd);
+				CENTROIDS_ANULMEDBGSTD[i] = bgstd;
+				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + CENTROIDS_ANULMEDBGEST[i] * npixels);
 
 				if (SAVE_PS)
 				{
@@ -415,15 +412,7 @@ namespace JPFITS
 					JPFITS.FITSImage f = new JPFITS.FITSImage(file, kernel, false, false);
 					f.WriteImage(DiskPrecision.Double, false);
 				}
-			}
-
-			double rsq = KERNEL_RADIUS * KERNEL_RADIUS;
-			if (rsq == 0)
-				rsq = 1;
-			double mediansigma = JPMath.Median(sigmas);
-			double bg = rsq * mediansigma * mediansigma;
-			for (int i = 0; i < N_SRC; i++)
-				CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
+			}			
 		}
 
 		/// <summary>Attempt to find N strongest sources in an image.</summary>
@@ -451,7 +440,7 @@ namespace JPFITS
 			{
 				niters++;
 
-				Extract_Sources(image, pix_saturation, pixthresh, Double.MaxValue, 0, Double.MaxValue, false, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar);
+				Extract_Sources(image, pix_saturation, pixthresh, Double.MaxValue, 0, Double.MaxValue, false, kernel_radius, source_separation, auto_background, kernel_filename_template, ROI_region, show_waitbar, 0, false, true);
 
 				if (this.N_Sources >= nBrightestSources)
 					break;
@@ -826,6 +815,10 @@ namespace JPFITS
 				CENTROIDS_ANULMEDBGEST[i] = CENTROIDS_ANULMEDBGEST[indices[i]];
 				CENTROIDS_ANULMEDBGEST[indices[i]] = dum;
 
+				dum = CENTROIDS_ANULMEDBGSTD[i];
+				CENTROIDS_ANULMEDBGSTD[i] = CENTROIDS_ANULMEDBGSTD[indices[i]];
+				CENTROIDS_ANULMEDBGSTD[indices[i]] = dum;
+
 				dum = CENTROIDS_SNR[i];
 				CENTROIDS_SNR[i] = CENTROIDS_SNR[indices[i]];
 				CENTROIDS_SNR[indices[i]] = dum;
@@ -891,6 +884,7 @@ namespace JPFITS
 			Array.Resize(ref CENTROIDS_VOLUME, NBright);
 			Array.Resize(ref CENTROIDS_AUTOBGEST, NBright);
 			Array.Resize(ref CENTROIDS_ANULMEDBGEST, NBright);
+			Array.Resize(ref CENTROIDS_ANULMEDBGSTD, NBright);
 			Array.Resize(ref FITS_AMPLITUDE, NBright);
 			Array.Resize(ref FITS_VOLUME, NBright);
 			Array.Resize(ref FITS_ECCENTRICITY, NBright);
@@ -1159,6 +1153,7 @@ namespace JPFITS
 		private double[]? CENTROIDS_VOLUME;
 		private double[]? CENTROIDS_AUTOBGEST;
 		private double[]? CENTROIDS_ANULMEDBGEST;
+		private double[]? CENTROIDS_ANULMEDBGSTD;
 		private double[]? CENTROIDS_SNR;
 		private bool[]? SATURATED;
 		private bool REJECT_SATURATED;
@@ -1193,29 +1188,6 @@ namespace JPFITS
 		//private object BGWRKR_RESULT;
 		private readonly object LOCKOBJECT = new object();
 
-		[MethodImpl(256)]/*256 = agressive inlining*/
-		private void RADIALIZE_MAPS_KERNEL(int x, int y, int sourceIndex)
-		{
-			int krad2 = KERNEL_RADIUS * KERNEL_RADIUS;
-
-			for (int i = x - KERNEL_RADIUS; i <= x + KERNEL_RADIUS; i++)
-			{
-				double sx2 = x - i;
-				sx2 *= sx2;
-
-				for (int j = y - KERNEL_RADIUS; j <= y + KERNEL_RADIUS; j++)
-				{
-					double sy = y - j;
-					double r2 = sx2 + sy * sy;
-					if (r2 > krad2)
-						continue;
-
-						SOURCE_BOOLEAN_MAP[i, j] = true;//this kernel radius position has a source detected
-						SOURCE_INDEX_MAP[i, j] = sourceIndex;//this is the source index of the given detection kernel radius position
-				}
-			}
-		}
-
 		private void BGWRKR_DoWork(object sender, DoWorkEventArgs e)
 		{
 			if (Convert.ToInt32(e.Argument) == 1)//Extract
@@ -1227,9 +1199,10 @@ namespace JPFITS
 				ArrayList Ks = new ArrayList();// kernel sums
 				ArrayList Ps = new ArrayList();// pixel values
 				ArrayList Bs = new ArrayList();// background estimates
+				ArrayList Ns = new ArrayList();// number of pixels
 				double KRAD2 = KERNEL_RADIUS * KERNEL_RADIUS;
 				double SSEP2 = BACKGROUND_RADIUS * BACKGROUND_RADIUS;
-				int src_index = 0;				
+				int src_index = 0;
 
 				if (PIX_SAT > 0)//check for saturation islands
 				{
@@ -1270,6 +1243,7 @@ namespace JPFITS
 									if (ymax >= IMAGE.GetLength(1))
 										ymax = IMAGE.GetLength(1) - 1;
 								}
+								double npixels = (xmax - xmin + 1) * (ymax - ymin + 1);
 
 								double bg_est = 0, sigma = -1;
 								if (AUTO_BG)
@@ -1290,8 +1264,8 @@ namespace JPFITS
 
 								if (Double.IsNaN(x_centroid) || Double.IsInfinity(x_centroid) || Double.IsNaN(y_centroid) || Double.IsInfinity(y_centroid))
 									continue;
-								if (x_centroid < xmin || x_centroid > xmax || y_centroid < ymin || y_centroid > ymax)
-									continue;
+								//if (x_centroid < xmin || x_centroid > xmax || y_centroid < ymin || y_centroid > ymax)
+								//	continue;
 
 								src_index++;
 								N_SATURATED++;
@@ -1300,8 +1274,9 @@ namespace JPFITS
 								Xs.Add(x_centroid);
 								Ys.Add(y_centroid);
 								Ks.Add(kernel_sum);
-								Ps.Add(IMAGE[x, y]);
+								Ps.Add(IMAGE[(xmin + xmax) / 2, (ymin + ymax) / 2]);
 								Bs.Add(bg_est);
+								Ns.Add(npixels);
 
 								if (SAVE_PS)
 								{
@@ -1369,7 +1344,6 @@ namespace JPFITS
 								continue;
 						}
 
-						#region OLD SOURCE_SEPARATION CHECK
 						if (BACKGROUND_RAD_AS_SSEP)
 						{
 							bool brek = false;
@@ -1408,7 +1382,6 @@ namespace JPFITS
 							if (brek)
 								continue;
 						}
-						#endregion
 						else
 						{
 							bool brek = false;
@@ -1468,7 +1441,7 @@ namespace JPFITS
 								continue;
 						}
 
-						lock (LOCKOBJECT) 
+						lock (LOCKOBJECT)
 						{
 							if (SOURCE_BOOLEAN_MAP[x, y])
 								continue;
@@ -1484,7 +1457,7 @@ namespace JPFITS
 							if (x_centroid < x - KERNEL_RADIUS || x_centroid > x + KERNEL_RADIUS || y_centroid < y - KERNEL_RADIUS || y_centroid > y + KERNEL_RADIUS)
 								continue;
 
-							RADIALIZE_MAPS_KERNEL(x, y, src_index);
+							RADIALIZE_MAPS_KERNEL(x, y, src_index, out int npixels);
 
 							src_index++;
 							XPIXs.Add(x);
@@ -1494,6 +1467,7 @@ namespace JPFITS
 							Ks.Add(kernel_psf_sum);
 							Ps.Add(pixel);
 							Bs.Add(bg_est);
+							Ns.Add((double)npixels);
 
 							if (SAVE_PS)
 							{
@@ -1524,6 +1498,7 @@ namespace JPFITS
 					Ks.RemoveRange(0, N_SATURATED);
 					Ps.RemoveRange(0, N_SATURATED);
 					Bs.RemoveRange(0, N_SATURATED);
+					Ns.RemoveRange(0, N_SATURATED);
 
 					int[] indexes = new int[XPIXs.Count];
 					for (int i = 0; i < XPIXs.Count; i++)
@@ -1538,7 +1513,6 @@ namespace JPFITS
 				N_SRC = Xs.Count;
 				INITARRAYS();
 
-				double[] sigma = new double[N_SRC];
 				for (int i = 0; i < N_SRC; i++)
 				{
 					CENTROIDS_PIXEL_X[i] = Convert.ToInt32(XPIXs[i]);
@@ -1552,22 +1526,15 @@ namespace JPFITS
 					if (i < N_SATURATED)
 						SATURATED[i] = true;
 
-					double sig = 0;
-					CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.BackgoundRadiusSquareAnnulus, ref sig);
-					sigma[i] = sig;
+					double bgstd = 0;
+					CENTROIDS_ANULMEDBGEST[i] = ESTIMATELOCALBACKGROUND(CENTROIDS_PIXEL_X[i], CENTROIDS_PIXEL_Y[i], BACKGROUND_RADIUS, BackGroundEstimateStyle.AnnulusMedian, ref bgstd);
+					CENTROIDS_ANULMEDBGSTD[i] = bgstd;
+					CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + CENTROIDS_ANULMEDBGEST[i] * Convert.ToDouble(Ns[i]));
 				}
-				double mediansigma = JPMath.Median(sigma);
-				double rsq = KERNEL_RADIUS * KERNEL_RADIUS;
-				if (rsq == 0)
-					rsq = 1;
-				double bg = rsq * mediansigma * mediansigma;
-				for (int i = 0; i < N_SRC; i++)
-					CENTROIDS_SNR[i] = CENTROIDS_VOLUME[i] / Math.Sqrt(CENTROIDS_VOLUME[i] + bg);
 
 				return;
 			}
 			//returned if after Source Extraction
-
 
 			//perform Fitting
 			int intprog = 0;
@@ -1734,9 +1701,9 @@ namespace JPFITS
 		private void GENERATEPSETABLE()
 		{
 			if (!FITTED)
-				PSE_TABLE = new string[13, N_SRC + 1];
+				PSE_TABLE = new string[14, N_SRC + 1];
 			else
-				PSE_TABLE = new string[27 + FITS_PARAMS.GetLength(0), N_SRC + 1];
+				PSE_TABLE = new string[28 + FITS_PARAMS.GetLength(0), N_SRC + 1];
 
 			int c = 0;
 
@@ -1748,6 +1715,7 @@ namespace JPFITS
 			PSE_TABLE[c++, 0] = "PSE Volume";
 			PSE_TABLE[c++, 0] = "PSE Background";
 			PSE_TABLE[c++, 0] = "Annulus Background";
+			PSE_TABLE[c++, 0] = "Annulus Background Stdv";
 			PSE_TABLE[c++, 0] = "PSE SNR";
 			PSE_TABLE[c++, 0] = "PSE RA (deg)";
 			PSE_TABLE[c++, 0] = "PSE Dec (deg)";
@@ -1786,6 +1754,7 @@ namespace JPFITS
 				PSE_TABLE[c++, i + 1] = CENTROIDS_VOLUME[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_AUTOBGEST[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_ANULMEDBGEST[i].ToString();
+				PSE_TABLE[c++, i + 1] = CENTROIDS_ANULMEDBGSTD[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_SNR[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_RADEG[i].ToString();
 				PSE_TABLE[c++, i + 1] = CENTROIDS_DECDEG[i].ToString();
@@ -1830,7 +1799,7 @@ namespace JPFITS
 			/// <summary>
 			/// The median of the square periphery annulus of the Background Radius box centered on the source pixel. Very accurate but slower.
 			/// </summary>
-			BackgoundRadiusSquareAnnulus
+			AnnulusMedian
 		}
 
 		/// <summary>
@@ -1879,7 +1848,7 @@ namespace JPFITS
 
 				return min;
 			}
-			else if (bgeststyle == BackGroundEstimateStyle.BackgoundRadiusSquareAnnulus)
+			else if (bgeststyle == BackGroundEstimateStyle.AnnulusMedian)
 			{
 				double[] xtop = new double[xmax - xmin + 1];
 				double[] xbot = new double[xmax - xmin + 1];
@@ -1912,7 +1881,32 @@ namespace JPFITS
 			}
 			else
 				throw new Exception("Made it to end of ESTIMATELOCALBACKGROUND without returning.");
-		}		
+		}
+
+		[MethodImpl(256)]/*256 = agressive inlining*/
+		public void RADIALIZE_MAPS_KERNEL(int x, int y, int sourceIndex, out int npixels)
+		{
+			int krad2 = KERNEL_RADIUS * KERNEL_RADIUS;
+			npixels = 0;
+
+			for (int i = x - KERNEL_RADIUS; i <= x + KERNEL_RADIUS; i++)
+			{
+				double sx2 = x - i;
+				sx2 *= sx2;
+
+				for (int j = y - KERNEL_RADIUS; j <= y + KERNEL_RADIUS; j++)
+				{
+					double sy = y - j;
+					double r2 = sx2 + sy * sy;
+					if (r2 > krad2)
+						continue;
+
+					SOURCE_BOOLEAN_MAP[i, j] = true;//this kernel radius position has a source detected
+					SOURCE_INDEX_MAP[i, j] = sourceIndex;//this is the source index of the given detection kernel radius position
+					npixels++;
+				}
+			}
+		}
 
 		[MethodImpl(256)]
 		private void MAPSATURATIONISLAND(int X, int Y, int sourceindex, ref int xmin, ref int xmax, ref int ymin, ref int ymax)
@@ -1990,6 +1984,7 @@ namespace JPFITS
 			CENTROIDS_VOLUME = new double[N_SRC];
 			CENTROIDS_AUTOBGEST = new double[N_SRC];
 			CENTROIDS_ANULMEDBGEST = new double[N_SRC];
+			CENTROIDS_ANULMEDBGSTD = new double[N_SRC];
 			CENTROIDS_SNR = new double[N_SRC];
 			SATURATED = new bool[N_SRC];
 			CENTROIDS_RADEG = new double[N_SRC];
@@ -2082,9 +2077,9 @@ namespace JPFITS
 			{
 				CENTROIDS_X = value;
 				N_SRC = CENTROIDS_X.Length;
-				CENTROID_POINTS = new JPMath.PointD[N_SRC];
-				for (int i = 0; i < N_SRC; i++)
-					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
+				//CENTROID_POINTS = new JPMath.PointD[N_SRC];
+				//for (int i = 0; i < N_SRC; i++)
+				//	CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 			}
 		}
 
@@ -2096,9 +2091,9 @@ namespace JPFITS
 			{
 				CENTROIDS_Y = value;
 				N_SRC = CENTROIDS_Y.Length;
-				CENTROID_POINTS = new JPMath.PointD[N_SRC];
-				for (int i = 0; i < N_SRC; i++)
-					CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
+				//CENTROID_POINTS = new JPMath.PointD[N_SRC];
+				//for (int i = 0; i < N_SRC; i++)
+				//	CENTROID_POINTS[i] = new JPMath.PointD(CENTROIDS_X[i], CENTROIDS_Y[i], CENTROIDS_VOLUME[i]);
 			}
 		}
 
@@ -2106,6 +2101,7 @@ namespace JPFITS
 		public double[] Centroids_Volume
 		{
 			get { return CENTROIDS_VOLUME; }
+			set { CENTROIDS_VOLUME = value; }
 		}
 
 		public double[] Fit_Volumes
@@ -2252,6 +2248,7 @@ namespace JPFITS
 		public int KernelRadius
 		{
 			get { return KERNEL_RADIUS; }
+			set { KERNEL_RADIUS = value; }
 		}
 
 		public int KernelWidth

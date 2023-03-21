@@ -11,6 +11,14 @@ namespace JPFITS
 	/// <summary>WorldCoordinateSolution class for creating, interacting with, and solving the paramaters for World Coordinate Solutions for the FITS image standard.</summary>
 	public class WorldCoordinateSolution
 	{
+		public enum WCSType
+		{
+			/// <summary>
+			/// Tangent-plane Gnomic projection.
+			/// </summary>
+			TAN
+		}
+
 		#region CONSTRUCTORS
 
 		/// <summary>Default constructor.</summary>
@@ -650,15 +658,7 @@ namespace JPFITS
 		public string GetCTYPEn(int coordinate_Axis)
 		{
 			return CTYPEN[coordinate_Axis - 1];
-		}
-
-		public enum WCSType
-		{
-			/// <summary>
-			/// Tangent-plane Gnomic projection.
-			/// </summary>
-			TAN
-		}
+		}		
 
 		/// <summary>Solves the projection parameters for a given list of pixel and coordinate values. Pass nullptr for FITS if writing WCS parameters to a primary header not required.</summary>
 		/// <param name="WCS_Type">The world coordinate solution type. For example: TAN, for tangent-plane or Gnomic projection. Only TAN is currently supported.</param>
@@ -669,7 +669,7 @@ namespace JPFITS
 		/// <param name="cval2">An array of coordinate values in degrees on coordinate axis 2.</param>
 		/// <param name="header">An FITSImageHeader instance to write the solution into. Pass null if not required.</param>
 		/// <param name="verbose">Copy all WCS diagnostic data into the header in addition to essential WCS keywords.</param>
-		public void Solve_WCS(WCSType WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, FITSHeader header, bool verbose = false/*, WorldCoordinateSolution? INIT = null*/)
+		public void Solve_WCS(WCSType WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, FITSHeader? header, bool verbose = false/*, WorldCoordinateSolution? INIT = null*/)
 		{
 			//should first do a check of WCS type to make sure it is valid
 			//if (WCS_Type != "TAN")
@@ -1457,12 +1457,15 @@ namespace JPFITS
 		#region STATIC MEMBERS
 		/// <summary>Checks if a WCS solution exists based on the existence of the CTYPE keywords in the primary header of the given FITS object.</summary>
 		/// <param name="header">The header to scan for complete FITS standard WCS keywords.</param>
-		/// <param name="wcs_CTYPEN">The WCS solution type CTYPE to check for. Only "TAN" supported at this time. Typically both axes utilize the same solution type. For example wcs_CTYPEN = new string[2]{"TAN", "TAN"}</param>
-		public static bool Exists(FITSHeader header, string[] wcs_CTYPEN)
+		/// <param name="wcs_CTYPEN">The WCS solution type CTYPE to check for. Typically both axes of an image utilize the same projection type.</param>
+		public static bool Exists(FITSHeader header, WCSType wcs_CTYPEN)
 		{
-			for (int i = 1; i <= wcs_CTYPEN.Length; i++)
-				if (!header.GetKeyValue("CTYPE" + i.ToString()).Contains(wcs_CTYPEN[i - 1]))
-					return false;
+			//for (int i = 1; i <= 2; i++)
+			//	if (!header.GetKeyValue("CTYPE" + i.ToString()).Contains(wcs_CTYPEN[i - 1]))
+			//		return false;
+
+			if (header.GetKeyIndex("CTYPE1", false) == -1)
+				return false;
 
 			return true;
 		}

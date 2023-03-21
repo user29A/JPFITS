@@ -21,7 +21,7 @@ namespace JPFITS
 		private string? CAT_CVAL1NAME;
 		private string? CAT_CVAL2NAME;
 		private string? CAT_MAGNAME;
-		private FITSImage? FITS_IMG;
+		private FITSImage? FITS_IMG = null;
 		//FITSImage FITS_CAT;
 		private double[]? CAT_CVAL1s;
 		private double[]? CAT_CVAL2s;
@@ -34,7 +34,7 @@ namespace JPFITS
 		private WorldCoordinateSolution? WCS;
 		private PointSourceExtractor? PSE;
 		private DateTime DATE;
-		private string? WCS_TYPE;
+		private WorldCoordinateSolution.WCSType? WCS_TYPE;
 		private bool ZERO_BASED_PIX;
 		private bool AUTO_BACKGROUND;
 		private bool REFINE = false;
@@ -446,7 +446,10 @@ namespace JPFITS
 				return;
 
 			BGWRKR.ReportProgress(0, "Solving for " + c + " point pair matches out of a possible " + N_SOLVE_PTS);
-			WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
+			if (FITS_IMG == null)
+				WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, null, VERBOSEHEADER);
+			else
+				WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
 			BGWRKR.ReportProgress(0, "Solution:" + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "CRPIX1 = " + WCS.GetCRPIXn(1));
 			BGWRKR.ReportProgress(0, "CRPIX2 = " + WCS.GetCRPIXn(2));
@@ -626,7 +629,7 @@ namespace JPFITS
 		#region CONSTRUCTORS
 
 		/// <summary>Initializes the WCS_AutoSolver class including performing source extraction on a given FITS image.</summary>
-		/// <param name="WCS_type">The WCS transformation type. Solution only uses TAN at this time.</param>
+		/// <param name="WCS_type">The WCS transformation type.</param>
 		/// <param name="N_Solve_Points">The number of points N to use to compare image coordinates to catalogue coordinates. Suggest N equals 25 for good correspondence, N equals 50 for poor, N equals 100 for very poor.</param>
 		/// <param name="Fits_Img">The JPFITS.FITSImage containing the primary image data.</param>
 		/// <param name="Image_ROI">The region of interest of the FITS image to search for point sources, of identical size to the FITS image. Pass null or all true for entire image.</param>
@@ -640,7 +643,7 @@ namespace JPFITS
 		/// <param name="Catalogue_CVAL2_Name">The name of the entry inside the binary table which lists the CVAL2 (i.e. declination) coordinates.</param>
 		/// <param name="Catalogue_Magnitude_Name">The name of the entry inside the binary table which lists the source magnitudes.</param>
 		/// <param name="N_Refine_Points">Number of points to use for refinement of the solution. Default is 300. Pass -1 for no refining after the initial solution.</param>
-		public WCSAutoSolver(string WCS_type, int N_Solve_Points, FITSImage Fits_Img, bool[,]? Image_ROI, double Image_Saturation, bool auto_background, int PSE_kernel_radius, int PSE_separation_radius, string Fits_Catalogue_BinTable_File, string Catalogue_Extension_Name, string Catalogue_CVAL1_Name, string Catalogue_CVAL2_Name, string Catalogue_Magnitude_Name, int N_Refine_Points = 300)
+		public WCSAutoSolver(WorldCoordinateSolution.WCSType WCS_type, int N_Solve_Points, FITSImage Fits_Img, bool[,]? Image_ROI, double Image_Saturation, bool auto_background, int PSE_kernel_radius, int PSE_separation_radius, string Fits_Catalogue_BinTable_File, string Catalogue_Extension_Name, string Catalogue_CVAL1_Name, string Catalogue_CVAL2_Name, string Catalogue_Magnitude_Name, int N_Refine_Points = 300)
 		{
 			this.BGWRKR = new BackgroundWorker();
 			this.BGWRKR.WorkerReportsProgress = true;
@@ -681,14 +684,15 @@ namespace JPFITS
 		}
 
 		/// <summary>Initializes the WCS_AutoSolver class for an existing pair of unmatched pixel source and catalogue coordinates.</summary>
-		/// <param name="WCS_type">The WCS transformation type. Solution only uses TAN at this time.</param>
-		/// <param name="pixels">The source pixel positions in computer graphics coordinate orientation, i.e., origin top left of image.</param>
+		/// <param name="WCS_type">The WCS transformation type.</param>
+		/// <param name="x_pixels">The source pixel positions in computer graphics coordinate orientation, i.e., origin top left of image.</param>
+		/// <param name="y_pixels">The source pixel positions in computer graphics coordinate orientation, i.e., origin top left of image.</param>
 		/// <param name="zero_based_pixels">If the source pixel positions are zero-based.</param>
 		/// <param name="pixels_tolerance_radius">The tolerance of the source positions, identical to usage as the PSE_kernel_radius in the other constructor. Typically 2 (pixels).</param>
 		/// <param name="image_width">The 1-based width of the source image from where the source pixels points originate.</param>
 		/// <param name="image_height">The 1-based height of the source image from where the source pixels points originate.</param>
 		/// <param name="wcspoints">The catalogue sky coordinate values, in degrees, corresponding to the region in the image of the source pixel positions.</param>
-		public WCSAutoSolver(string WCS_type, JPMath.PointD[] pixels, bool zero_based_pixels, int pixels_tolerance_radius, int image_width, int image_height, JPMath.PointD[] wcspoints)
+		public WCSAutoSolver(WorldCoordinateSolution.WCSType WCS_type, double[] x_pixels, double[] y_pixels, bool zero_based_pixels, int pixels_tolerance_radius, int image_width, int image_height, JPMath.PointD[] wcspoints)
 		{
 			this.BGWRKR = new BackgroundWorker();
 			this.BGWRKR.WorkerReportsProgress = true;
@@ -697,20 +701,41 @@ namespace JPFITS
 			this.BGWRKR.ProgressChanged += new System.ComponentModel.ProgressChangedEventHandler(BGWRKR_ProgressChanged);
 			this.BGWRKR.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(BGWRKR_RunWorkerCompleted);
 
-			WCS_TYPE = WCS_type;
-			PSE_PTS = pixels;
+			WCS_TYPE = WCS_type;			
 			ZERO_BASED_PIX = zero_based_pixels;
 			PSE_KERNEL_RADIUS = pixels_tolerance_radius;
 			IMAGE_WIDTH = image_width;
 			IMAGE_HEIGHT = image_height;
 			CAT_PTS = wcspoints;
+			FITS_IMG = null;
+			CAT_CVAL1s = new double[CAT_PTS.Length];
+			CAT_CVAL2s = new double[CAT_PTS.Length];
+			CAT_MAGs = new double[CAT_PTS.Length];
+			for (int i = 0; i < CAT_PTS.Length; i++)
+			{
+				CAT_CVAL1s[i] = CAT_PTS[i].X;
+				CAT_CVAL2s[i] = CAT_PTS[i].Y;
+				CAT_MAGs[i] = CAT_PTS[i].Value;
+			}
 			CANCELLED = false;
 			PROGRESS = 0;
 			DO_PSE = false;
-			N_SOLVE_PTS = pixels.Length;
+			N_SOLVE_PTS = x_pixels.Length;
 			SOLVED = false;
-			PSE = null;
 			WCS = new JPFITS.WorldCoordinateSolution();
+			PSE = new PointSourceExtractor();
+			PSE.KernelRadius = pixels_tolerance_radius;
+			PSE.Centroids_X = x_pixels;
+			PSE.Centroids_Y = y_pixels;
+			PSE.Centroids_Volume = x_pixels;
+			PSE_PTS = new JPMath.PointD[x_pixels.Length];
+			PSE.SourceBooleanMap = new bool[image_width, image_height];
+			PSE.SourceIndexMap = new int[image_width, image_height];
+			for (int x = 0; x < image_width; x++)
+				for (int y = 0; y < image_height; y++)
+					PSE.SourceIndexMap[x, y] = -1;
+			for (int i = 0; i < x_pixels.Length; i++)
+				PSE.RADIALIZE_MAPS_KERNEL((int)Math.Round(PSE.Centroids_X[i]), (int)Math.Round(PSE.Centroids_Y[i]), i, out _);
 		}
 
 		#endregion
@@ -866,7 +891,7 @@ namespace JPFITS
 
 				string fullcataloguepath = AstraCarta.Query(dRA, dDEC, scale, fitsImage.Width, fitsImage.Height, keys);//query will take a few moments
 
-				WCSAutoSolver wcsas = new WCSAutoSolver("TAN", 75, fitsImage, ROI, pixelSaturation, true, 2, 21, fullcataloguepath, "GaiaDR3", "ra", "dec", "phot_g_mean_mag");//instatiate a solver
+				WCSAutoSolver wcsas = new WCSAutoSolver(WorldCoordinateSolution.WCSType.TAN, 75, fitsImage, ROI, pixelSaturation, true, 2, 21, fullcataloguepath, "GaiaDR3", "ra", "dec", "phot_g_mean_mag");//instatiate a solver
 				wcsas.SolveAsync(scale, scale / 1.05, scale * 1.05, 0, -180, 180, 0.25, 6, 25, true, false);//should solve quickly
 				if (wcsas.Solved)
 				{
