@@ -7,8 +7,6 @@ using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Drawing;
 using System.IO;
-using static alglib;
-
 #nullable enable
 
 namespace JPFITS
@@ -16,6 +14,9 @@ namespace JPFITS
 	/// <summary>SourceExtractor class provides functionality for extracting sources from image arrays.</summary>
 	public class PointSourceExtractor
 	{
+		/// <summary>
+		/// Provides functionality for handling multiple PSE objects.
+		/// </summary>
 		public class PSESet
 		{
 			private ArrayList PSESET = new ArrayList();
@@ -59,8 +60,6 @@ namespace JPFITS
 			/// <summary>
 			/// Returns the PointSourceExtractor instance at the index.
 			/// </summary>
-			/// <param name="i"></param>
-			/// <returns></returns>
 			public PointSourceExtractor this[int i]
 			{
 				get { return ((PointSourceExtractor)(PSESET[i])); }

@@ -16,7 +16,6 @@ namespace JPFITS
 	public partial class AstraCarta : Form
 	{
 		string OUTFILE = "";
-		//string ERR = "";
 		bool OPENFROMARGS = false;
 		bool EXECUTEONSHOW = false;
 		bool PERFORMEXECUTE = false;
@@ -69,6 +68,8 @@ namespace JPFITS
 			sb.AppendLine("\"-entries\" A commaspace \", \" separated list of source columns to request from the query. Pass entries=\"all\" to get everything from the query source. Default is for GaiaDR3, entries=\"ref_epoch, ra, ra_err, dec, dec_err, pmra, pmra_err, pmdec, pmdec_err, pm, phot_bp_mean_mag, phot_g_mean_mag, phot_rp_mean_mag\". Thus, if entries is supplied, it appends additional entries to the default. For example if you additionally wanted the absolute value of proper motion errors then passing entries=\"pm_error\" would append \", pm_error\" to the string." + Environment.NewLine);
 			sb.AppendLine("\"-notableout\" Do not write an output file even when sources have been found. Useful if only wanting to view images but do not want to fill up a directory with table results." + Environment.NewLine);
 			sb.AppendLine("\"-silent\" Do not output process milestones to command window. Default false." + Environment.NewLine);
+
+			Clipboard.SetText(sb.ToString());
 
 			MessageBox.Show(sb.ToString());
 		}
