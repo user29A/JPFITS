@@ -6,6 +6,8 @@ using System.Collections;
 using System.Net;
 using System.Text;
 using System.Windows.Forms.DataVisualization.Charting;
+using System.Globalization;
+
 #nullable enable
 
 namespace JPFITS
@@ -365,38 +367,46 @@ namespace JPFITS
 						jobstr += "WHERE 1=CONTAINS(POINT('ICRS', gaiadr3.gaia_source.ra,gaiadr3.gaia_source.dec),";
 
 						if (shape == "rectangle")
-							jobstr += string.Format("POLYGON('ICRS',{0},{1},{2},{3},{4},{5},{6},{7}))", ra_topleft, dec_topleft, ra_topright, dec_topright, ra_bottomright, dec_bottomright, ra_bottomleft, dec_bottomleft) + Environment.NewLine;
+							jobstr += string.Format(CultureInfo.GetCultureInfo("en-US").NumberFormat, "POLYGON('ICRS',{0},{1},{2},{3},{4},{5},{6},{7}))", ra_topleft, dec_topleft, ra_topright, dec_topright, ra_bottomright, dec_bottomright, ra_bottomleft, dec_bottomleft) + Environment.NewLine;
 						else
-							jobstr += string.Format("CIRCLE('ICRS',{0},{1},{2}))", ra, dec, radius) + Environment.NewLine;
+							jobstr += string.Format(CultureInfo.GetCultureInfo("en-US").NumberFormat, "CIRCLE('ICRS',{0},{1},{2}))", ra, dec, radius) + Environment.NewLine;
 
 						jobstr += "ORDER by gaiadr3.gaia_source." + filter + " ASC";
 
-						WebResponse response = default;
-						HttpWebRequest tapQueryRequest = HttpWebRequest.CreateHttp("https://gea.esac.esa.int/tap-server/tap/sync?");
-						tapQueryRequest.CookieContainer = new CookieContainer();
-						tapQueryRequest.Method = "POST";
-						tapQueryRequest.ContentType = "application/x-www-form-urlencoded";
-						byte[] paramsStream = Encoding.UTF8.GetBytes(jobstr);
-						tapQueryRequest.ContentLength = paramsStream.Length;
-						var requestStream = tapQueryRequest.GetRequestStream();
-						requestStream.Write(paramsStream, 0, paramsStream.Length);
-						requestStream.Close();
-						response = tapQueryRequest.GetResponse();
 						string content = "";
-						using (var dataStream = response.GetResponseStream())
+						try
 						{
-							content = new StreamReader(dataStream, Encoding.UTF8).ReadToEnd();
+							WebResponse response = default;
+							HttpWebRequest tapQueryRequest = HttpWebRequest.CreateHttp("https://gea.esac.esa.int/tap-server/tap/sync?");
+							tapQueryRequest.CookieContainer = new CookieContainer();
+							tapQueryRequest.Method = "POST";
+							tapQueryRequest.ContentType = "application/x-www-form-urlencoded";
+							byte[] paramsStream = Encoding.UTF8.GetBytes(jobstr);
+							tapQueryRequest.ContentLength = paramsStream.Length;
+							var requestStream = tapQueryRequest.GetRequestStream();
+							requestStream.Write(paramsStream, 0, paramsStream.Length);
+							requestStream.Close();
+							response = tapQueryRequest.GetResponse();
+							using (var dataStream = response.GetResponseStream())
+							{
+								content = new StreamReader(dataStream, Encoding.UTF8).ReadToEnd();
+							}
+							response.Close();
+							response = default;
+
+							string[] lines = content.Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+							using (var stream = File.CreateText(rawqueryfilename))
+							{
+								for (int i = 0; i < lines.Length - 1; i++)//last line always empty so ignore
+									stream.WriteLine(lines[i]);
+							}
 						}
-						response.Close();
-						response = default;
-
-						string[] lines = content.Split(new string[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-
-						using (var stream = File.CreateText(rawqueryfilename))
+						catch (Exception ex)
 						{
-							for (int i = 0; i < lines.Length - 1; i++)//last line always empty so ignore
-								stream.WriteLine(lines[i]);
-						}						
+							//Clipboard.SetText("jobstr: '" + jobstr + "'");
+							MessageBox.Show(ex.Message + Environment.NewLine + ex.TargetSite + Environment.NewLine + ex.StackTrace + Environment.NewLine + ex.Source + Environment.NewLine + ex.InnerException + Environment.NewLine + Environment.NewLine + ex.Data + Environment.NewLine + "jobstr: '" + jobstr + "'" + Environment.NewLine + "content: '" + content + "'");
+						}
 					}
 				}
 

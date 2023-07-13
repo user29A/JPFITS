@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Collections;
+using System.Globalization;
+
 #nullable enable
 
 namespace JPFITS
@@ -627,7 +629,7 @@ namespace JPFITS
 					return DiskPrecision.Double;
 
 				default:
-					throw new Exception(String.Format("Problem with BITPIX {0} or BZERO {1}", BITPIX, BZERO));
+					throw new Exception(String.Format(CultureInfo.GetCultureInfo("en-US").NumberFormat, "Problem with BITPIX {0} or BZERO {1}", BITPIX, BZERO));
 			}
 		}
 

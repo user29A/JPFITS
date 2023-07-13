@@ -471,10 +471,8 @@ namespace JPFITS
 
 			alglib.ndimensional_pfunc pf = new alglib.ndimensional_pfunc(alglib_Gauss_1d);
 			alglib.ndimensional_pgrad pg = new alglib.ndimensional_pgrad(alglib_Gauss_1d_grad);
-			//alglib.ndimensional_rep rep;
 			object obj = null;
-			//double diffstep = 0.0001;
-			double epsx = 0.000001;
+			double epsx = 1e-9;
 			int maxits = 0;
 			double[] scale;
 
@@ -555,10 +553,8 @@ namespace JPFITS
 
 			alglib.ndimensional_pfunc pf = new alglib.ndimensional_pfunc(alglib_Moffat_1d);
 			alglib.ndimensional_pgrad pg = new alglib.ndimensional_pgrad(alglib_Moffat_1d_grad);
-			//alglib.ndimensional_rep rep;
 			object obj = null;
-			//double diffstep = 0.0001;
-			double epsx = 0.000001;
+			double epsx = 1e-9;
 			int maxits = 0;
 			double[] scale;
 
@@ -5691,6 +5687,11 @@ namespace JPFITS
 
 			return result;
 		}
+
+		//public static Array Bin(Array array, int kernelWidth, bool do_parallel = false)
+		//{
+		//	return new Array();
+		//}
 
 		/// <summary>
 		/// 

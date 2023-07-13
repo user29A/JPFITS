@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Windows.Forms;
 
 namespace JPFITS
@@ -78,12 +79,12 @@ namespace JPFITS
 
 		private void KeyCommentTxt_TextChanged(object sender, EventArgs e)
 		{
-			label3.Text = String.Format("Key Comment ({0})", (48 - KeyCommentTxt.Text.Length).ToString());
+			label3.Text = String.Format(CultureInfo.GetCultureInfo("en-US").NumberFormat, "Key Comment ({0})", (48 - KeyCommentTxt.Text.Length).ToString());
 		}
 
 		private void CommentKeyLineTxt_TextChanged(object sender, EventArgs e)
 		{
-			label1.Text = string.Format("Comment Line ({0})", (80 - CommentKeyLineTxt.Text.Length).ToString());
+			label1.Text = string.Format(CultureInfo.GetCultureInfo("en-US").NumberFormat, "Comment Line ({0})", (80 - CommentKeyLineTxt.Text.Length).ToString());
 		}
 	}
 }
