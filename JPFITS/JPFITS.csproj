@@ -136,6 +136,7 @@
     <Compile Include="PSETableViewer.designer.cs">
       <DependentUpon>PSETableViewer.cs</DependentUpon>
     </Compile>
+    <Compile Include="readme.cs" />
     <Compile Include="REG.cs" />
     <Compile Include="PointSourceExtractor.cs" />
     <Compile Include="WaitBar.cs">
