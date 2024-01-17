@@ -1288,7 +1288,7 @@ namespace JPFITS
 		/// <param name="FileName">The full file name to read from disk.</param>
 		public static string[] GetAllExtensionNames(string FileName)
 		{
-			return FITSFILEOPS.GetAllExtensionNames(FileName, "IMAGE");
+			return FITSFILEOPS.GetAllExtensionNames(FileName, ExtensionType.IMAGE);
 		}
 
 		#endregion

@@ -25,6 +25,8 @@ using System.ComponentModel;
 using System.Windows.Forms;
 using System.Collections.Concurrent;
 using System.Collections;
+using System.Runtime.InteropServices.ComTypes;
+
 #nullable enable
 
 namespace JPFITS
@@ -120,15 +122,18 @@ namespace JPFITS
 				{
 					NITERS++;
 
+					if (AUTO_BACKGROUND)
+						PIXTHRESH -= IMMED;
+
 					PSE.Extract_Sources(FITS_IMG.Image, PIX_SAT, PIXTHRESH, Double.MaxValue, 0, Double.MaxValue, false, PSE_KERNEL_RADIUS, PSE_SEP_RADIUS, AUTO_BACKGROUND, "", IMAGE_ROI, false);
 
-					BGWRKR.ReportProgress(0, "Found " + PSE.N_Sources + " point sources on iteration " + NITERS);
-
-					if (PSE.N_Sources >= N_SOLVE_PTS)
-						break;
+					BGWRKR.ReportProgress(0, "Found " + PSE.N_Sources + " point sources on iteration " + NITERS);					
 
 					DIV *= 2;
 					PIXTHRESH = IMAMP / DIV + IMMED;
+
+					if (PSE.N_Sources >= N_SOLVE_PTS)
+						break;
 				}
 				if (PSE.N_Sources > N_SOLVE_PTS)
 					PSE.ClipToNBrightest(N_SOLVE_PTS);
@@ -508,15 +513,18 @@ namespace JPFITS
 			{
 				NITERS++;
 
+				if (AUTO_BACKGROUND)
+					PIXTHRESH -= IMMED;
+
 				PSE.Extract_Sources(FITS_IMG.Image, PIX_SAT, PIXTHRESH, Double.MaxValue, 0, Double.MaxValue, false, PSE_KERNEL_RADIUS, PSE_SEP_RADIUS, AUTO_BACKGROUND, "", IMAGE_ROI, false);
 
 				BGWRKR.ReportProgress(0, "Found " + PSE.N_Sources + " point sources on iteration " + NITERS);
 
-				if (PSE.N_Sources >= N_REFINE_PTS)
-					break;
-
 				DIV *= 2;
 				PIXTHRESH = IMAMP / DIV + IMMED;
+
+				if (PSE.N_Sources >= N_REFINE_PTS)
+					break;				
 			}
 			if (PSE.N_Sources > N_REFINE_PTS)
 				PSE.ClipToNBrightest(N_REFINE_PTS);

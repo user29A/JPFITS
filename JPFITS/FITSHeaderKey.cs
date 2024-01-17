@@ -61,6 +61,9 @@ namespace JPFITS
 				}
 				else
 				{
+					if (JPMath.IsNumeric(NAME))
+						throw new Exception("The FITSHeaderKey name must not be numeric: " + ": " + NAME);
+
 					LINEISCOMMENTFORMAT = false;
 					if (line.Substring(10, 1) != "'")//must be numeric or T/F then
 					{
@@ -90,8 +93,6 @@ namespace JPFITS
 						{
 							VALUE = line.Substring(indx + 1, line.LastIndexOf("'") - indx - 1);
 							VALUE = VALUE.Trim();
-							//if (VALUE.Length > 18)
-							//	VALUE = VALUE.Substring(0, 18);
 						}
 					}
 
@@ -116,6 +117,9 @@ namespace JPFITS
 		/// <param name="comment">The header key comment, maximum 80 characters if it is the entire comment line, or maximum 73 characters if name is COMMENT; excess elements will be truncated.</param>
 		public FITSHeaderKey(string name, string value, string comment)
 		{
+			if (JPMath.IsNumeric(name))
+				throw new Exception("The FITSHeaderKey name must not be numeric: " + ": " + name);
+
 			NAME = name.Trim().ToUpper();
 			VALUE = value.Trim();
 			COMMENT = comment.Trim();
@@ -135,16 +139,9 @@ namespace JPFITS
 
 				if (COMMENT.Length > 80)
 					COMMENT = COMMENT.Substring(0, 80);
-					//throw new Exception("Header line string: \r\r'" + COMMENT + "'\r\r is longer than 80 characters. The string must contain eighty (or less) elements.");
 			}
 			else
-			{
-				//if (!ValueIsNumeric() && VALUE.Length > 18)
-				//	VALUE = VALUE.Substring(0, 18);
-					//throw new Exception("Error: Key value cannot exceed 18 characters. Key value: '" + VALUE + "' is " + VALUE.Length + " characters long.");
-
 				LINEISCOMMENTFORMAT = false;
-			}
 		}
 
 		/// <summary>The name of the key (elements 1 through 8).</summary>
@@ -156,6 +153,9 @@ namespace JPFITS
 				if (value.Length > 8)
 					throw new Exception("Error: Key name '" + value + "' cannot exceed 8 characters in length; it is " + value.Length + " characters long.");
 				NAME = value.Trim().ToUpper();
+
+				if (JPMath.IsNumeric(NAME))
+					throw new Exception("The FITSHeaderKey name must not be numeric: " + ": " + NAME);
 			}
 		}
 
@@ -204,7 +204,6 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the key value as a double. Will throw a conversion exception if the value is not numeric.</summary>
-		/// <returns></returns>
 		public double ValueAsDouble()
 		{
 			return Convert.ToDouble(VALUE);

@@ -101,6 +101,25 @@ namespace JPFITS
 		Boolean
 	}
 
+	/// <summary>The FITS XTENSION extension type.</summary>
+	public enum ExtensionType
+	{
+		/// <summary>
+		/// Binary table extension.
+		/// </summary>
+		BINTABLE,
+		
+		/// <summary>
+		/// ASCII table extension.
+		/// </summary>
+		TABLE, 
+		
+		/// <summary>
+		/// Image extension.
+		/// </summary>
+		IMAGE
+	}
+
 	///<summary>FITSFILEOPS static class for facilitating interaction with FITS data on disk.</summary>
 	public class FITSFILEOPS
 	{
@@ -7435,7 +7454,7 @@ namespace JPFITS
 		/// <summary>Gets all extension names of a specified extension type in the FITS file. If no extensions of the type exist, returns and empty array.</summary>
 		/// <param name="FileName">The full file name to read from disk.</param>
 		/// <param name="extension_type">The XTENSION extension type, either: &quot;BINTABLE&quot;, &quot;TABLE&quot;, or &quot;IMAGE&quot;.</param>
-		public static string[] GetAllExtensionNames(string FileName, string extension_type)
+		public static string[] GetAllExtensionNames(string FileName, ExtensionType extension_type)
 		{
 			FileStream fs = new FileStream(FileName, FileMode.Open);
 			ArrayList header_return = null;
@@ -7485,7 +7504,7 @@ namespace JPFITS
 							{
 								int f = strheaderline.IndexOf("'");
 								int l = strheaderline.LastIndexOf("'");
-								if (strheaderline.Substring(f + 1, l - f - 1).Trim() == extension_type)
+								if (strheaderline.Substring(f + 1, l - f - 1).Trim() == extension_type.ToString())
 									extensiontypefound = true;
 								continue;
 							}

@@ -22,7 +22,9 @@ using System;
 using System.Collections;
 using System.Threading.Tasks;
 using System.IO;
-using System.CodeDom;
+using System.Runtime.Remoting;
+
+
 #nullable enable
 
 namespace JPFITS
@@ -32,11 +34,14 @@ namespace JPFITS
 	{
 		#region CONSTRUCTORS
 		/// <summary>Create an empty FITSBinTable object. TTYPE entries may be added later via SetTTYPEEntries or AddTTYPEEntry.</summary>
-		/// <param name="extensionName">The EXTNAME keyword extension name of the table. Always name your BINTABLE's.</param>
+		/// <param name="extensionName">The EXTNAME keyword extension name of the table. Always name your BINTABLE's. Cannot be numeric string.</param>
 		public FITSBinTable(string extensionName)
 		{
-			if (extensionName == null || extensionName == "")
+			if (extensionName == null || extensionName.Trim() == "")
 				throw new Exception("The EXTNAME extension name of the binary table must have a value.");
+
+			if (JPMath.IsNumeric(extensionName))
+				throw new Exception("The EXTNAME extension name of the binary table must not be numeric.");
 
 			EXTNAME = extensionName;
 		}
@@ -2037,7 +2042,12 @@ namespace JPFITS
 		public string ExtensionNameEXTNAME
 		{
 			get { return EXTNAME; }
-			set { EXTNAME = value; }
+			set 
+			{
+				if (JPMath.IsNumeric(value))
+					throw new Exception("The EXTNAME extension name of the binary table must not be numeric: " + value);
+				EXTNAME = value;
+			}
 		}
 
 		/// <summary>Return the width, in bytes, of the table.</summary>
@@ -3897,7 +3907,7 @@ namespace JPFITS
 			return GetTTypeEntryRow(GetTTYPEIndex(ttypeEntry), rowindex);
 		}
 
-		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements. Operates on heap-stored data where required.</summary>
+		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements. Operates on heap-stored data as required.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		public void RemoveTTYPEEntry(string ttypeEntry)
 		{
@@ -3996,7 +4006,7 @@ namespace JPFITS
 		/// <br />If adding a complex number array to the binary table, the entryArray must be either single or double floating point, and must be a factor of two columns repeats where the 1st and odd numbered columns are the spatial part, and the 2nd and even numbered columns are the temporal part.
 		/// <br />If entryArray is to be interpreted as rank &gt;= 3, then array dimensions need to be supplied with the optional tdim argument after the EntryArrayFormat.IsNDimensional option. If entries already exist then the user must have formatted the entryArray to match the existing table height NAXIS2.
 		/// </summary>
-		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value. Cannot be numeric.</param>
 		/// <param name="replaceIfExists">Replace the TTYPE entry if it already exists. If it already exists and the option is given to not replace, then an exception will be thrown.</param>
 		/// <param name="entryUnits">The TUNITS physical units of the values of the array. Pass empty string if not required.</param>
 		/// <param name="entryArray">The array to enter into the table.</param>
@@ -4004,6 +4014,9 @@ namespace JPFITS
 		/// <param name="tdims">Specify the array dimensions for rank r &gt;= 3, to be written as the TDIM keywords.</param>
 		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray, EntryArrayFormat arrayFormat = EntryArrayFormat.Default, int[]? tdims = null)
 		{
+			if (JPMath.IsNumeric(ttypeEntry))
+				throw new Exception("The ttypeEntry TTYPE value of the binary table entry must not be numeric.");
+
 			bool isComplex = false;
 			if (arrayFormat == EntryArrayFormat.IsComplex)
 				isComplex = true;
@@ -4204,6 +4217,10 @@ namespace JPFITS
 		/// <param name="entryArrays">An array of vectors or 2D arrays to enter into the table as TTYPEs, all of which have the same height NAXIS2.</param>
 		public void SetTTYPEEntries(string[] ttypeEntries, string[]? entryUnits, Array[] entryArrays)
 		{
+			for (int i = 0; i < ttypeEntries.Length; i++)
+				if (JPMath.IsNumeric(ttypeEntries[i]))
+					throw new Exception("The ttypeEntry TTYPE value of the binary table entry must not be numeric: " + i.ToString() + ": " + ttypeEntries[i]);
+
 			for (int i = 0; i < entryArrays.Length; i++)
 				if (entryArrays[i].Rank > 2)
 					throw new Exception("Error: Do not use this function to add an n &gt; 2 dimensional array. Use AddTTYPEEntry with '" + ttypeEntries[i] + "' formatted as a vector, whilst specifying the option to supply the TDIM keywords.");
@@ -4358,8 +4375,11 @@ namespace JPFITS
 		/// <param name="keyName">The name of the key.</param>
 		public string GetExtraHeaderKeyValue(string keyName)
 		{
+			if (EXTRAKEYS == null)
+				return "";
+
 			for (int i = 0; i < EXTRAKEYS.Length; i++)
-				if (keyName.Equals(EXTRAKEYS[i]))
+				if (keyName.ToUpper().Equals(EXTRAKEYS[i].Name))
 					return EXTRAKEYS[i].Value;
 			return "";
 		}
@@ -4373,7 +4393,38 @@ namespace JPFITS
 			int keyindex = -1;
 
 			for (int i = 0; i < EXTRAKEYS.Length; i++)
-				if (EXTRAKEYS[i].Name == keyName && EXTRAKEYS[i].Value == keyValue)
+				if (EXTRAKEYS[i].Name == keyName.ToUpper() && EXTRAKEYS[i].Value == keyValue)
+				{
+					keyindex = i;
+					break;
+				}
+
+			if (keyindex == -1)
+				return;
+
+			FITSHeaderKey[] newkeys = new FITSHeaderKey[EXTRAKEYS.Length - 1];
+			int c = 0;
+			for (int i = 0; i < EXTRAKEYS.Length; i++)
+				if (i == keyindex)
+					continue;
+				else
+				{
+					newkeys[c] = EXTRAKEYS[i];
+					c++;
+				}
+			EXTRAKEYS = newkeys;
+		}
+
+		/// <summary>Remove the extra header key with the given name and value.</summary>
+		public void RemoveExtraHeaderKey(string keyName)
+		{
+			if (EXTRAKEYS == null)
+				return;
+
+			int keyindex = -1;
+
+			for (int i = 0; i < EXTRAKEYS.Length; i++)
+				if (EXTRAKEYS[i].Name == keyName.ToUpper())
 				{
 					keyindex = i;
 					break;
@@ -4532,7 +4583,7 @@ namespace JPFITS
 		/// <param name="FileName">The full file name to read from disk.</param>
 		public static string[] GetAllExtensionNames(string FileName)
 		{
-			return FITSFILEOPS.GetAllExtensionNames(FileName, "BINTABLE");
+			return FITSFILEOPS.GetAllExtensionNames(FileName, ExtensionType.BINTABLE);
 		}		
 
 		/// <summary>Remove a binary table extension from the given FITS file.</summary>
