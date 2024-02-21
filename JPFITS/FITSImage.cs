@@ -64,7 +64,7 @@ namespace JPFITS
 		/// <param name="imageArrayVectorData">The data array or vector to use for the FITS image data. The precision and rank of the underlying array will be automatically determined. Vectors will be converted to a 1D array.</param>
 		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data - saves time if you don't need those.</param>
 		/// <param name="doParallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-		public FITSImage(string fullFileName, Array imageArrayVectorData, bool doStats, bool doParallel)
+		public FITSImage(string fullFileName, Array imageArrayVectorData, bool doStats, bool doParallel = false)
 		{
 			int rank = imageArrayVectorData.Rank;
 
@@ -309,7 +309,7 @@ namespace JPFITS
 		/// <param name="populateData">Optionally populate the image data array - sometimes you just want the header and don't need the data.</param>
 		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data (if populated) - saves time if you don't need those.</param>
 		/// <param name="doParallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-		public FITSImage(string fullFileName, int[]? range, bool populateHeader, bool populateData, bool doStats, bool doParallel)
+		public FITSImage(string fullFileName, int[]? range, bool populateHeader, bool populateData, bool doStats, bool doParallel = false)
 		{
 			FULLFILENAME = fullFileName;
 			FILENAME = Path.GetFileName(FULLFILENAME);
@@ -359,7 +359,7 @@ namespace JPFITS
 		/// <param name="populateData">Optionally populate the image data array - sometimes you just want the header and don't need the data.</param>
 		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data (if populated) - saves time if you don't need those.</param>
 		/// <param name="doParallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-		public FITSImage(string fullFileName, string extensionName, int[]? range, bool populateHeader, bool populateData, bool doStats, bool doParallel)
+		public FITSImage(string fullFileName, string extensionName, int[]? range, bool populateHeader, bool populateData, bool doStats, bool doParallel = false)
 		{
 			FULLFILENAME = fullFileName;
 			FILENAME = Path.GetFileName(FULLFILENAME);
@@ -428,7 +428,7 @@ namespace JPFITS
 		/// <param name="populateData">Optionally populate the image data array - sometimes you just want the header and don't need the data.</param>
 		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and standard deviation of the image data (if populated) - saves time if you don't need those.</param>
 		/// <param name="doParallel">Populate the FITSImage object ImageData and perform stats (if true) with parallelization.</param>
-		public FITSImage(string fullFileName, int extensionNumber, int[]? range, bool populateHeader, bool populateData, bool doStats, bool doParallel)
+		public FITSImage(string fullFileName, int extensionNumber, int[]? range, bool populateHeader, bool populateData, bool doStats, bool doParallel = false)
 		{
 			FULLFILENAME = fullFileName;
 			FILENAME = Path.GetFileName(FULLFILENAME);
@@ -751,7 +751,7 @@ namespace JPFITS
 		/// <summary>Use SetImage to replace the existing double array for the FITSImage object with a new double array.</summary>
 		/// <param name="imageArrayData">The 2-D double array to set for the FITSImage object.</param>
 		/// <param name="Do_Stats">Optionally update the stats for the new array.</param>
-		public void SetImage(double[,] imageArrayData, bool Do_Stats, bool doParallel)
+		public void SetImage(double[,] imageArrayData, bool Do_Stats, bool doParallel = false)
 		{
 			DIMAGE = imageArrayData;
 			NAXISN = new int[2] { imageArrayData.GetLength(0), imageArrayData.GetLength(1) };
@@ -935,7 +935,7 @@ namespace JPFITS
 		/// <br />If the file name already exists on disk, the primary unit will be overwritten, and any existing extensions will be appended to conserve the data file.</summary>
 		/// <param name="precision">Byte precision at which to write the image data.</param>
 		/// <param name="doParallel">Populate the underlying byte arrays for writing with parallelization.</param>
-		public void WriteImage(DiskPrecision precision, bool doParallel)
+		public void WriteImage(DiskPrecision precision, bool doParallel = false)
 		{
 			ISEXTENSION = false;
 			EXTNAME = null;
@@ -948,7 +948,7 @@ namespace JPFITS
 		/// <param name="fullFileName">File name.</param>
 		/// <param name="precision">Byte precision at which to write the image data.</param>
 		/// <param name="doParallel">Populate the underlying byte arrays for writing with parallelization.</param>
-		public void WriteImage(string fullFileName, DiskPrecision precision, bool doParallel)
+		public void WriteImage(string fullFileName, DiskPrecision precision, bool doParallel = false)
 		{
 			ISEXTENSION = false;
 			EXTNAME = null;
@@ -972,7 +972,7 @@ namespace JPFITS
 		/// <param name="overwriteExtensionIfExists">If the image extension already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
 		/// <param name="precision">Byte precision at which to write the image data.</param>
 		/// <param name="doParallel">Populate the underlying byte arrays for writing with parallelization.</param>
-		public void WriteImage(string fullFileName, string extensionName, bool overwriteExtensionIfExists, DiskPrecision precision, bool doParallel)
+		public void WriteImage(string fullFileName, string extensionName, bool overwriteExtensionIfExists, DiskPrecision precision, bool doParallel = false)
 		{
 			ISEXTENSION = true;
 			EXTNAME = extensionName;
@@ -1178,7 +1178,7 @@ namespace JPFITS
 		/// <summary>Return the primary image of the FITS file as a double 2-D array.</summary>
 		/// <param name="fullFileName">The full file name to read from disk.</param>
 		/// <param name="range">Range is ZERO based 1-D int array [xmin xmax ymin ymax]. Pass null or Range[0] = -1 to default to full image size.</param>
-		public static double[,] ReadImageArrayOnly(string fullFileName, int[]? range, bool doParallel)
+		public static double[,] ReadImageArrayOnly(string fullFileName, int[]? range, bool doParallel = false)
 		{
 			return new FITSImage(fullFileName, range, false, true, false, doParallel).Image;
 		}
@@ -1187,7 +1187,7 @@ namespace JPFITS
 		/// <param name="fullFileName">The full file name to read from disk.</param>
 		/// <param name="range">Range is ZERO based 1-D int array [xmin xmax ymin ymax]. One of the axes ranges must be length equal to 1.
 		/// <br /> Pass null or Range[0] = -1 to default to full image size, assuming the image data is a vector.</param>
-		public static double[] ReadImageVectorOnly(string fullFileName, int[]? range, bool doParallel)
+		public static double[] ReadImageVectorOnly(string fullFileName, int[]? range, bool doParallel = false)
 		{
 			FileStream fs = new FileStream(fullFileName, FileMode.Open, FileAccess.Read, FileShare.Read);
 			ArrayList header = null;

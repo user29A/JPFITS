@@ -7451,7 +7451,7 @@ namespace JPFITS
 			return SeekExtension(fs, extension_type, "_FINDEXTNUM_" + extension_number.ToString(), ref header_return, out extensionStartPosition, out extensionEndPosition, out tableEndPosition, out pcount, out theap);
 		}
 
-		/// <summary>Gets all extension names of a specified extension type in the FITS file. If no extensions of the type exist, returns and empty array.</summary>
+		/// <summary>Gets all extension names of a specified extension type in the FITS file. If no extensions of the type exist, returns an empty array.</summary>
 		/// <param name="FileName">The full file name to read from disk.</param>
 		/// <param name="extension_type">The XTENSION extension type, either: &quot;BINTABLE&quot;, &quot;TABLE&quot;, or &quot;IMAGE&quot;.</param>
 		public static string[] GetAllExtensionNames(string FileName, ExtensionType extension_type)

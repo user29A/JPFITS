@@ -69,7 +69,7 @@ namespace JPFITS
 		{
 			StringBuilder sb = new StringBuilder();
 			sb.AppendLine("\"-maglimit\" Magnitude limit below which to flag bright sources and save to output table. Default is 100, to pass all, given that there is no such low magnitude." + Environment.NewLine);
-			sb.AppendLine("\"-buffer\" Tolerance buffer around image field, in arcminutes. This field can be negative, if one wishes to mitigate image padding in the query." + Environment.NewLine);
+			sb.AppendLine("\"-buffer\" Tolerance buffer around image field, in arcminutes. This field can be negative, if one wishes to mitigate image padding." + Environment.NewLine);
 			sb.AppendLine("\"-offsetra\" Offset the center of the query region in right ascension. Units in arcminutes." + Environment.NewLine);
 			sb.AppendLine("\"-offsetdec\" Offset the center of the query region in declination. Units in arcminutes." + Environment.NewLine);
 			sb.AppendLine("\"-shape\" Shape of field to query: \"rectangle\" (default) or \"circle\". Circle may only be used if pixwidth and pixheight are equal. Rectangle query uses a polygon query with corners defined by an ad-hoc WCS given the supplied field parameters, whereas circle uses a radius." + Environment.NewLine);
@@ -99,8 +99,8 @@ namespace JPFITS
 		/// <summary>
 		/// Perform a query with no user interface dialog form. Will throw an informative exception if something goes wrong. Returns a string which is the filename of the catalogue data downloaded. If nothing was found the string will be empty.
 		/// </summary>
-		/// <param name="ra">The right acension of the field center.</param>
-		/// <param name="dec">The declination of the field center.</param>
+		/// <param name="ra">The right acension of the field center. Degrees.</param>
+		/// <param name="dec">The declination of the field center. Degrees.</param>
 		/// <param name="scale">The plate scale in arcseconds per pixel.</param>
 		/// <param name="pixwidth">The number of horizontal pixels of the image.</param>
 		/// <param name="pixheight">The number of vertical pixels of the image</param>
@@ -110,6 +110,9 @@ namespace JPFITS
 		/// <br />Boolean arguments do not require a value, and their presence indicates true. For example the presence of optArgs.Add("-fitsout") equates to true for writing the file as a FITS bintable.</param>
 		public static string Query(double ra, double dec, double scale, int pixwidth, int pixheight, ArrayList? optArgs = null)
 		{
+			double RAorig = ra;
+			double decorig = dec;
+
 			try
 			{
 				if (optArgs == null)
@@ -609,6 +612,11 @@ namespace JPFITS
 
 					FITSBinTable fbt = new FITSBinTable(catalogue);
 					fbt.SetTTYPEEntries(ttypes, null, table);
+					fbt.AddExtraHeaderKey("RADEG", RAorig.ToString(), "Right Ascension of query center");
+					fbt.AddExtraHeaderKey("DECDEG", decorig.ToString(), "Declination of query center");
+					WorldCoordinateSolution.DegreeElementstoSexagesimalElements(RAorig, decorig, out string rasex, out string decsex, ":", 4);
+					fbt.AddExtraHeaderKey("RASEX", rasex, "Right Ascension of query center");
+					fbt.AddExtraHeaderKey("DECSEX", decsex, "Declination of query center");
 					File.Delete(resultsfilename);
 					resultsfilename = resultsfilename.Split('.')[0];
 					resultsfilename += ".fit";

@@ -34,7 +34,7 @@ namespace JPFITS
 	{
 		#region CONSTRUCTORS
 		/// <summary>Create an empty FITSBinTable object. TTYPE entries may be added later via SetTTYPEEntries or AddTTYPEEntry.</summary>
-		/// <param name="extensionName">The EXTNAME keyword extension name of the table. Always name your BINTABLE's. Cannot be numeric string.</param>
+		/// <param name="extensionName">The EXTNAME keyword extension name of the table. Always name your BINTABLEs. Cannot be numeric string.</param>
 		public FITSBinTable(string extensionName)
 		{
 			if (extensionName == null || extensionName.Trim() == "")
