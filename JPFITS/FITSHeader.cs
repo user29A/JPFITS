@@ -209,7 +209,7 @@ namespace JPFITS
 						if (HEADERKEYS[i].Name.Trim() == "PCOUNT")
 							pcountkey = true;
 						if (HEADERKEYS[i].Name.Trim() == "GCOUNT")
-							pcountkey = true;
+                            gcountkey = true;
 					}
 				if (!pcountkey && !gcountkey)//they would BOTH not be present if things are being done correctly...need to add them
 				{

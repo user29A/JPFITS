@@ -96,19 +96,19 @@ namespace JPFITS
 			MessageBox.Show(sb.ToString());
 		}
 
-		/// <summary>
-		/// Perform a query with no user interface dialog form. Will throw an informative exception if something goes wrong. Returns a string which is the filename of the catalogue data downloaded. If nothing was found the string will be empty.
-		/// </summary>
-		/// <param name="ra">The right acension of the field center. Degrees.</param>
-		/// <param name="dec">The declination of the field center. Degrees.</param>
-		/// <param name="scale">The plate scale in arcseconds per pixel.</param>
-		/// <param name="pixwidth">The number of horizontal pixels of the image.</param>
-		/// <param name="pixheight">The number of vertical pixels of the image</param>
-		/// <param name="optArgs">Optional arguments list. Possible arguments can be found here: https://github.com/user29A/AstraCarta/wiki, or with AstraCarta.Help call.
-		/// <br />Be sure to pass the switch "-argument"; for example do not pass "buffer", but pass "-buffer", etc.
-		/// <br />Arguments and their values must be consecutive, for example: optArgs.Add("-buffer); optArgs.Add(2); and so on.
-		/// <br />Boolean arguments do not require a value, and their presence indicates true. For example the presence of optArgs.Add("-fitsout") equates to true for writing the file as a FITS bintable.</param>
-		public static string Query(double ra, double dec, double scale, int pixwidth, int pixheight, ArrayList? optArgs = null)
+        /// <summary>
+        /// Perform a query with no user interface dialog form. Will throw an informative exception if something goes wrong. Returns a string which is the filename of the catalogue data downloaded. If nothing was found the string will be empty.
+        /// </summary>
+        /// <param name="ra">The right acension of the field center. Degrees.</param>
+        /// <param name="dec">The declination of the field center. Degrees.</param>
+        /// <param name="scale">The plate scale in arcseconds per pixel.</param>
+        /// <param name="pixwidth">The number of horizontal pixels of the image.</param>
+        /// <param name="pixheight">The number of vertical pixels of the image</param>
+        /// <param name="optArgs">Optional arguments list. Possible arguments can be found here: https://github.com/user29A/AstraCarta/wiki, or with AstraCarta.Help call.
+        /// <br />Be sure to pass the switch "-argument"; for example do not pass "buffer", but pass "-buffer", etc.
+        /// <br />Arguments and their values must be consecutive, for example: optArgs.Add("-buffer); optArgs.Add(2); and so on.
+        /// <br />Boolean arguments do not require a value, and their presence indicates true. For example the presence of optArgs.Add("-fitsout") equates to true for writing the file as a FITS bintable.</param>
+        public static string Query(double ra, double dec, double scale, int pixwidth, int pixheight, ArrayList? optArgs = null)
 		{
 			double RAorig = ra;
 			double decorig = dec;
