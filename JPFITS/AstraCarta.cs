@@ -611,7 +611,7 @@ namespace JPFITS
 					}
 
 					FITSBinTable fbt = new FITSBinTable(catalogue);
-					fbt.SetTTYPEEntries(ttypes, null, table);
+					fbt.SetFields(ttypes, null, table);
 					fbt.AddExtraHeaderKey("RADEG", RAorig.ToString(), "Right Ascension of query center");
 					fbt.AddExtraHeaderKey("DECDEG", decorig.ToString(), "Declination of query center");
 					WorldCoordinateSolution.DegreeElementstoSexagesimalElements(RAorig, decorig, out string rasex, out string decsex, ":", 4);

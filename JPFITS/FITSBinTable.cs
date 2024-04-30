@@ -32,10 +32,10 @@ namespace JPFITS
 	/// <summary> FITSBinTable class to create, read, interact with, modify components of, and write FITS BINTABLE binary table data extensions.</summary>
 	public class FITSBinTable
 	{
-		#region CONSTRUCTORS
-		/// <summary>Create an empty FITSBinTable object. TTYPE entries may be added later via SetTTYPEEntries or AddTTYPEEntry.</summary>
-		/// <param name="extensionName">The EXTNAME keyword extension name of the table. Always name your BINTABLEs. Cannot be numeric string.</param>
-		public FITSBinTable(string extensionName)
+        #region CONSTRUCTORS
+        /// <summary>Create an empty FITSBinTable object. Field TTYPE entries may be added later via AddField or SetFields.</summary>
+        /// <param name="extensionName">The EXTNAME keyword extension name of the table. Always name your BINTABLEs. Cannot be numeric string.</param>
+        public FITSBinTable(string extensionName)
 		{
 			if (extensionName == null || extensionName.Trim() == "")
 				throw new Exception("The EXTNAME extension name of the binary table must have a value.");
@@ -2008,26 +2008,26 @@ namespace JPFITS
 		#endregion
 
 		#region PROPERTIES
-		/// <summary>NumberOfTableEntries reports the number of fields in the extension, i.e. the TFIELDS value.</summary>
-		public int NumberOfTableEntriesTFIELDS
+		/// <summary>Reports the number of fields in the extension, i.e. the TFIELDS value.</summary>
+		public int NumberOfFields
 		{
 			get { return TFIELDS; }
 		}
 
-		/// <summary>TableDataRepeats reports the number of columns or repeats in each table entry. Variable repeat (heap data) entries only report 1...use GetTTYPERowRepeatsHeapEntry to get the number of repeats for a given row.</summary>
-		public int[] TableDataRepeats
+        /// <summary>Reports the number of columns or repeats in each table entry. Variable repeat (heap data) entries only report 1...use GetHeapFieldRowLength to get the number of repeats for a given row.</summary>
+        public int[] FieldWidths
 		{
 			get { return TREPEATS; }
 		}
 
-		/// <summary>TableDataLabelTTYPEs reports the name of each table entry, i.e. the TTYPE values.</summary>
-		public string[] TableDataLabelTTYPEs
+		/// <summary>Reports the name of each table entry, i.e. the TTYPE values.</summary>
+		public string[] FieldLabels
 		{
 			get { return TTYPES; }
 		}
 
 		/// <summary>ExtensionEntryUnits reports the units of each table entry, i.e. the TUNITS values.</summary>
-		public string[] ExtensionEntryUnits
+		public string[] FieldUnits
 		{
 			get { return TUNITS; }
 		}
@@ -2039,7 +2039,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Accesses the EXTNAME name of the extension. Can be used to set the name.</summary>
-		public string ExtensionNameEXTNAME
+		public string ExtensionName
 		{
 			get { return EXTNAME; }
 			set 
@@ -2072,7 +2072,7 @@ namespace JPFITS
 		#region MEMBERS
 		/// <summary>Check if a TTYPE entry exists within the bintable.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		public bool TTYPEEntryExists(string ttypeEntry)
+		public bool FieldExists(string ttypeEntry)
 		{
 			for (int i = 0; i < TTYPES.Length; i++)
 				if (TTYPES[i] == ttypeEntry)
@@ -2110,9 +2110,9 @@ namespace JPFITS
 		/// <br />If the return is from the heap, therefore as a vector of vectors (numeric or string), therefore containing a variable number of elements on each row, then it is a vector containing the number of elements of the vector on each row.
 		/// <br />If the ttypeEntry has TDIM keywords for an n &gt;= 3 dimensional array, then it contains the TDIM values for each TDIMn keyword. It therefore should have at least 3 elements.</param>
 		/// <param name="returnType">Use this option to force a non-native return for the Array precision. For example, a user may want single or int values returned as all doubles, or all values returned as strings.</param>
-		public Array GetTTYPEEntry(string ttypeEntry, out TypeCode entryTypeCode, out int[] entryNElements, TTYPEReturn returnType = TTYPEReturn.Native)
+		public Array GetField(string ttypeEntry, out TypeCode entryTypeCode, out int[] entryNElements, TTYPEReturn returnType = TTYPEReturn.Native)
 		{
-			int ttypeindex = GetTTYPEIndex(ttypeEntry);
+			int ttypeindex = GetFieldIndex(ttypeEntry);
 
 			if (returnType == TTYPEReturn.AsDouble)
 			{
@@ -3426,7 +3426,7 @@ namespace JPFITS
 		/// <summary>Use this to access individual elements of the table with a string return of the value. Useful for looking at TTYPEs with multiple elements on a row, or, for extracting values for display purposes, etc.</summary>
 		/// <param name="ttypeIndex">The index of the TTYPE value.</param>
 		/// <param name="rowindex">The row index of the column.</param>
-		public string GetTTypeEntryRow(int ttypeIndex, int rowindex)
+		public string GetFieldRow(int ttypeIndex, int rowindex)
 		{
 			if (!TTYPEISHEAPARRAYDESC[ttypeIndex])
 			{
@@ -3902,16 +3902,16 @@ namespace JPFITS
 		/// <summary>Use this to access individual elements of the table with a string return of the value. Useful for looking at TTYPEs with multiple elements on a row, or, for extracting values for display purposes, etc.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
 		/// <param name="rowindex">The row index of the column.</param>
-		public string GetTTypeEntryRow(string ttypeEntry, int rowindex)
+		public string GetFieldRow(string ttypeEntry, int rowindex)
 		{
-			return GetTTypeEntryRow(GetTTYPEIndex(ttypeEntry), rowindex);
+			return GetFieldRow(GetFieldIndex(ttypeEntry), rowindex);
 		}
 
 		/// <summary>Remove one of the entries from the binary table. Inefficient if the table has a very large number of entries with very large number of elements. Operates on heap-stored data as required.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		public void RemoveTTYPEEntry(string ttypeEntry)
+		public void RemoveField(string ttypeEntry)
 		{
-			int ttypeindex = GetTTYPEIndex(ttypeEntry);
+			int ttypeindex = GetFieldIndex(ttypeEntry);
 
 			Array[] newEntryDataObjs = new Array[TFIELDS - 1];
 			string[] newTTYPES = new string[TFIELDS - 1];
@@ -3935,7 +3935,7 @@ namespace JPFITS
 				}
 				else
 				{
-					newEntryDataObjs[c] = this.GetTTYPEEntry(TTYPES[i], out TypeCode code, out int[] dimnelements, TTYPEReturn.Native);
+					newEntryDataObjs[c] = this.GetField(TTYPES[i], out TypeCode code, out int[] dimnelements, TTYPEReturn.Native);
 					newTTYPES[c] = TTYPES[i];
 					newTFORMS[c] = TFORMS[i];
 					newTUNITS[c] = TUNITS[i];
@@ -3969,7 +3969,7 @@ namespace JPFITS
 		/// <summary>
 		/// Provides options for specifying the nature of the data added to a BINTABLE.
 		/// </summary>
-		public enum EntryArrayFormat
+		public enum FieldArrayFormat
 		{
 			/// <summary>
 			/// The entryArray is a 1-dimensional array of numeric or string values, or is a 2-dimensional array of numeric values only. If entryArray is a 1-D array of strings, all strings must be the same length, otherwise specify IsHeapVariableRepeatRows.
@@ -4012,18 +4012,18 @@ namespace JPFITS
 		/// <param name="entryArray">The array to enter into the table.</param>
 		/// <param name="arrayFormat">Specify entryArray format for non-default (trivial) cases.</param>
 		/// <param name="tdims">Specify the array dimensions for rank r &gt;= 3, to be written as the TDIM keywords.</param>
-		public void AddTTYPEEntry(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray, EntryArrayFormat arrayFormat = EntryArrayFormat.Default, int[]? tdims = null)
+		public void AddField(string ttypeEntry, bool replaceIfExists, string entryUnits, Array entryArray, FieldArrayFormat arrayFormat = FieldArrayFormat.Default, int[]? tdims = null)
 		{
 			if (JPMath.IsNumeric(ttypeEntry))
 				throw new Exception("The ttypeEntry TTYPE value of the binary table entry must not be numeric.");
 
 			bool isComplex = false;
-			if (arrayFormat == EntryArrayFormat.IsComplex)
+			if (arrayFormat == FieldArrayFormat.IsComplex)
 				isComplex = true;
 			bool addAsHeapVarRepeatArray = false;
-			if (arrayFormat == EntryArrayFormat.IsHeapVariableLengthRows || arrayFormat == EntryArrayFormat.IsHeapComplexVariableLengthRows)
+			if (arrayFormat == FieldArrayFormat.IsHeapVariableLengthRows || arrayFormat == FieldArrayFormat.IsHeapComplexVariableLengthRows)
 				addAsHeapVarRepeatArray = true;
-			if (arrayFormat == EntryArrayFormat.IsNDimensional && tdims == null)
+			if (arrayFormat == FieldArrayFormat.IsNDimensional && tdims == null)
 				throw new Exception("The tdims optional argument must be provided if the array format is n >= 3 dimensional.");
 
 			if (entryArray.Rank >= 3)
@@ -4086,7 +4086,7 @@ namespace JPFITS
 				}
 
 			if (ttypeindex != -1)//then remove it
-				this.RemoveTTYPEEntry(ttypeEntry);
+				this.RemoveField(ttypeEntry);
 			else
 				ttypeindex = TFIELDS;//then put the entry at the last column of the table...NB this is a zero-based index...TFIELDS will increment by one below
 
@@ -4175,7 +4175,7 @@ namespace JPFITS
 				}
 				else
 				{
-					newEntryDataObjs[i] = this.GetTTYPEEntry(TTYPES[c], out TypeCode code, out int[] dimnelements, TTYPEReturn.Native);
+					newEntryDataObjs[i] = this.GetField(TTYPES[c], out TypeCode code, out int[] dimnelements, TTYPEReturn.Native);
 					newTTYPES[i] = TTYPES[c];
 					newTFORMS[i] = TFORMS[c];
 					newTUNITS[i] = TUNITS[c];
@@ -4215,7 +4215,7 @@ namespace JPFITS
 		/// <param name="ttypeEntries">The names of the binary table extension entries, i.e. the TTYPE values.</param>
 		/// <param name="entryUnits">The physical units of the values of the arrays. Pass null if not needed, or with null elements or empty elements where not required.</param>
 		/// <param name="entryArrays">An array of vectors or 2D arrays to enter into the table as TTYPEs, all of which have the same height NAXIS2.</param>
-		public void SetTTYPEEntries(string[] ttypeEntries, string[]? entryUnits, Array[] entryArrays)
+		public void SetFields(string[] ttypeEntries, string[]? entryUnits, Array[] entryArrays)
 		{
 			for (int i = 0; i < ttypeEntries.Length; i++)
 				if (JPMath.IsNumeric(ttypeEntries[i]))
@@ -4300,7 +4300,7 @@ namespace JPFITS
 		}
 
 		/// <summary>Returns the System.TypeCode for an entry in the table. Note that strings entries report as Char.</summary>
-		public TypeCode GetTTYPETypeCode(int ttypeindex)
+		public TypeCode GetFieldTypeCode(int ttypeindex)
 		{
 			if (TTYPEISHEAPARRAYDESC[ttypeindex])
 				return HEAPTCODES[ttypeindex];
@@ -4310,13 +4310,13 @@ namespace JPFITS
 
 		/// <summary>Returns the System.TypeCode for an entry in the table. Note that strings entries report as Char.</summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		public TypeCode GetTTYPETypeCode(string ttypeEntry)
+		public TypeCode GetFieldTypeCode(string ttypeEntry)
 		{
-			return GetTTYPETypeCode(GetTTYPEIndex(ttypeEntry));
+			return GetFieldTypeCode(GetFieldIndex(ttypeEntry));
 		}
 
 		/// <summary>Returns wheather the TTYPE entry at the given entry index is a variable repeat heap area vector of vectors.</summary>
-		public bool GetTTYPEIsHeapEntry(int ttypeindex)
+		public bool GetFieldIsHeapEntry(int ttypeindex)
 		{
 			return TTYPEISHEAPARRAYDESC[ttypeindex];
 		}
@@ -4325,24 +4325,24 @@ namespace JPFITS
 		/// Returns wheather the TTYPE entry is a variable repeat heap area vector.
 		/// </summary>
 		/// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-		public bool GetTTYPEIsHeapEntry(string ttypeEntry)
+		public bool GetFieldIsHeapEntry(string ttypeEntry)
 		{
-            return GetTTYPEIsHeapEntry(GetTTYPEIndex(ttypeEntry));
+            return GetFieldIsHeapEntry(GetFieldIndex(ttypeEntry));
 		}
 
         /// <summary>Returns the number of elements (repeats) for a given heap entry at a given row.</summary>
         /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
         /// <param name="row">The row of the entry.</param>
-        public int GetTTYPEHeapEntryRowLength(string ttypeEntry, int row)
+        public int GetHeapFieldRowLength(string ttypeEntry, int row)
 		{
-            return TTYPEHEAPARRAYNELSPOS[GetTTYPEIndex(ttypeEntry)][0, row];
+            return TTYPEHEAPARRAYNELSPOS[GetFieldIndex(ttypeEntry)][0, row];
 		}
 
         /// <summary>
         /// Returns the index of the TTYPE entry.
         /// </summary>
         /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
-        public int GetTTYPEIndex(string ttypeEntry)
+        public int GetFieldIndex(string ttypeEntry)
 		{
             for (int i = 0; i < TTYPES.Length; i++)
                 if (TTYPES[i] == ttypeEntry)
@@ -4462,7 +4462,7 @@ namespace JPFITS
 			if (!File.Exists(FILENAME))//then write a new file, otherwise check the existing file for existing table, etc.
 			{
 				JPFITS.FITSImage ff = new FITSImage(FILENAME, true);
-				ff.WriteImage(DiskPrecision.Double, true);
+				ff.WriteImage(DiskPrecision.Double);
 			}
 
 			FileStream fs = new FileStream(FILENAME, FileMode.Open);

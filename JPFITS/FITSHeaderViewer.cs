@@ -64,6 +64,9 @@ namespace JPFITS
 			if (index == IMAGESETHEADERINDEX)
 				return;
 
+			if (index < 0 || index >= IMAGESET.Count)
+				throw new ArgumentOutOfRangeException("Header index at JPFITS.FITSHeaderViewer.UpdateImageSetHeaderIndex out of range: " + index);
+
 			IMAGESETHEADERINDEX = index;
 			this.Header = IMAGESET[IMAGESETHEADERINDEX].Header;
 			this.Text = "Header " + (IMAGESETHEADERINDEX + 1) + " of " + IMAGESET.Count + ": " + IMAGESET[IMAGESETHEADERINDEX].FileName;

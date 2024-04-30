@@ -491,13 +491,14 @@ namespace JPFITS
 			WORLDCOORDINATESOLUTION = new JPFITS.WorldCoordinateSolution();
 		}
 
-		/// <summary>Create a FITSImage object referencing raw UChar data on disk. Image data is loaded as double precision independent of storage precision on disk.</summary>
-		/// <param name="fullFileName">File name for the FITS object.</param>
-		/// <param name="DiskUCharBufferName">File name of the disk byte data.</param>
-		/// <param name="Precision">Precision of the data stored in the disk char array.</param>
-		/// <param name="NAxis1">Length of the 1st axis (x-axis)</param>
-		/// <param name="NAxis2">Length of the 2nd axis (y-axis)</param>
-		public FITSImage(string fullFileName, string DiskUCharBufferName, DiskPrecision Precision, int NAxis1, int NAxis2)
+        /// <summary>Create a FITSImage object referencing raw UChar data on disk. Image data is loaded as double precision independent of storage precision on disk.
+        /// <br /> Use with WriteFileFromDiskBuffer immediately afterwards.</summary>
+        /// <param name="fullFileName">File name for the FITS object.</param>
+        /// <param name="DiskUCharBufferName">File name of the disk byte data.</param>
+        /// <param name="Precision">Precision of the data stored in the disk char array.</param>
+        /// <param name="NAxis1">Length of the 1st axis (x-axis)</param>
+        /// <param name="NAxis2">Length of the 2nd axis (y-axis)</param>
+        public FITSImage(string fullFileName, string DiskUCharBufferName, DiskPrecision Precision, int NAxis1, int NAxis2)
 		{
 			ISEXTENSION = false;
 			EXTNAME = null;

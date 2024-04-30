@@ -131,7 +131,7 @@ namespace JPFITS
 				MenuChooseTableEntries.DropDownItems.RemoveAt(2);
 
 			FITSBINTABLE = new FITSBinTable(FILENAME, EXTENSIONNAME);
-			string[] ttypes = FITSBINTABLE.TableDataLabelTTYPEs;
+			string[] ttypes = FITSBINTABLE.FieldLabels;
 
 			for (int i = 0; i < ttypes.Length; i++)
 			{
@@ -202,7 +202,7 @@ namespace JPFITS
 		{
 			try
 			{
-				e.Value = FITSBINTABLE.GetTTypeEntryRow(ExtensionTableGrid.Columns[e.ColumnIndex].HeaderText, e.RowIndex);
+				e.Value = FITSBINTABLE.GetFieldRow(ExtensionTableGrid.Columns[e.ColumnIndex].HeaderText, e.RowIndex);
 			}
 			catch {	}
 		}
@@ -321,25 +321,25 @@ namespace JPFITS
 		{
 			//first need to check that the items being plotted are vectors...can only plot y vs.x as vectors
 			if (XDrop.Enabled)
-				if (FITSBINTABLE.GetTTYPEIsHeapEntry(XDrop.SelectedItem.ToString()) || FITSBINTABLE.TableDataRepeats[XDrop.SelectedIndex] > 1)
+				if (FITSBINTABLE.GetFieldIsHeapEntry(XDrop.SelectedItem.ToString()) || FITSBINTABLE.FieldWidths[XDrop.SelectedIndex] > 1)
 				{
 					MessageBox.Show("Error: X-Axis selection is either a heap entry or has multiple columns. Can only plot with X as a vector of values.");
 					return;
 				}
-				else if (FITSBINTABLE.GetTTYPETypeCode(XDrop.SelectedItem.ToString()) == TypeCode.Char || FITSBINTABLE.GetTTYPETypeCode(XDrop.SelectedItem.ToString()) == TypeCode.Boolean)
+				else if (FITSBINTABLE.GetFieldTypeCode(XDrop.SelectedItem.ToString()) == TypeCode.Char || FITSBINTABLE.GetFieldTypeCode(XDrop.SelectedItem.ToString()) == TypeCode.Boolean)
 				{
-					MessageBox.Show("Error: X-Axis selection is " + FITSBINTABLE.GetTTYPETypeCode(XDrop.SelectedItem.ToString()).ToString());
+					MessageBox.Show("Error: X-Axis selection is " + FITSBINTABLE.GetFieldTypeCode(XDrop.SelectedItem.ToString()).ToString());
 					return;
 				}
 
-			if (FITSBINTABLE.GetTTYPEIsHeapEntry(YDrop.SelectedItem.ToString()) || FITSBINTABLE.TableDataRepeats[YDrop.SelectedIndex] > 1)
+			if (FITSBINTABLE.GetFieldIsHeapEntry(YDrop.SelectedItem.ToString()) || FITSBINTABLE.FieldWidths[YDrop.SelectedIndex] > 1)
 			{
 				MessageBox.Show("Error: Y-Axis selection is either a heap entry or has multiple columns. Can only plot with Y as a vector of values.");
 				return;
 			}
-			else if (FITSBINTABLE.GetTTYPETypeCode(YDrop.SelectedItem.ToString()) == TypeCode.Char || FITSBINTABLE.GetTTYPETypeCode(YDrop.SelectedItem.ToString()) == TypeCode.Boolean)
+			else if (FITSBINTABLE.GetFieldTypeCode(YDrop.SelectedItem.ToString()) == TypeCode.Char || FITSBINTABLE.GetFieldTypeCode(YDrop.SelectedItem.ToString()) == TypeCode.Boolean)
 			{
-				MessageBox.Show("Error: Y-Axis selection is " + FITSBINTABLE.GetTTYPETypeCode(XDrop.SelectedItem.ToString()).ToString());
+				MessageBox.Show("Error: Y-Axis selection is " + FITSBINTABLE.GetFieldTypeCode(XDrop.SelectedItem.ToString()).ToString());
 				return;
 			}
 
@@ -348,9 +348,9 @@ namespace JPFITS
 				for (int i = 0; i < x.Length; i++)
 					x[i] = i;
 			else
-				x = (double[])FITSBINTABLE.GetTTYPEEntry(XDrop.SelectedItem.ToString(), out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+				x = (double[])FITSBINTABLE.GetField(XDrop.SelectedItem.ToString(), out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 
-			double[] y = (double[])FITSBINTABLE.GetTTYPEEntry(YDrop.SelectedItem.ToString(), out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
+			double[] y = (double[])FITSBINTABLE.GetField(YDrop.SelectedItem.ToString(), out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 
 			Plotter plot = new Plotter("", false, false);
 
