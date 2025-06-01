@@ -26,6 +26,9 @@ using System.Windows.Forms;
 using System.Collections.Concurrent;
 using System.Collections;
 using System.Runtime.InteropServices.ComTypes;
+using System.Collections.Specialized;
+using static JPFITS.WorldCoordinateSolution;
+
 
 #nullable enable
 
@@ -76,7 +79,7 @@ namespace JPFITS
 				//get catalogue RA, Dec, and mag's
 				BGWRKR.ReportProgress(0, "Reading the Catalogue FITS binary tables...");
 
-				FITSBinTable bt = new JPFITS.FITSBinTable(CAT_FILENAME, CAT_EXTNAME);
+				FITSBinTable bt = new FITSBinTable(CAT_FILENAME, CAT_EXTNAME);
 				CAT_CVAL1s = (double[])(double[])bt.GetField(CAT_CVAL1NAME, out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 				CAT_CVAL2s = (double[])(double[])bt.GetField(CAT_CVAL2NAME, out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
 				CAT_MAGs = (double[])(double[])bt.GetField(CAT_MAGNAME, out _, out _, FITSBinTable.TTYPEReturn.AsDouble);
@@ -100,7 +103,7 @@ namespace JPFITS
 
 				//sort the catalogue list by magnitude
 				BGWRKR.ReportProgress(0, "Sorting the Catalogue FITS binary tables...");
-				double[] keysref = new double[(CAT_MAGs.Length)];
+				double[] keysref = new double[CAT_MAGs.Length];
 				Array.Copy(CAT_MAGs, keysref, CAT_MAGs.Length);
 				Array.Sort(CAT_MAGs, CAT_CVAL1s);
 				Array.Copy(keysref, CAT_MAGs, CAT_MAGs.Length);
@@ -254,10 +257,10 @@ namespace JPFITS
 
 			//for each PSE triangle, fit it to a CAT intermediate triangle, and then check if this fit satisfies the other CAT points to the PSE points
 			//rotation transformation p[0] = scale; p[1] = phi (radians); p[2] = x-axis coordinate reference; p[3] = y-axis coordinate reference;
-			double[] plb = new double[(4)] { SCALE_LB, ROTATION_LB, crpix1_lb, crpix2_lb };
-			double[] pub = new double[(4)] { SCALE_UB, ROTATION_UB, crpix1_ub, crpix2_ub };
-			double[] psc = new double[(4)] { SCALE_INIT, 1, Math.Abs(crpix1_init), Math.Abs(crpix2_init) };
-			double kern_diam = (double)(2 * PSE_KERNEL_RADIUS) + 1;
+			double[] plb = new double[] { SCALE_LB, ROTATION_LB, crpix1_lb, crpix2_lb };
+			double[] pub = new double[] { SCALE_UB, ROTATION_UB, crpix1_ub, crpix2_ub };
+			double[] psc = new double[] { SCALE_INIT, 1, Math.Abs(crpix1_init), Math.Abs(crpix2_init) };
+			double kern_diam = (2 * PSE_KERNEL_RADIUS) + 1;
 			double p00 = 0, p01 = 0, p02 = 0, p03 = 0;
 			int total_pt_matches = 0;
 			DATE = DateTime.Now;
@@ -473,9 +476,9 @@ namespace JPFITS
 
 			BGWRKR.ReportProgress(0, "Solving for " + c + " point pair matches out of a possible " + N_SOLVE_PTS);
 			if (FITS_IMG == null)
-				WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, null, VERBOSEHEADER);
+				WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, null, null, null, null, VERBOSEHEADER);
 			else
-				WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
+				WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, null, null, null, VERBOSEHEADER);
 			BGWRKR.ReportProgress(0, "Solution:" + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "CRPIX1 = " + WCS.GetCRPIXn(1));
 			BGWRKR.ReportProgress(0, "CRPIX2 = " + WCS.GetCRPIXn(2));
@@ -533,10 +536,10 @@ namespace JPFITS
 			if (CANCELLED)
 				return;
 
+			//get the brightest catlaogue points
 			if (N_REFINE_PTS > CAT_CVAL1s.Length)
 				N_REFINE_PTS = CAT_CVAL1s.Length;
 
-			//get the brightest catlaogue points
 			cval1 = new double[N_REFINE_PTS];
 			cval2 = new double[N_REFINE_PTS];
 			for (int i = 0; i < N_REFINE_PTS; i++)
@@ -548,7 +551,7 @@ namespace JPFITS
 			//get the catlaogue pixel locations
 			cpix1 = new double[N_REFINE_PTS];
 			cpix2 = new double[N_REFINE_PTS];
-			WCS.Get_Pixels(cval1, cval2, "TAN", out cpix1, out cpix2, true);
+			WCS.Get_Pixels(cval1, cval2, WCSType.TAN, out cpix1, out cpix2, true);
 
 			//check for catlaogue pixels which fall onto PSE pixels
 			int nmatches = 0;
@@ -588,7 +591,7 @@ namespace JPFITS
 				return;
 
 			WorldCoordinateSolution.ClearWCS(FITS_IMG.Header);
-			WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, VERBOSEHEADER);
+			WCS.Solve_WCS(WorldCoordinateSolution.WCSType.TAN, cpix1, cpix2, true, cval1, cval2, FITS_IMG.Header, null, null, null, VERBOSEHEADER);
 			BGWRKR.ReportProgress(0, Environment.NewLine + nmatches + " sources of " + N_REFINE_PTS + " were able to be used for WCS refinement.");
 			BGWRKR.ReportProgress(0, Environment.NewLine + "Refined solution:" + Environment.NewLine);
 			BGWRKR.ReportProgress(0, "CRPIX1 = " + WCS.GetCRPIXn(1));
@@ -912,11 +915,10 @@ namespace JPFITS
 					WorldCoordinateSolution.SexagesimalElementsToDegreeElements(sRA, sDEC, "", out dRA, out dDEC);
 
 				//populate the mandatory arguments for AstraCarta query
-				ArrayList keys = new ArrayList();
-				keys.Add("-fitsout");//need a fits binary table
-				keys.Add("-overwrite");//
-				keys.Add("-buffer");
-				keys.Add((double)2);
+				NameValueCollection keys = new NameValueCollection();
+				keys.Add("fitsout", "true");//need a fits binary table
+				keys.Add("overwrite", "true");
+				keys.Add("buffer", "2");
 
 				string fullcataloguepath = AstraCarta.Query(dRA, dDEC, scale, fitsImage.Width, fitsImage.Height, keys);//query will take a few moments
 
@@ -933,8 +935,9 @@ namespace JPFITS
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show(ex.Data + "	" + ex.InnerException + "	" + ex.Message + "	" + ex.Source + "	" + ex.StackTrace + "	" + ex.TargetSite);
-				return false;
+				//MessageBox.Show(ex.Data + "	" + ex.InnerException + "	" + ex.Message + "	" + ex.Source + "	" + ex.StackTrace + "	" + ex.TargetSite);
+				throw new Exception(ex.Data + "	" + ex.InnerException + "	" + ex.Message + "	" + ex.Source + "	" + ex.StackTrace + "	" + ex.TargetSite);
+				//return false;
 			}
 		}
 

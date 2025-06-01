@@ -33,24 +33,24 @@ namespace JPFITS
 	/// </summary>
 	public class JPBitMap
 	{
-		/// <summary>
-		/// Convert a single-layer 2D image to a bitmap.
-		/// </summary>
-		/// <param name="fitsImg">The FITSImage to pull the 2D array from to make the bitmap with.</param>
-		/// <param name="scaling">Data scaling: <br />0 = linear; <br />1 = square root; <br />2 = squared; 3 = log.</param>
-		/// <param name="color">Artificial color mapping: 
-		/// <br />0 = grayscale; 
-		/// <br />1 = jet; 
-		/// <br />2 = winter; 
-		/// <br />3 = lines (detects contours and edges).</param>
-		/// <param name="invert">Invert tone...i.e. black becomes white.</param>
-		/// <param name="stdImclim">Pass a single-element array to specify a pre-set contrast limit as per below, or pass a 2-element array to specify the literal contrast limits in terms of standard deviation about the image mean.
-		/// <br />Contrast limits:
-		/// <br />0 = full range (min to max);
-		/// <br />1 = wide (-1 stdv to 2 stdv, stdImclim = [-1, 2]);
-		/// <br />2 = dark (-0.5 stdv to 5 stdv, stdImclim = [-0.5, 5]);
-		/// <br />any other single-element value throws an exception.</param>
-		public static unsafe Bitmap FITSImageToBmp(FITSImage fitsImg, int scaling, int color, bool invert, double[] stdImclim)
+        /// <summary>
+        /// Convert a single-layer 2D image to a bitmap.
+        /// </summary>
+        /// <param name="fitsImg">The FITSImage to pull the 2D array from to make the bitmap with.</param>
+        /// <param name="scaling">Data scaling: <br />0 = linear; <br />1 = square root; <br />2 = squared; <br />3 = log.</param>
+        /// <param name="colour">Artificial color mapping: 
+        /// <br />0 = grayscale; 
+        /// <br />1 = jet; 
+        /// <br />2 = winter; 
+        /// <br />3 = lines (detects contours and edges).</param>
+        /// <param name="invert">Invert tone...i.e. black becomes white.</param>
+        /// <param name="stdImclim">Pass a single-element array to specify a pre-set contrast limit as per below, or pass a 2-element array to specify the literal contrast limits in terms of standard deviation about the image mean.
+        /// <br />Contrast limits:
+        /// <br />0 = full range (min to max);
+        /// <br />1 = wide (-1 stdv to 2 stdv, stdImclim = [-1, 2]);
+        /// <br />2 = dark (-0.5 stdv to 5 stdv, stdImclim = [-0.5, 5]);
+        /// <br />any other single-element value throws an exception.</param>
+        public static unsafe Bitmap FITSImageToBmp(FITSImage fitsImg, int scaling, int colour, bool invert, double[] stdImclim)
 		{
 			double[] dimclim;
 			if (stdImclim.Length == 1)
@@ -67,30 +67,64 @@ namespace JPFITS
 			else
 				throw new Exception("Something wrong with parameter \"stdImclim\"");
 
-			return ArrayToBmp(fitsImg.Image, scaling, color, invert, dimclim, Int32.MaxValue, Int32.MaxValue, false);
+			return ArrayToBmp(fitsImg.Image, scaling, colour, invert, dimclim, Int32.MaxValue, Int32.MaxValue, false);
 		}
 
-		/// <summary>
-		/// Convert a single layer 2D image to bitmap.
-		/// </summary>
-		/// <param name="image">The image data array.</param>
-		/// <param name="scaling">Data scaling: 
-		/// <br />0 = linear; 
-		/// <br />1 = square root; 
-		/// <br />2 = squared; 
-		/// <br />3 = log.</param>
-		/// <param name="colour">Artificial color mapping: 
-		/// <br />0 = grayscale; 
-		/// <br />1 = jet; 
-		/// <br />2 = winter; 
-		/// <br />3 = lines (detects contours and edges).</param>
-		/// <param name="invert">Invert tone...i.e. black becomes white.</param>
-		/// <param name="DImCLim">The image contrast limits. A 2-element vector which clips the low (element 1) and high (element 2) values of the image array when forming the bitmap. 
-		/// <br />Suggest [mean(image)-0.5*stdv(image), mean(image)+5*stdv(image)]</param>
-		/// <param name="WinWidth">If it is a small image required, the function will bin if necessary. If no binning desired then set to Int32.Maxvalue.</param>
-		/// <param name="WinHeight">If it is a small image required, the function will bin if necessary. If no binning desired then set to Int32.Maxvalue.</param>
-		/// <param name="invertYaxis">Flip the image vertically...i.e. about the central horizontal axis.</param>
-		public static unsafe Bitmap ArrayToBmp(double[,] image, int scaling, int colour, bool invert, double[] DImCLim, int WinWidth, int WinHeight, bool invertYaxis)
+        /// <summary>
+        /// Convert a single-layer 2D image to a bitmap.
+        /// </summary>
+        /// <param name="image">The FITSImage to pull the 2D array from to make the bitmap with.</param>
+        /// <param name="scaling">Data scaling: <br />0 = linear; <br />1 = square root; <br />2 = squared; <br />3 = log.</param>
+        /// <param name="colour">Artificial color mapping: 
+        /// <br />0 = grayscale; 
+        /// <br />1 = jet; 
+        /// <br />2 = winter; 
+        /// <br />3 = lines (detects contours and edges).</param>
+        /// <param name="invert">Invert tone...i.e. black becomes white.</param>
+        /// <param name="contrast">Contrast limits:
+        /// <br />0 = full range (min to max);
+        /// <br />1 = wide (-1 stdv to 2 stdv, stdImclim = [-1, 2]);
+        /// <br />2 = dark (-0.5 stdv to 5 stdv, stdImclim = [-0.5, 5]);
+        /// <br />any other single-element value throws an exception.</param>
+        public static unsafe Bitmap ArrayToBmp(double[,] image, int scaling, int colour, bool invert, int contrast, int WinWidth, int WinHeight, bool invertYaxis)
+		{
+            double[] dimclim;
+			double mean = JPMath.Mean(image);
+			double stdv = JPMath.Stdv(image);
+
+            if (contrast == 0)
+                dimclim = new double[] { JPMath.Min(image), JPMath.Max(image) };
+            else if (contrast == 1)
+                dimclim = new double[] { mean - stdv, mean + stdv * 2 };
+            else if (contrast == 2)
+                dimclim = new double[] { mean - stdv * 0.5, mean + stdv * 5 };
+            else
+                throw new Exception("Image contrast limit \"contrast\" value invalid: " + contrast);
+
+            return ArrayToBmp(image, scaling, colour, invert, dimclim, WinWidth, WinHeight, invertYaxis);
+        }
+
+        /// <summary>
+        /// Convert a single layer 2D image to bitmap.
+        /// </summary>
+        /// <param name="image">The image data array.</param>
+        /// <param name="scaling">Data scaling: 
+        /// <br />0 = linear; 
+        /// <br />1 = square root; 
+        /// <br />2 = squared; 
+        /// <br />3 = log.</param>
+        /// <param name="colour">Artificial color mapping: 
+        /// <br />0 = grayscale; 
+        /// <br />1 = jet; 
+        /// <br />2 = winter; 
+        /// <br />3 = lines (detects contours and edges).</param>
+        /// <param name="invert">Invert tone...i.e. black becomes white.</param>
+        /// <param name="DImCLim">The image contrast limits. A 2-element vector which clips the low (element 1) and high (element 2) values of the image array when forming the bitmap. 
+        /// <br />Suggest [mean(image)-0.5*stdv(image), mean(image)+5*stdv(image)]</param>
+        /// <param name="WinWidth">If it is a small image required, the function will bin if necessary. If no binning desired then set to Int32.Maxvalue.</param>
+        /// <param name="WinHeight">If it is a small image required, the function will bin if necessary. If no binning desired then set to Int32.Maxvalue.</param>
+        /// <param name="invertYaxis">Flip the image vertically...i.e. about the central horizontal axis.</param>
+        public static unsafe Bitmap ArrayToBmp(double[,] image, int scaling, int colour, bool invert, double[] DImCLim, int WinWidth, int WinHeight, bool invertYaxis)
 		{
 			if (image.GetLength(0) > WinWidth * 2 || image.GetLength(1) > WinHeight * 2)
 			{

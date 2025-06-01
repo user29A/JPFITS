@@ -469,7 +469,7 @@ namespace JPFITS
 
 				int RefImgIndex = (int)arg[1];
 				bool Do_Stats = (bool)arg[2];
-				string style = (string)arg[3];
+                JPMath.RegistrationInterpolation style = (JPMath.RegistrationInterpolation)arg[3];
 
 				double[,] refim = new double[this[RefImgIndex].Width, this[RefImgIndex].Height];
 				Array.Copy(this[RefImgIndex].Image, refim, this[RefImgIndex].Image.LongLength);
@@ -692,7 +692,17 @@ namespace JPFITS
 
 				return names;
 			}
-		}
+
+            set
+            {
+                if (value.Length == 1)
+                    for (int i = 0; i < FITSLIST.Count; i++)
+                        ((FITSImage)FITSLIST[i]).FileName = value[0];
+                else
+                    for (int i = 0; i < FITSLIST.Count; i++)
+                        ((FITSImage)FITSLIST[i]).FileName = value[i];
+            }
+        }
 
 		/// <summary>
 		/// Getter returns a String array of the file paths (excluding file names) of all FITSImage objects in the current FITSImageSet. If Setting, argument can be either a 1-element array, which therefore changes all file paths to the same value, or an array the same length as the number of members to set each individually. User is responsible for managing possibility of identical full file names in the members.
@@ -1072,7 +1082,7 @@ namespace JPFITS
 		/// <param name="headerkey">If key is &quot;filename&quot; then the FITSImageSet list is sorted according to the member file names.
 		/// <br /> For example if the file names are alphabetical or numeric then the FITSImageSet list will be sorted by increasing file name.
 		/// <br /> Otherwise key is a primary header key and then their corresponding values will be used to sort by increasing value the FITSImageSet list.</param>
-		public int Sort(string headerkey)
+		public void Sort(string headerkey = "filename")
 		{
 			if (headerkey == "filename")//filenames are nice because they are always unique
 			{
@@ -1096,7 +1106,6 @@ namespace JPFITS
 							FITSLIST[j] = tempfits;
 						}
 				}
-				return 0;
 			}
 
 			//else use header key value, returned already if for filename
@@ -1117,18 +1126,12 @@ namespace JPFITS
 			{
 				string[] keys = new string[FITSLIST.Count];
 
-				bool keycheck = true;
-
 				for (int i = 0; i < FITSLIST.Count; i++)
 				{
 					keys[i] = ((FITSImage)(FITSLIST[i])).Header.GetKeyValue(headerkey);
 
-					if (keys[i] == "" && keycheck)
-					{
-						if (MessageBox.Show("Key not found in at least one FITS header: continue?", "Warning", MessageBoxButtons.YesNo) == DialogResult.No)
-							return -1;
-						keycheck = false;
-					}
+					if (keys[i] == "")
+						throw new Exception("Key '" + headerkey + "' not found in file '" + ((FITSImage)(FITSLIST[i])).FullFileName + "' in FITSImageSet.Sort");
 				}
 
 				Array.Sort(keys);
@@ -1146,24 +1149,17 @@ namespace JPFITS
 							FITSLIST[j] = tempfits;
 						}
 				}
-				return 0;
 			}
 			else//numeric
 			{
 				double[] keys = new double[FITSLIST.Count];
 
-				bool keycheck = true;
-
 				for (int i = 0; i < FITSLIST.Count; i++)
 				{
 					string k = ((FITSImage)(FITSLIST[i])).Header.GetKeyValue(headerkey);
 
-					if (k == "" && keycheck)
-					{
-						if (MessageBox.Show("Key not found in at least one FITS header: continue?", "Warning", MessageBoxButtons.YesNo) == DialogResult.No)
-							return -1;
-						keycheck = false;
-					}
+					if (k == "")
+                        throw new Exception("Key '" + headerkey + "' not found in file '" + ((FITSImage)(FITSLIST[i])).FullFileName + "' in FITSImageSet.Sort");
 
 					try
 					{
@@ -1171,8 +1167,7 @@ namespace JPFITS
 					}
 					catch
 					{
-						MessageBox.Show("Tried to convert what had been numeric key values for the sorting keys.  Check FITSImageSet index (1-based) " + (i + 1).ToString() + ".", "Sorting Error");
-						return -1;
+                        throw new Exception("Tried to convert what had been numeric key values for the sorting keys.  Check FITSImageSet index (1-based) " + (i + 1).ToString() + ".");
 					}
 				}
 
@@ -1191,7 +1186,6 @@ namespace JPFITS
 							FITSLIST[j] = tempfits;
 						}
 				}
-				return 0;
 			}
 		}
 
@@ -1461,12 +1455,12 @@ namespace JPFITS
 			return new FITSImage(Path.Combine(this.GetCommonDirectory(), "stdv.fits"), (double[,])BGWRKR_RESULT, doStats, true);
 		}
 
-		/// <summary>Auto-register non-rotational primary images from the FITSImageSet. Only works when there is no field rotation in the image set, only translational shifts, and the shifts are less than half of the field.</summary>
-		/// <param name="refImgIndex">The index in the FitSet list of the reference image to register all the other images to.</param>
-		/// <param name="interpStyle">&quot;nearest&quot; - nearest-neighbor pixel, or, &quot;bilinear&quot; - for 2x2 interpolation, or, &quot;lanc_n&quot; - for Lanczos interpolation of order n = 3, 4, 5.</param>
-		/// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the registered images - saves time if you don't need those.</param>
-		/// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
-		public void Register(int refImgIndex, string interpStyle, bool doStats, bool waitbar)
+        /// <summary>Auto-register non-rotational primary images from the FITSImageSet. Only works when there is no field rotation in the image set, only translational shifts, and the shifts are less than half of the field.</summary>
+        /// <param name="refImgIndex">The index in the FitSet list of the reference image to register all the other images to.</param>
+        /// <param name="interpStyle">&quot;nearest&quot; - nearest-neighbor pixel, or, &quot;bilinear&quot; - for 2x2 interpolation, or, &quot;lanc_n&quot; - for Lanczos interpolation of order n = 3, 4, 5.</param>
+        /// <param name="doStats">Optionally perform the statistics to determine min, max, mean, median, and stdv of the registered images - saves time if you don't need those.</param>
+        /// <param name="waitbar">Optionally compute the function with a cancellable Waitbar. If cancelled, return value is null. False equates to a syncronous call.</param>
+        public void Register(int refImgIndex, JPMath.RegistrationInterpolation interpStyle, bool doStats, bool waitbar)
 		{
 			object[] arg = new object[] { "AutoReg", refImgIndex, doStats, interpStyle };
 			SHOWWAITBAR = false;

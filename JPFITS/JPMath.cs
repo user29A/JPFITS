@@ -19,12 +19,15 @@
 */
 
 using System;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Collections;
-using System.Windows.Forms;
-using System.Runtime.CompilerServices;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
 #nullable enable
 
 namespace JPFITS
@@ -137,7 +140,7 @@ namespace JPFITS
 		/// <summary>
 		/// cubic spline interpolation
 		/// </summary>
-		Cublic,
+		Cubic,
 
 		/// <summary>
 		/// monotone cubic spline which preserves monoticity of the data
@@ -155,67 +158,89 @@ namespace JPFITS
 		Akima
 	}
 
-	public class JPMath
+	public enum SearchStyle
 	{
-		public class PointD
+
+	}
+
+	public class JPMath
+	{ 
+        public class PointD
 		{
-			private double POINTX, POINTY, POINTVAL, POINTXOLD, POINTYOLD;
+			private double POINT_X, POINT_Y, POINT_VAL, POINT_X_ALTERNATE, POINT_Y_ALTERNATE;
+			private UInt64 POINTID = UInt64.MaxValue;
 
 			public PointD(double x, double y, double value)
 			{
-				POINTX = x;
-				POINTY = y;
-				POINTVAL = value;
+				POINT_X = x;
+				POINT_Y = y;
+				POINT_VAL = value;
 			}
 
-			public PointD(double x, double y, double value, double x_old, double y_old)
+            public PointD(double x, double y, double value, UInt64 id)
+            {
+                POINT_X = x;
+                POINT_Y = y;
+                POINT_VAL = value;
+				POINTID = id;
+            }
+
+            public PointD(double x, double y, double value, double x_alternate, double y_alternate, UInt64 id)
 			{
-				POINTX = x;
-				POINTY = y;
-				POINTVAL = value;
-				POINTXOLD = x_old;
-				POINTYOLD = y_old;
-			}
+				POINT_X = x;
+				POINT_Y = y;
+				POINT_VAL = value;
+				POINT_X_ALTERNATE = x_alternate;
+				POINT_Y_ALTERNATE = y_alternate;
+                POINTID = id;
+            }
 
 			public double X
 			{
-				get { return POINTX; }
-				set { POINTX = value; }
+				get { return POINT_X; }
+				set { POINT_X = value; }
 			}
 
 			public double Y
 			{
-				get { return POINTY; }
-				set { POINTY = value; }
+				get { return POINT_Y; }
+				set { POINT_Y = value; }
 			}
 
 			public double Value
 			{
-				get { return POINTVAL; }
-				set { POINTVAL = value; }
+				get { return POINT_VAL; }
+				set { POINT_VAL = value; }
 			}
 
-			public double X_Old
+			public UInt64 ID
 			{
-				get { return POINTXOLD; }
-				set { POINTXOLD = value; }
+				get { return POINTID; }
+				set { POINTID = value; }
 			}
 
-			public double Y_Old
+			public double X_Alternate
 			{
-				get { return POINTYOLD; }
-				set { POINTYOLD = value; }
+				get { return POINT_X_ALTERNATE; }
+				set { POINT_X_ALTERNATE = value; }
+			}
+
+			public double Y_Alternate
+			{
+				get { return POINT_Y_ALTERNATE; }
+				set { POINT_Y_ALTERNATE = value; }
 			}
 
 			/// <summary>Computes the distance from the current point to another point.</summary>
 			[MethodImpl(256)]
 			public double DistanceTo(PointD other_point)
 			{
-				double dx = POINTX - other_point.X, dy = POINTY - other_point.Y;
+				double dx = POINT_X - other_point.X, dy = POINT_Y - other_point.Y;
 				return Math.Sqrt(dx * dx + dy * dy);
 			}
 
-			public static bool PointInPoly(PointD P, PointD[] V, int n)
+            [MethodImpl(256)]/*256 = agressive inlining*/
+            public static bool PointInPoly(PointD P, PointD[] V, int n)
 			{
 				int wn = 0;    // the  winding number counter
 
@@ -290,7 +315,15 @@ namespace JPFITS
 
 		public class Triangle
 		{
-			public Triangle(PointD point0, PointD point1, PointD point2)
+            private PointD[] POINTS;
+            private double[] VERTEXANGLES = new double[0];
+            private double[] SIDELENGTHS = new double[0];
+            private PointD FIELDVECTOR = new PointD(0, 0, 0);
+            private double FIELDVECTORRADANGLE;
+            private double TOTALVERTEXPOINTVALUESUM;
+			private double CENTROID_X = double.NaN, CENTROID_Y = double.NaN;
+
+            public Triangle(PointD point0, PointD point1, PointD point2)
 			{
 				POINTS = new PointD[3] { point0, point1, point2 };
 				SORTTRIANGLE();
@@ -308,33 +341,129 @@ namespace JPFITS
 				TOTALVERTEXPOINTVALUESUM = POINTS[0].Value + POINTS[1].Value + POINTS[2].Value;
 			}
 
-			public PointD GetVertex(int i)
+			public void SetCentroid(bool alternate)
+			{
+				if (alternate)
+				{
+                    CENTROID_X = (POINTS[0].X_Alternate + POINTS[1].X_Alternate + POINTS[2].X_Alternate) / 3;
+                    CENTROID_Y = (POINTS[0].Y_Alternate + POINTS[1].Y_Alternate + POINTS[2].Y_Alternate) / 3;
+                }
+				else
+				{
+                    CENTROID_X = (POINTS[0].X + POINTS[1].X + POINTS[2].X) / 3;
+                    CENTROID_Y = (POINTS[0].Y + POINTS[1].Y + POINTS[2].Y) / 3;
+                }
+            }
+
+			public double Centroid_X
+			{
+                get { return CENTROID_X; }
+                set { CENTROID_X = value; }
+            }
+
+            public double Centroid_Y
+            {
+                get { return CENTROID_Y; }
+                set { CENTROID_Y = value; }
+            }
+
+            public PointD GetVertex(int i)
 			{
 				return POINTS[i];
 			}
 
-			public double GetVertexAngle(int i)
+			public PointD VertexPoint_1
 			{
+				get { return POINTS[0]; }
+			}
+
+            public PointD VertexPoint_2
+            {
+                get { return POINTS[1]; }
+            }
+
+            public PointD VertexPoint_3
+            {
+                get { return POINTS[2]; }
+            }
+
+            public double GetVertexAngle(int i)// radians
+            {
 				return VERTEXANGLES[i];
 			}
 
-			public PointD[] Points
+			public double VertexAngle_1// radians
+            {
+				get { return VERTEXANGLES[0]; }
+			}
+
+            public double VertexAngle_2// radians
+            {
+                get { return VERTEXANGLES[1]; }
+            }
+
+            public double VertexAngle_3// radians
+            {
+                get { return VERTEXANGLES[2]; }
+            }
+
+            public PointD[] Points
 			{
 				get { return POINTS; }
 				set { POINTS = value; }
-			}
+			}			
 
 			public double GetSideLength(int i)
 			{
 				return SIDELENGTHS[i];
 			}
 
-			public PointD FieldVector
+			public double SideLength_Shortest
+			{
+				get { return SIDELENGTHS[0]; }
+			}
+
+            public double SideLength_Intermediate
+            {
+                get { return SIDELENGTHS[1]; }
+            }
+
+            public double SideLength_Longest
+            {
+                get { return SIDELENGTHS[2]; }
+            }
+
+            public ulong[] Point_IDs
+            {
+				get { return new ulong[3] { POINTS[0].ID, POINTS[1].ID, POINTS[2].ID }; }
+            }
+
+            public double[] Triplet_X
+			{
+				get { return new double[3] { POINTS[0].X, POINTS[1].X, POINTS[2].X }; }
+			}
+
+			public double[] Triplet_Y
+			{
+				get { return new double[3] { POINTS[0].Y, POINTS[1].Y, POINTS[2].Y }; }
+			}
+
+            public double[] Triplet_X_Alternate
+            {
+                get { return new double[3] { POINTS[0].X_Alternate, POINTS[1].X_Alternate, POINTS[2].X_Alternate }; }
+            }
+
+            public double[] Triplet_Y_Alternate
+            {
+                get { return new double[3] { POINTS[0].Y_Alternate, POINTS[1].Y_Alternate, POINTS[2].Y_Alternate }; }
+            }
+
+            public PointD FieldVector
 			{
 				get { return FIELDVECTOR; }
 			}
 
-			public double FieldVectorRadAngle
+			public double FieldVectorRadAngle// radians
 			{
 				get { return FIELDVECTORRADANGLE; }
 			}
@@ -351,9 +480,60 @@ namespace JPFITS
 				return Math.Abs(area);
 			}
 
-			private PointD[] POINTS;
-			private double[] VERTEXANGLES = new double[0];
-			private double[] SIDELENGTHS = new double[0];
+			/// <summary>
+			/// Reorders the triangle's vertices to ensure a consistent representation.
+			/// The vertex common to the two shortest sides is placed at POINTS[0], with POINTS[1] and POINTS[2]
+			/// being the other vertices of the shortest and middle sides, respectively. This standardization
+			/// ensures that triangles with the same geometric shape have identical vertex orderings, enabling
+			/// direct comparison.
+			/// </summary>
+			/// <remarks>
+			/// The algorithm:
+			/// 1. Computes the three side lengths between the input points.
+			/// 2. Sorts the sides from shortest to longest, tracking their vertex indices.
+			/// 3. Identifies the vertex common to the two shortest sides (POINTS[0]).
+			/// 4. Assigns the remaining vertices based on the shortest and middle sides (POINTS[1] and POINTS[2]).
+			/// 5. Stores the sorted side lengths in SIDELENGTHS for later use (e.g., angle computation).
+			/// This approach guarantees that for any input order of points, the output triangle has a unique
+			/// representation based on side lengths, critical for matching triangles.
+			/// </remarks>
+			//      [MethodImpl(256)]/*256 = agressive inlining*/
+			//private void SORTTRIANGLE()
+			//{
+			//	// Define the three sides with their distances and vertex indices
+			//	var sides = new[]
+			//	{
+			//		(Distance: POINTS[0].DistanceTo(POINTS[1]), I0: 0, I1: 1), // Side between points 0 and 1
+			//		(Distance: POINTS[0].DistanceTo(POINTS[2]), I0: 0, I1: 2), // Side between points 0 and 2
+			//		(Distance: POINTS[1].DistanceTo(POINTS[2]), I0: 1, I1: 2)  // Side between points 1 and 2
+			//	};
+
+			//	// Sort sides by distance (shortest to longest); sides[0] is shortest, sides[1] is middle, sides[2] is longest
+			//	Array.Sort(sides, (a, b) => a.Distance.CompareTo(b.Distance));
+
+			//	// Store sorted side lengths for use in angle calculations
+			//	SIDELENGTHS = new double[] { sides[0].Distance, sides[1].Distance, sides[2].Distance };
+
+			//	// Find the vertex common to the two shortest sides (v0)
+			//	// The common vertex is the one shared between sides[0] and sides[1]
+			//	int v0;
+			//	if (sides[0].I0 == sides[1].I0) // If first vertex of side 0 equals first vertex of side 1
+			//		v0 = sides[0].I0;
+			//	else if (sides[0].I1 == sides[1].I1) // If second vertex of side 0 equals second vertex of side 1
+			//		v0 = sides[0].I1;
+			//	else // Otherwise, the common vertex is the other vertex of side 1
+			//		v0 = sides[1].I0;
+
+			//	// Assign v1 as the other vertex of the shortest side (sides[0])
+			//	int v1 = sides[0].I0 == v0 ? sides[0].I1 : sides[0].I0;
+
+			//	// Assign v2 as the other vertex of the middle side (sides[1])
+			//	int v2 = sides[1].I0 == v0 ? sides[1].I1 : sides[1].I0;
+
+			//	// Reorder POINTS: POINTS[0] is the common vertex, POINTS[1] is from the shortest side,
+			//	// POINTS[2] is from the middle side
+			//	POINTS = new PointD[] { POINTS[v0], POINTS[v1], POINTS[v2] };
+			//}
 
 			[MethodImpl(256)]/*256 = agressive inlining*/
 			private void SORTTRIANGLE()
@@ -454,11 +634,7 @@ namespace JPFITS
 			{
 				FIELDVECTOR = new PointD(POINTS[2].X - POINTS[1].X, POINTS[2].Y - POINTS[1].Y, SIDELENGTHS[2]);
 				FIELDVECTORRADANGLE = Math.Atan2(FIELDVECTOR.Y, FIELDVECTOR.X);
-			}
-
-			private PointD FIELDVECTOR = new PointD(0, 0, 0);
-			private double FIELDVECTORRADANGLE;
-			private double TOTALVERTEXPOINTVALUESUM;
+			}			
 		}
 
 		#region FITTING
@@ -1433,36 +1609,40 @@ namespace JPFITS
 		}
 
 		/// <summary>Computes the 2-D transformation elements between intermediate catalogue coordinates and image pixel coordinates.</summary>
-		/// <param name="x_intrmdt">The x-axis reference points of which to determine the transformation to.</param>
-		/// <param name="y_intrmdt">The y-axis reference points of which to determine the transformation to.</param>
+		/// <param name="x_intrmdt">The x-axis intermediate coordinates of which to determine the transformation to.</param>
+		/// <param name="y_intrmdt">The y-axis intermediate coordinates of which to determine the transformation to.</param>
 		/// <param name="x_pix">The x-axis points for which to determine the transformation of.</param>
 		/// <param name="y_pix">The y-axis points for which to determine the transformation of.</param>
 		/// <param name="p">The initial and return parameters of the tranformation. Options are
-		/// <br />p[0] = scale; p[1] = phi (radians); p[2] = x-axis pixel coordinate reference; p[3] = y-axis pixel coordinate reference;
-		/// <br />or
+		/// <br />p[0] = scale (radians per pixel); p[1] = phi (radians); p[2] = x-axis pixel coordinate reference; p[3] = y-axis pixel coordinate reference;
+		/// <br />or (P[0-3] in radians per pixel)
 		/// <br />p[0] = Matrix coeff [0, 0]; p[1] = Matrix coeff [1, 0]; p[2] = Matrix coeff [0, 1]; p[3] = Matrix coeff [1, 1]; p[4] = x-axis pixel coordinate reference; p[5] = y-axis pixel coordinate reference;</param>
 		/// <param name="p_lbnd">The lower-bound on the fit parameters.</param>
 		/// <param name="p_ubnd">The upper-bound on the fit parameters.</param>
 		/// <param name="p_scale">The order of magnitude scale (positive) of the fit parameters.</param>
-		public static void Fit_WCSTransform2d(double[] x_intrmdt, double[] y_intrmdt, double[] x_pix, double[] y_pix, ref double[] p, double[] p_lbnd, double[] p_ubnd, double[] p_scale)
+		/// <param name="siporder">SIP polynomial order for distortion corrections. 0 = no SIP, 1 = tip-tilt, 2 = quadratic, 3 = cubic, up to 9. Recommend no higher than 3.</param>
+		public static void Fit_WCSTransform2d(double[] x_intrmdt, double[] y_intrmdt, double[] x_pix, double[] y_pix, ref double[] p, double[] p_lbnd, double[] p_ubnd, double[] p_scale, int siporder = 0)
 		{
-			double epsx = 1e-11;
-			int maxits = 0;
+			double epsx = 1e-8;
+			int maxits = 500;
 			alglib.ndimensional_fvec fvec = new alglib.ndimensional_fvec(alglib_WCSTransform2d_fvec);
 			alglib.ndimensional_jac jac = new alglib.ndimensional_jac(alglib_WCSTransform2d_jac);
-			object[] objj = new object[4];
-			objj[0] = (object)x_pix;
-			objj[1] = (object)y_pix;
-			objj[2] = (object)x_intrmdt;
-			objj[3] = (object)y_intrmdt;
+			object[] objj = new object[5] { x_pix, y_pix, x_intrmdt, y_intrmdt, siporder };
 			object obj = (object)objj;
 
-			alglib.minlmcreatevj(y_pix.Length, p, out alglib.minlmstate state);
-			alglib.minlmsetcond(state, epsx, maxits);
-			alglib.minlmsetscale(state, p_scale);
-			alglib.minlmsetbc(state, p_lbnd, p_ubnd);
-			alglib.minlmoptimize(state, fvec, jac, null, obj);
-			alglib.minlmresults(state, out p, out alglib.minlmreport report);
+			try
+			{
+				alglib.minlmcreatevj(y_pix.Length, p, out alglib.minlmstate state);
+				alglib.minlmsetcond(state, epsx, maxits);
+				alglib.minlmsetscale(state, p_scale);
+				alglib.minlmsetbc(state, p_lbnd, p_ubnd);
+				alglib.minlmoptimize(state, fvec, jac, null, obj);
+				alglib.minlmresults(state, out p, out alglib.minlmreport report);
+			}
+			catch (Exception ex)
+			{
+				throw new Exception($"Fit_WCSTransform2d failed: x_intrmdt.Length={x_intrmdt.Length}, x_pix.Length={x_pix.Length}, p.Length={p.Length}, p_lbnd.Length={p_lbnd.Length}, p_ubnd.Length={p_ubnd.Length}, p_scale.Length={p_scale.Length}, Error: {ex.Message}, StackTrace: {ex.StackTrace}", ex);
+			}
 		}
 
 		/// <summary>Computes the 2-D transformation elements between two sets of coordinates.</summary>
@@ -1599,7 +1779,7 @@ namespace JPFITS
 			}
 			catch (Exception e)
 			{
-				MessageBox.Show(e.Data + "	" + e.InnerException + "	" + e.Message + "	" + e.Source + "	" + e.StackTrace + "	" + e.TargetSite);
+				throw new Exception(e.Data + "	" + e.InnerException + "	" + e.Message + "	" + e.Source + "	" + e.StackTrace + "	" + e.TargetSite);
 			}
 
 			//MessageBox.Show(p[p.Length - 1] + " ");
@@ -2260,7 +2440,7 @@ namespace JPFITS
 
 			if (style == InterpolationType.Linear)
 				alglib.spline1dbuildlinear(xdata, ydata, out sp, param);
-			else if (style == InterpolationType.Cublic)
+			else if (style == InterpolationType.Cubic)
 				alglib.spline1dbuildcubic(xdata, ydata, out sp, param);
 			else if (style == InterpolationType.Monotone)
 				alglib.spline1dbuildmonotone(xdata, ydata, out sp, param);
@@ -4087,61 +4267,85 @@ namespace JPFITS
 			}
 		}
 
-		public static void alglib_WCSTransform2d_fvec(double[] p, double[] f, object obj)
+        public static void alglib_WCSTransform2d_fvec(double[] p, double[] f, object obj)
+        {
+            object[] objj = (object[])obj;
+            double[] x_pix = (double[])objj[0];
+            double[] y_pix = (double[])objj[1];
+            double[] x_intrmdt = (double[])objj[2];
+            double[] y_intrmdt = (double[])objj[3];
+            int sip_order = (int)objj[4]; // Get from obj
+
+            double xres, yres;
+
+            if (p.Length == 4)
+            {
+                double cosp1 = Math.Cos(p[1]);
+                double sinp1 = Math.Sin(p[1]);
+                double xpiximp2, ypiximp3;
+
+                for (int i = 0; i < x_intrmdt.Length; i++)
+                {
+                    xpiximp2 = x_pix[i] - p[2];
+                    ypiximp3 = y_pix[i] - p[3];
+
+                    xres = p[0] * (cosp1 * xpiximp2 - sinp1 * ypiximp3) - x_intrmdt[i];
+                    yres = p[0] * (sinp1 * xpiximp2 + cosp1 * ypiximp3) - y_intrmdt[i];
+
+                    f[i] = Math.Sqrt(xres * xres + yres * yres);
+                }
+                return;
+            }
+
+            // CD matrix + SIP fit
+            double[,] A = sip_order > 0 ? new double[sip_order + 1, sip_order + 1] : null;
+            double[,] B = sip_order > 0 ? new double[sip_order + 1, sip_order + 1] : null;
+            if (sip_order > 0)
+            {
+                int idx = 6;
+                for (int i = 0; i <= sip_order; i++)
+                    for (int j = 0; j <= sip_order - i; j++)
+                    {
+                        A[i, j] = p[idx++];
+                        B[i, j] = p[idx++];
+                    }
+            }
+
+            for (int i = 0; i < x_pix.Length; i++)
+            {
+                double u = x_pix[i] - p[4];
+                double v = y_pix[i] - p[5];
+				double f_uv = 0, g_uv = 0, powuj;
+                if (sip_order > 0)
+                {
+					for (int j = 0; j <= sip_order; j++)
+					{
+						powuj = Math.Pow(u, j);
+
+                        for (int k = 0; k <= sip_order - j; k++)
+						{
+							double term = powuj * Math.Pow(v, k);
+							f_uv += A[j, k] * term;
+							g_uv += B[j, k] * term;
+						}
+					}
+                }
+                xres = p[0] * (u + f_uv) + p[1] * (v + g_uv) - x_intrmdt[i];
+                yres = p[2] * (u + f_uv) + p[3] * (v + g_uv) - y_intrmdt[i];
+                f[i] = Math.Sqrt(xres * xres + yres * yres);
+            }
+        }
+
+        public static void alglib_WCSTransform2d_jac(double[] p, double[] f, double[,] jac, object obj)
 		{
 			object[] objj = (object[])obj;
 			double[] x_pix = (double[])objj[0];
 			double[] y_pix = (double[])objj[1];
 			double[] x_intrmdt = (double[])objj[2];
 			double[] y_intrmdt = (double[])objj[3];
+            int sip_order = (int)objj[4]; // Get from obj
 
-			double xres, yres;
-
-			if (p.Length == 4)
-			{
-				double cosp1 = Math.Cos(p[1]);
-				double sinp1 = Math.Sin(p[1]);
-				double xpiximp2, ypiximp3;
-
-				for (int i = 0; i < x_intrmdt.Length; i++)
-				{
-					xpiximp2 = x_pix[i] - p[2];
-					ypiximp3 = y_pix[i] - p[3];
-
-					xres = p[0] * (cosp1 * xpiximp2 - sinp1 * ypiximp3) - x_intrmdt[i];
-					yres = p[0] * (sinp1 * xpiximp2 + cosp1 * ypiximp3) - y_intrmdt[i];
-
-					f[i] = Math.Sqrt(xres * xres + yres * yres);
-				}
-				return;
-			}
-
-			if (p.Length == 6)
-			{
-				double xpiximp4, ypiximp5;
-
-				for (int i = 0; i < x_pix.Length; i++)
-				{
-					xpiximp4 = x_pix[i] - p[4];
-					ypiximp5 = y_pix[i] - p[5];
-
-					xres = p[0] * xpiximp4 + p[1] * ypiximp5 - x_intrmdt[i];
-					yres = p[2] * xpiximp4 + p[3] * ypiximp5 - y_intrmdt[i];
-
-					f[i] = Math.Sqrt(xres * xres + yres * yres);
-				}
-			}
-		}
-
-		public static void alglib_WCSTransform2d_jac(double[] p, double[] f, double[,] jac, object obj)
-		{
-			object[] objj = (object[])obj;
-			double[] x_pix = (double[])objj[0];
-			double[] y_pix = (double[])objj[1];
-			double[] x_intrmdt = (double[])objj[2];
-			double[] y_intrmdt = (double[])objj[3];
-
-			alglib_WCSTransform2d_fvec(p, f, obj);
+            alglib_WCSTransform2d_fvec(p, f, obj);
 
 			if (p.Length == 4)
 			{
@@ -4170,34 +4374,83 @@ namespace JPFITS
 				return;
 			}
 
-			if (p.Length == 6)
-			{
-				double p4mx_pixi, p5my_pixi, p0p4mx_pixi, rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq, x_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq, p1p5my_pixi, p2p4mx_pixi, p3p5my_pixi, x_intrmdtip0p4mx_pixip1p5my_pixi, y_intrmdtip2p4mx_pixip3p5my_pixi, x_intrmdtip0p4mx_pixip1p5my_pixisq, y_intrmdtip2p4mx_pixip3p5my_pixisq;
+            // CD matrix + SIP Jacobian
+            double[,] A = sip_order > 0 ? new double[sip_order + 1, sip_order + 1] : null;
+            double[,] B = sip_order > 0 ? new double[sip_order + 1, sip_order + 1] : null;
+            if (sip_order > 0)
+            {
+                int idx = 6;
+                for (int i = 0; i <= sip_order; i++)
+                    for (int j = 0; j <= sip_order - i; j++)
+                    {
+                        A[i, j] = p[idx++];
+                        B[i, j] = p[idx++];
+                    }
+            }
 
-				for (int i = 0; i < x_pix.Length; i++)
-				{
-					p4mx_pixi = p[4] - x_pix[i];
-					p5my_pixi = p[5] - y_pix[i];
-					p0p4mx_pixi = p[0] * p4mx_pixi;
-					p1p5my_pixi = p[1] * p5my_pixi;
-					p2p4mx_pixi = p[2] * p4mx_pixi;
-					p3p5my_pixi = p[3] * p5my_pixi;
-					x_intrmdtip0p4mx_pixip1p5my_pixi = x_intrmdt[i] + p0p4mx_pixi + p1p5my_pixi;
-					y_intrmdtip2p4mx_pixip3p5my_pixi = y_intrmdt[i] + p2p4mx_pixi + p3p5my_pixi;
-					x_intrmdtip0p4mx_pixip1p5my_pixisq = x_intrmdtip0p4mx_pixip1p5my_pixi * x_intrmdtip0p4mx_pixip1p5my_pixi;
-					y_intrmdtip2p4mx_pixip3p5my_pixisq = y_intrmdtip2p4mx_pixip3p5my_pixi * y_intrmdtip2p4mx_pixip3p5my_pixi;
-					x_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq = x_intrmdtip0p4mx_pixip1p5my_pixisq + y_intrmdtip2p4mx_pixip3p5my_pixisq;
-					rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq = Math.Sqrt(x_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq);
+			double pujm1, puj, pvkm1, pvk, twop0xres, twop2yres, twop1xres, twop3yres;
 
-					jac[i, 0] = (p4mx_pixi * x_intrmdtip0p4mx_pixip1p5my_pixi) / rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq;
-					jac[i, 1] = (p5my_pixi * x_intrmdtip0p4mx_pixip1p5my_pixi) / rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq;
-					jac[i, 2] = (p4mx_pixi * y_intrmdtip2p4mx_pixip3p5my_pixi) / rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq;
-					jac[i, 3] = (p5my_pixi * y_intrmdtip2p4mx_pixip3p5my_pixi) / rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq;
-					jac[i, 4] = (2 * p[0] * x_intrmdtip0p4mx_pixip1p5my_pixi + 2 * p[2] * y_intrmdtip2p4mx_pixip3p5my_pixi) / (2 * rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq);
-					jac[i, 5] = (2 * p[1] * x_intrmdtip0p4mx_pixip1p5my_pixi + 2 * p[3] * y_intrmdtip2p4mx_pixip3p5my_pixi) / (2 * rootx_intrmdtip0p4mx_pixip1p5my_pixisqy_intrmdtip2p4mx_pixip3p5my_pixisq);
-				}
-			}
-		}
+            for (int i = 0; i < x_pix.Length; i++)
+            {
+                double u = x_pix[i] - p[4];
+                double v = y_pix[i] - p[5];
+                double f_uv = 0, g_uv = 0;
+                double[] df_du = new double[sip_order + 1], df_dv = new double[sip_order + 1];
+                double[] dg_du = new double[sip_order + 1], dg_dv = new double[sip_order + 1];
+                if (sip_order > 0)
+                {
+					for (int j = 0; j <= sip_order; j++)
+					{
+						pujm1 = Math.Pow(u, j - 1);
+						puj = Math.Pow(u, j);
+
+                        for (int k = 0; k <= sip_order - j; k++)
+						{
+							pvk = Math.Pow(v, k);
+							pvkm1 = Math.Pow(v, k - 1);
+
+                            double term = puj * pvk;
+							f_uv += A[j, k] * term;
+							g_uv += B[j, k] * term;
+							if (j > 0) df_du[j] += j * A[j, k] * pujm1 * pvk;
+							if (k > 0) df_dv[k] += k * A[j, k] * puj * pvkm1;
+							if (j > 0) dg_du[j] += j * B[j, k] * pujm1 * pvk;
+							if (k > 0) dg_dv[k] += k * B[j, k] * puj * pvkm1;
+						}
+					}
+                }
+
+                double xres = p[0] * (u + f_uv) + p[1] * (v + g_uv) - x_intrmdt[i];
+                double yres = p[2] * (u + f_uv) + p[3] * (v + g_uv) - y_intrmdt[i];
+                double denom = 2 * Math.Sqrt(xres * xres + yres * yres);
+                if (denom < 1e-10) denom = 1e-10;
+				twop0xres = 2 * p[0] * xres;
+				twop2yres = 2 * p[2] * yres;
+				twop1xres = 2 * p[1] * xres;
+				twop3yres = 2 * p[3] * yres;
+
+                jac[i, 0] = (2 * (u + f_uv) * xres) / denom;
+                jac[i, 1] = (2 * (v + g_uv) * xres) / denom;
+                jac[i, 2] = (2 * (u + f_uv) * yres) / denom;
+                jac[i, 3] = (2 * (v + g_uv) * yres) / denom;
+                jac[i, 4] = (-2 * (p[0] * (1 + df_du.Sum()) + p[1] * dg_du.Sum()) * xres - 2 * (p[2] * (1 + df_du.Sum()) + p[3] * dg_du.Sum()) * yres) / denom;
+                jac[i, 5] = (-2 * (p[0] * df_dv.Sum() + p[1] * (1 + dg_dv.Sum())) * xres - 2 * (p[2] * df_dv.Sum() + p[3] * (1 + dg_dv.Sum())) * yres) / denom;
+
+                if (sip_order > 0)
+                {
+                    int idx = 6;
+					for (int j = 0; j <= sip_order; j++)
+					{
+						for (int k = 0; k <= sip_order - j; k++)
+						{
+							double term = Math.Pow(u, j) * Math.Pow(v, k);
+							jac[i, idx++] = (twop0xres * term + twop2yres * term) / denom;
+							jac[i, idx++] = (twop1xres * term + twop3yres * term) / denom;
+						}
+					}
+                }
+            }
+        }
 
 		public static void alglib_GeneralTransform2d_fvec(double[] p, double[] f, object obj)
 		{
@@ -4254,7 +4507,7 @@ namespace JPFITS
 		/// <summary>Returns an array with the indeces at which the 2D data array satisfies the matching style for the given value.
 		/// <br />The return array is an n x 2 array giving the row [n, 0] and column [n, 1] indices of the match.</summary>
 		/// <param name="data">The data array to check for matches.</param>
-		/// <param name="val">The value with which to check for a match in the data array.</param>
+		/// <param name="val">The value of which to check for a match in the data array.</param>
 		/// <param name="style">The matching style can be &lt;, &lt;=, ==, &gt;=, &gt;, !=.</param>
 		public static void Find(double[,] data, double val, string style, bool do_parallel, out int[] xIndices, out int[] yIndices)
 		{
@@ -4285,7 +4538,9 @@ namespace JPFITS
 			if (Double.IsNegativeInfinity(val))
 				method = 8;
 
-			ParallelOptions opt = new ParallelOptions();
+            //Double.IsInfinity(val)
+
+            ParallelOptions opt = new ParallelOptions();
 			if (do_parallel)
 				opt.MaxDegreeOfParallelism = Environment.ProcessorCount;
 			else
@@ -4783,7 +5038,7 @@ namespace JPFITS
 		/// <summary>Returns a new array with all values at the given indeces replaced with the given value.</summary>
 		/// <param name="data">A 2-D double array.</param>
 		/// <param name="xcoords">The horizontal indexes of the values to be replaced.</param>
-		/// /// <param name="ycoords">The vertical indexes of the values to be replaced.</param>
+		/// <param name="ycoords">The vertical indexes of the values to be replaced.</param>
 		/// <param name="val">The value with which to replace at the given indices.</param>
 		public static double[,] Replace(double[,] data, int[] xcoords, int[] ycoords, double val, bool do_parallel = false)
 		{
@@ -5521,16 +5776,44 @@ namespace JPFITS
 				return Math.Sin(x) / x;
 		}
 
-		/// <summary>Rotates an array about its center.</summary>
-		/// <param name="data">The array to rotate.</param>
-		/// <param name="radians">The angle to rotate the array, positive counter-clockwise.</param>
-		/// <param name="x_center">The zero-based rotation center on the x-axis to rotate the array about. Pass Double.MaxValue for array center.</param>
-		/// <param name="y_center">The zero-based rotation center on the y-axis to rotate the array about. Pass Double.MaxValue for array center.</param>
-		/// <param name="interp_style">&quot;nearest&quot; nearest neighbor pixel<br />&quot;bilinear&quot; 2x2 bilinear interpolation<br />&quot;lanc_n&quot; Lanczos interpolation of order n = 3, 4, 5</param>
-		/// <param name="xshift">The amount to shift the image on the x-axis.</param>
-		/// <param name="yshift">The amount to shift the image on the y-axis.</param>
-		/// <param name="do_parallel">Perform operation with parallelism.</param>
-		public static double[,] RotateShiftArray(double[,] data, double radians, double x_center, double y_center, string interp_style, double xshift, double yshift, bool do_parallel = false)
+        public enum RegistrationInterpolation
+        {
+            /// <summary>
+            /// Nearest-neighbor pixel
+            /// </summary>
+            Nearest,
+
+            /// <summary>
+            /// 2x2 interpolation
+            /// </summary>
+            Bilinear,
+
+            /// <summary>
+            /// Lanczos interpolation of order 3
+            /// </summary>
+            Lanczos3,
+
+            /// <summary>
+            /// Lanczos interpolation of order 4
+            /// </summary>
+            Lanczos4,
+
+            /// <summary>
+            /// Lanczos interpolation of order 5
+            /// </summary>
+            Lanczos5
+        }
+
+        /// <summary>Rotates an array about its center.</summary>
+        /// <param name="data">The array to rotate.</param>
+        /// <param name="radians">The angle to rotate the array, positive counter-clockwise.</param>
+        /// <param name="x_center">The zero-based rotation center on the x-axis to rotate the array about. Pass Double.MaxValue for array center.</param>
+        /// <param name="y_center">The zero-based rotation center on the y-axis to rotate the array about. Pass Double.MaxValue for array center.</param>
+        /// <param name="interp_style">&quot;nearest&quot; nearest neighbor pixel<br />&quot;bilinear&quot; 2x2 bilinear interpolation<br />&quot;lanc_n&quot; Lanczos interpolation of order n = 3, 4, 5</param>
+        /// <param name="xshift">The amount to shift the image on the x-axis.</param>
+        /// <param name="yshift">The amount to shift the image on the y-axis.</param>
+        /// <param name="do_parallel">Perform operation with parallelism.</param>
+        public static double[,] RotateShiftArray(double[,] data, double radians, double x_center, double y_center, RegistrationInterpolation interp_style, double xshift, double yshift, bool do_parallel = false)
 		{
 			int width = data.GetLength(0);
 			int height = data.GetLength(1);
@@ -5551,7 +5834,7 @@ namespace JPFITS
 			double MyshiftMymid = -yshift - ymid;
 			double MxshiftMxmid = -xshift - xmid;
 
-            if (interp_style.ToLower() == "nearest")
+            if (interp_style == RegistrationInterpolation.Nearest)
 			{
 				Parallel.For(0, width, opts, x =>
 				{
@@ -5570,7 +5853,7 @@ namespace JPFITS
 				});
 			}
 
-			if (interp_style.ToLower() == "bilinear")
+			if (interp_style == RegistrationInterpolation.Bilinear)
 			{
 				Parallel.For(0, width, opts, x =>
 				{
@@ -5588,16 +5871,15 @@ namespace JPFITS
 				});
 			}
 
-			if (interp_style.Contains("lanc"))
+			if (interp_style == RegistrationInterpolation.Lanczos3 || interp_style == RegistrationInterpolation.Lanczos4 || interp_style == RegistrationInterpolation.Lanczos5)
 			{
-				string sn = interp_style.Substring(interp_style.Length - 1);
-				if (!JPMath.IsNumeric(sn))
-					throw new Exception("Lanczos order " + sn + " indeterminable. ");
-				int n = Convert.ToInt32(sn);
-				if (n < 3 || n > 5)
-					throw new Exception("Lanczos order " + n + " not computable. Allowed n = 3, 4, 5. ");
+				int n = 3;
+				if (interp_style == RegistrationInterpolation.Lanczos4)
+					n = 4;
+                if (interp_style == RegistrationInterpolation.Lanczos5)
+                    n = 5;
 
-				Parallel.For(0, width, opts, x =>
+                Parallel.For(0, width, opts, x =>
 				{
 					double xold, yold;
                     double xMxmidPxshift = (double)x + MxshiftMxmid;
@@ -7187,10 +7469,56 @@ namespace JPFITS
 			return STD;
 		}
 
-		/// <summary>Returns the standard deviation of all elements in the data array.</summary>
-		/// <param name="data">A 1-D double array.</param>
-		/// <param name="known_mean">If the mean of the data is already known, then save compute time by not having to calculate it first before the stdv is calculated.</param>
-		public static double Stdv(double[] data, double known_mean, bool do_parallel = false)
+        /// <summary>Returns the standard deviation of all elements in the data array.</summary>
+        public static double Stdv(int[] data, bool do_parallel = false)
+        {
+            double SUM = 0, STD = 0;
+            object locker = new object();
+            var rangePartitioner = Partitioner.Create(0, data.Length);
+            ParallelOptions opts = new ParallelOptions();
+            if (do_parallel)
+                opts.MaxDegreeOfParallelism = Environment.ProcessorCount;
+            else
+                opts.MaxDegreeOfParallelism = 1;
+
+            Parallel.ForEach(rangePartitioner, opts, (range, loopState) =>
+            {
+                double sum = 0;
+
+                for (int i = range.Item1; i < range.Item2; i++)
+                    sum += data[i];
+
+                lock (locker)
+                {
+                    SUM += sum;
+                }
+            });
+
+            double MEAN = SUM / (double)data.Length;
+
+            Parallel.ForEach(rangePartitioner, opts, (range, loopState) =>
+            {
+                double std = 0, delta;
+                for (int i = range.Item1; i < range.Item2; i++)
+                {
+                    delta = (data[i] - MEAN);
+                    std += delta * delta;
+                }
+
+                lock (locker)
+                {
+                    STD += std;
+                }
+            });
+            STD = Math.Sqrt(STD / ((double)data.Length - 1.0));
+
+            return STD;
+        }
+
+        /// <summary>Returns the standard deviation of all elements in the data array.</summary>
+        /// <param name="data">A 1-D double array.</param>
+        /// <param name="known_mean">If the mean of the data is already known, then save compute time by not having to calculate it first before the stdv is calculated.</param>
+        public static double Stdv(double[] data, double known_mean, bool do_parallel = false)
 		{
 			double STD = 0;
 			object locker = new object();
@@ -7238,7 +7566,43 @@ namespace JPFITS
 			return m;
 		}
 
-		public static double Mean_RobustClipped(double[,] data, double sigma)
+        public static void MostCommonElement(int[] elements, out int mostCommonValue, out int frequency)
+        {
+            // Handle edge case: empty array
+            if (elements == null || elements.Length == 0)
+            {
+                mostCommonValue = 0;
+                frequency = 0;
+                return;
+            }
+
+            // Use dictionary to count frequencies
+            Dictionary<int, int> abundances = new Dictionary<int, int>();
+            foreach (int element in elements)
+            {
+                if (abundances.ContainsKey(element))
+                    abundances[element]++;
+                else
+                    abundances[element] = 1;
+            }
+
+            // Find the element with maximum frequency
+            int maxAbundance = 0;
+            int maxValue = elements[0]; // Default to first element
+            foreach (var pair in abundances)
+            {
+                if (pair.Value > maxAbundance)
+                {
+                    maxAbundance = pair.Value;
+                    maxValue = pair.Key;
+                }
+            }
+
+            mostCommonValue = maxValue;
+            frequency = maxAbundance; // Frequency is the count of occurrences
+        }
+
+        public static double Mean_RobustClipped(double[,] data, double sigma)
 		{
 			double[,] clipper = data;
 			double m = Mean(clipper, true);
@@ -8086,7 +8450,7 @@ namespace JPFITS
 			double JD1583UT00 = 2299238.5;
 
 			//% get year, month, day
-			string[] splitdate = date.Split(new string[] { "-", ":" }, StringSplitOptions.RemoveEmptyEntries);
+			string[] splitdate = date.Substring(0, 10).Split(new string[] { "-", ":", " " }, StringSplitOptions.RemoveEmptyEntries);
 			double year = Convert.ToDouble(splitdate[0]);
 			double month = Convert.ToDouble(splitdate[1]);
 			double day = Convert.ToDouble(splitdate[2]);
@@ -8115,7 +8479,7 @@ namespace JPFITS
 				yearpointyear += (monthdays[i] / yeardays);
 			}
 
-			string[] splittime = utime.Split(new string[] { "-", ":" }, StringSplitOptions.RemoveEmptyEntries);
+			string[] splittime = utime.Split(new string[] { "-", ":", " " }, StringSplitOptions.RemoveEmptyEntries);
 			double t = Convert.ToDouble(splittime[0]) / 24 + Convert.ToDouble(splittime[1]) / 24 / 60 + Convert.ToDouble(splittime[2]) / 24 / 3600;
 			yearpointyear += (t / yeardays);
 
@@ -8138,6 +8502,9 @@ namespace JPFITS
 		/// <param name="year"></param>
 		public static bool YearIsLeap(double year)
 		{
+			if (year < 1583)
+				throw new Exception("Year must be greater than 1582: YearIsLeap(double year): " + year);
+
 			if (Math.IEEERemainder(year, 4) != 0)
 				return false;
 			else if (Math.IEEERemainder(year, 100) != 0)
@@ -8460,6 +8827,41 @@ namespace JPFITS
 					result[x] += p[i * 2] * Math.Cos((double)(i + 1) * xdata[x] * p[p.Length - 1] / 2 / Math.PI) + p[i * 2 + 1] * Math.Sin((double)(i + 1) * xdata[x] * p[p.Length - 1] / 2 / Math.PI);
 			}
 			return result;
+		}
+
+		public static ulong MakeUniqueHashCode(double[]? darray = null, string?  str = null)
+		{
+			int nbytes = 0;
+			if (darray != null)
+				nbytes += darray.Length * sizeof(double);
+			if (str != null)
+				nbytes += str.Length * sizeof(char);
+
+			byte[] bytes = new byte[nbytes];
+
+			int ind = 0;
+			if (darray != null)
+				foreach (double value in darray)
+				{
+					var doublebytes = BitConverter.GetBytes(value);
+					Array.Copy(doublebytes, 0, bytes, ind, doublebytes.Length);
+					ind += doublebytes.Length;
+				}
+
+			if (str != null)
+			{
+				char[] charsarr = str.ToCharArray();
+				foreach (char value in charsarr)
+				{
+					var charbytes = BitConverter.GetBytes(value);
+					Array.Copy(charbytes, 0, bytes, ind, charbytes.Length);
+					ind += charbytes.Length;
+				}
+			}
+			
+			System.Security.Cryptography.SHA256 sha256 = System.Security.Cryptography.SHA256.Create();
+			byte[] hashbytes = sha256.ComputeHash(bytes);
+			return BitConverter.ToUInt64(hashbytes, 0);
 		}
 
 		#endregion

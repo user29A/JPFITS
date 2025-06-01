@@ -23,6 +23,8 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Windows.Forms;
+using System.Drawing;
 #nullable enable
 
 namespace JPFITS
@@ -930,6 +932,14 @@ namespace JPFITS
 
 		#endregion
 
+		#region MEMBERS
+
+		public Bitmap ToBitMapImage(int scaling, int color, bool invert, double[] stdImclim)
+		{
+			return JPBitMap.FITSImageToBmp(this, scaling, color, invert, stdImclim);
+		}
+		#endregion
+
 		#region WRITING
 
 		/// <summary>Write a FITS image to disk as a primary header and primary image from the FITSImage object with its existing file name.
@@ -1492,12 +1502,12 @@ namespace JPFITS
 
 			return result;
 		}
-		#endregion
+        #endregion
 
-		#region PRIVATEMEMBERS
+        #region PRIVATEMEMBERS
 
-		//Conditions
-		private bool HEADER_POP;
+        //Conditions
+        private bool HEADER_POP;
 		private bool DATA_POP;
 		private bool STATS_POP;
 		private bool FROMDISKBUFFER;

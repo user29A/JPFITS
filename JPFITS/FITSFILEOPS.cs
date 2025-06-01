@@ -23,7 +23,6 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Collections;
 using System.Runtime.CompilerServices;
-using System.Windows.Forms;
 #nullable enable
 
 namespace JPFITS

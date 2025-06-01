@@ -22,12 +22,12 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Windows.Forms;
-using System.Collections;
 using System.Net;
 using System.Text;
 using System.Windows.Forms.DataVisualization.Charting;
 using System.Globalization;
-
+using System.Collections.Specialized;
+using System.Linq;
 #nullable enable
 
 namespace JPFITS
@@ -65,36 +65,99 @@ namespace JPFITS
 			}
 		}
 
-		public static void Help()
+		public static void Help(bool showmessagebox)
 		{
 			StringBuilder sb = new StringBuilder();
-			sb.AppendLine("\"-maglimit\" Magnitude limit below which to flag bright sources and save to output table. Default is 100, to pass all, given that there is no such low magnitude." + Environment.NewLine);
-			sb.AppendLine("\"-buffer\" Tolerance buffer around image field, in arcminutes. This field can be negative, if one wishes to mitigate image padding." + Environment.NewLine);
-			sb.AppendLine("\"-offsetra\" Offset the center of the query region in right ascension. Units in arcminutes." + Environment.NewLine);
-			sb.AppendLine("\"-offsetdec\" Offset the center of the query region in declination. Units in arcminutes." + Environment.NewLine);
-			sb.AppendLine("\"-shape\" Shape of field to query: \"rectangle\" (default) or \"circle\". Circle may only be used if pixwidth and pixheight are equal. Rectangle query uses a polygon query with corners defined by an ad-hoc WCS given the supplied field parameters, whereas circle uses a radius." + Environment.NewLine);
-			sb.AppendLine("\"-rotation\" Field rotation, applicable to a rectangle query. Raises an exception if used for a circle query." + Environment.NewLine);
-			sb.AppendLine("\"-catalogue\" Catalogue or Service to query. Valid options are currently: \"GaiaDR3\" (default)." + Environment.NewLine);
-			sb.AppendLine("\"-filter\" Filter of the catalogue to sort on. Options are: for GaiaDR3: \"rp\", \"bp\", \"g\" (default)." + Environment.NewLine);
-			sb.AppendLine("\"-forcenew\" Force new astroquery. The raw query is saved with a filename based on a hash of the astroquery parameters, and therefore should be unique for unique queries, and the same for the same queries. The exception is for the \"entries\" option which cannot be hashed non-randomly. Therefore if everything else stays the same except for \"entries\", one would need to force a new query." + Environment.NewLine);
-			sb.AppendLine("\"-imageout\" Output an image field plot with maglimit sources marked." + Environment.NewLine);
-			sb.AppendLine("\"-imageshow\" Show the image field plot." + Environment.NewLine);
-			sb.AppendLine("\"-outdir\" Directory to save files. By default files are saved in the current working directory." + Environment.NewLine);
-			sb.AppendLine("\"-outname\" The name to use for output files. If not supplied a settings-consistent but random hash will be used for output file names. Existing filenames will not be overwritten." + Environment.NewLine);
-			sb.AppendLine("\"-overwrite\" Overwrite the output table if one is produced, instead of appending an instance number." + Environment.NewLine);
-			sb.AppendLine("\"-fitsout\" Output results table format as FITS binary table (instead of csv)." + Environment.NewLine);
-			sb.AppendLine("\"-rmvrawquery\" Remove the raw query folder and its contents after running. This will force future astroqueries." + Environment.NewLine);
-			sb.AppendLine("\"-nquery\" Number of brightest sources in the filter to retreive from the query service. Pass 0 to retreive all sources. Default 500." + Environment.NewLine);
-			sb.AppendLine("\"-pmepoch\" Pass the year.year value of the observation to update the RA and Dec entries of the table with their proper motion adjustments, given the catalogue reference epoch. Only entries in the query which have valid proper motion entries will be saved to output." + Environment.NewLine);
-			sb.AppendLine("\"-pmlimit\" Limit the output to proper motions whose absolute value are less than pmlimit. Milliarcseconds per year." + Environment.NewLine);
-			sb.AppendLine("\"-entries\" A commaspace \", \" separated list of source columns to request from the query. Pass entries=\"all\" to get everything from the query source. Default is for GaiaDR3, entries=\"ref_epoch, ra, ra_err, dec, dec_err, pmra, pmra_err, pmdec, pmdec_err, pm, phot_bp_mean_mag, phot_g_mean_mag, phot_rp_mean_mag\". Thus, if entries is supplied, it appends additional entries to the default. For example if you additionally wanted the absolute value of proper motion errors then passing entries=\"pm_error\" would append \", pm_error\" to the string." + Environment.NewLine);
-			sb.AppendLine("\"-notableout\" Do not write an output file even when sources have been found. Useful if only wanting to view images but do not want to fill up a directory with table results." + Environment.NewLine);
-			sb.AppendLine("\"-silent\" Do not output process milestones to command window. Default false." + Environment.NewLine);
+			sb.AppendLine("\"maglimit\" Magnitude limit below which to flag bright sources and save to output table; less bright sources will be ignored." + Environment.NewLine);
+			sb.AppendLine("\"buffer\" Tolerance buffer around image field, in arcminutes. This field can be negative, if one wishes to mitigate image padding." + Environment.NewLine);
+			sb.AppendLine("\"offsetra\" Offset the center of the query region in right ascension. Units in arcminutes." + Environment.NewLine);
+			sb.AppendLine("\"offsetdec\" Offset the center of the query region in declination. Units in arcminutes." + Environment.NewLine);
+			sb.AppendLine("\"shape\" Shape of field to query: \"rectangle\" (default) or \"circle\". Rectangle query uses a polygon query with corners defined by an ad-hoc WCS given the supplied field parameters, whereas circle uses a radius." + Environment.NewLine);
+			sb.AppendLine("\"rotation\" Field rotation, applicable to a rectangle query." + Environment.NewLine);
+			sb.AppendLine("\"catalogue\" Catalogue or Service to query. Valid options are currently: \"GaiaDR3\" (default)." + Environment.NewLine);
+			sb.AppendLine("\"filter\" Filter of the catalogue to sort on. Options are: for GaiaDR3: \"rp\", \"bp\", \"g\" (default)." + Environment.NewLine);
+			sb.AppendLine("\"forcenew\" Force new astroquery. The raw query is saved with a filename based on a hash of the astroquery parameters, and therefore should be unique for unique queries, and the same for the same queries. The exception is for the \"entries\" option which cannot be hashed non-randomly. Therefore if everything else stays the same except for \"entries\", one would need to force a new query." + Environment.NewLine);
+			sb.AppendLine("\"imageout\" Output an image field plot with maglimit sources marked." + Environment.NewLine);
+			sb.AppendLine("\"imageshow\" Show the image field plot." + Environment.NewLine);
+			sb.AppendLine("\"rawoutdir\" Directory to save raw querry files. By default raw files are saved in the user's appdata folder." + Environment.NewLine);
+			sb.AppendLine("\"outdir\" Directory to save files. By default files are saved in the current working directory." + Environment.NewLine);
+			sb.AppendLine("\"outname\" The name to use for output files. If not supplied a settings-consistent but random hash will be used for output file names. Existing filenames will not be overwritten." + Environment.NewLine);
+			sb.AppendLine("\"overwrite\" Overwrite the output table if one is produced, instead of appending an instance number." + Environment.NewLine);
+			sb.AppendLine("\"fitsout\" Output results table format as FITS binary table (instead of csv)." + Environment.NewLine);
+			sb.AppendLine("\"rmvrawquery\" Remove the raw query folder and its contents after running. This will force future astroqueries." + Environment.NewLine);
+			sb.AppendLine("\"nquery\" Number of brightest sources in the filter to retreive from the query service. Pass 0 to retreive all sources. Default 500." + Environment.NewLine);
+			sb.AppendLine("\"pmepoch\" Pass the year.year value or the big-endian year string ex. 2013-06-12 of the observation to update the RA and Dec entries of the table with their proper motion adjustments, given the catalogue reference epoch. Only entries in the query which have valid proper motion entries will be saved to output." + Environment.NewLine);
+			sb.AppendLine("\"pmlimit\" Limit the output to proper motions whose absolute value are less than pmlimit. Only valid if pmepoch is specified. Milliarcseconds per year." + Environment.NewLine);
+			sb.AppendLine("\"entries\" A commaspace \", \" separated list of source columns to request from the query. Pass entries=\"all\" to get everything from the query source. Default is for GaiaDR3, entries=\"ref_epoch, ra, ra_err, dec, dec_err, pmra, pmra_err, pmdec, pmdec_err, pm, phot_bp_mean_mag, phot_g_mean_mag, phot_rp_mean_mag\". Thus, if entries is supplied, it appends additional entries to the default. For example if you additionally wanted the absolute value of proper motion errors then passing entries=\"pm_error\" would append \", pm_error\" to the string." + Environment.NewLine);
+			sb.AppendLine("\"notableout\" Do not write an output file even when sources have been found. Useful if only wanting to view images but do not want to fill up a directory with table results." + Environment.NewLine);
+			sb.AppendLine("\"silent\" Do not output process milestones to command window. Default false." + Environment.NewLine);
 
 			Clipboard.SetText(sb.ToString());
 
-			MessageBox.Show(sb.ToString());
+			if (showmessagebox)
+				MessageBox.Show(sb.ToString());
 		}
+
+        /// <summary>
+        /// Perform a query with no user interface dialog form. Will throw an informative exception if something goes wrong. Returns a string which is the filename of the catalogue data downloaded. If nothing was found the string will be empty.
+        /// </summary>
+        /// <param name="RA">Right Ascension: degree.degree format; sexagesimal hh:mm:ss.s format (any delimiter acceptable); or the keyword of the FITS image header which contains the value in either format.</param>
+        /// <param name="DEC">Declination: degree.degree format; sexagesimal dd:am:as.s format (any delimiter acceptable); or the keyword of the FITS image header which contains the value in either format.</param>
+        /// <param name="SCALE">The plate scale in arcseconds per pixel, or the keyword of the FITS image header which contains the value.</param>
+        /// <param name="fimg">The reference FITS image from which values may be extracted from the Header. Pass null if not required; pixwidth and pixheight must then be supplied.</param>
+		/// <param name="pixwidth">The number of horizontal pixels of the image. Pass null if fimg is not null.</param>
+		/// <param name="pixheight">The number of vertical pixels of the image. Pass null if fimg is not null.</param>
+		/// <param name="ra">Give the RA back as its determined double value.</param>
+		/// <param name="dec">Give the DEC back as its determined double value.</param>
+		/// <param name="scale">Give the SCALE back as its determined double value.</param>
+        /// <param name="args">Optional arguments list. Possible arguments can be found here: https://github.com/user29A/AstraCarta/wiki, or with AstraCarta.Help call.</param>
+        public static string Query(string RA, string DEC, string SCALE, FITSImage? fimg, int? pixwidth, int? pixheight, out double ra, out double dec, out double scale, NameValueCollection? args = null)
+		{
+			WorldCoordinateSolution.RADecParse(RA, DEC, fimg, out ra, out dec);
+
+            if (JPMath.IsNumeric(SCALE))
+                scale = Convert.ToDouble(SCALE);
+            else
+            {
+                if (fimg == null)
+                    throw new Exception("FITSImage fimg in AstraCarta SCALE is null. Cannot proceed.");
+
+                try
+                {
+                    scale = Convert.ToDouble(fimg.Header.GetKeyValue(SCALE));
+                }
+                catch
+                {
+                    throw new Exception("Cannot make sense of scale '" + SCALE + "'. Stopping AstraCarta.");
+                }
+            }
+
+			if (args != null)
+				if (!string.IsNullOrEmpty(args["pmepoch"]))
+                    if (!JPMath.IsNumeric(args["pmepoch"]))
+					{
+						if (args["pmepoch"] == "DATE-OBS")
+						{
+                            if (fimg == null)
+                                throw new Exception("FITSImage fimg in AstraCarta pmepoch is null. Cannot proceed.");
+
+                            args["pmepoch"] = fimg.Header.GetKeyValue("DATE-OBS");
+							if (string.IsNullOrEmpty(args["pmepoch"]))
+								throw new Exception("pmepoch in AstraCarta, DATE-OBS keyword returned nothing from the FITS image header. Stopping AstraCarta");
+                            if (!JPMath.IsNumeric(args["pmepoch"].Substring(0, 4)) || !JPMath.IsNumeric(args["pmepoch"].Substring(5, 2)) || !JPMath.IsNumeric(args["pmepoch"].Substring(8, 2)) || args["pmepoch"].Substring(4, 1) != "-" || args["pmepoch"].Substring(7, 1) != "-")
+                                throw new Exception("'pmepoch=" + args["pmepoch"] + "' in AstraCarta invalid. Stopping AstraCarta");
+                        }
+						else if (!JPMath.IsNumeric(args["pmepoch"].Substring(0,4)) || !JPMath.IsNumeric(args["pmepoch"].Substring(5, 2)) || !JPMath.IsNumeric(args["pmepoch"].Substring(8, 2)) || args["pmepoch"].Substring(4, 1) != "-" || args["pmepoch"].Substring(7, 1) != "-")
+							throw new Exception("'pmepoch=" + args["pmepoch"] + "' in AstraCarta invalid. Stopping AstraCarta");
+					}
+
+			if (fimg != null)
+				return Query(ra, dec, scale, fimg.Width, fimg.Height, args);
+			else if (pixwidth != null && pixheight != null) 
+				return Query(ra, dec, scale, (int)pixwidth, (int)pixheight, args);
+			else
+                throw new Exception("AstraCarta.Query requires fimg or pixwidth & pixheight to not be null. Cannot proceed.");
+        }
 
         /// <summary>
         /// Perform a query with no user interface dialog form. Will throw an informative exception if something goes wrong. Returns a string which is the filename of the catalogue data downloaded. If nothing was found the string will be empty.
@@ -104,67 +167,57 @@ namespace JPFITS
         /// <param name="scale">The plate scale in arcseconds per pixel.</param>
         /// <param name="pixwidth">The number of horizontal pixels of the image.</param>
         /// <param name="pixheight">The number of vertical pixels of the image</param>
-        /// <param name="optArgs">Optional arguments list. Possible arguments can be found here: https://github.com/user29A/AstraCarta/wiki, or with AstraCarta.Help call.
-        /// <br />Be sure to pass the switch "-argument"; for example do not pass "buffer", but pass "-buffer", etc.
-        /// <br />Arguments and their values must be consecutive, for example: optArgs.Add("-buffer); optArgs.Add(2); and so on.
-        /// <br />Boolean arguments do not require a value, and their presence indicates true. For example the presence of optArgs.Add("-fitsout") equates to true for writing the file as a FITS bintable.</param>
-        public static string Query(double ra, double dec, double scale, int pixwidth, int pixheight, ArrayList? optArgs = null)
+        /// <param name="args">Optional arguments list. Possible arguments can be found here: https://github.com/user29A/AstraCarta/wiki, or with AstraCarta.Help call.</param>
+        public static string Query(double ra, double dec, double scale, int pixwidth, int pixheight, NameValueCollection? args = null)
 		{
-			double RAorig = ra;
+            if (scale <= 0)
+                throw new Exception("scale: '" + scale + "' not sensible for AstraCarta");
+			if (pixwidth <= 0)
+				throw new Exception("pixwidth: '" + pixwidth + "' not sensible for AstraCarta");
+            if (pixheight <= 0)
+                throw new Exception("pixheight: '" + pixheight + "' not sensible for AstraCarta");
+
+            double RAorig = ra;
 			double decorig = dec;
 
 			try
 			{
-				if (optArgs == null)
-					optArgs = new ArrayList();
+				if (args == null)
+					args = new NameValueCollection();
 
-				int n;
-
-				double maglimit = 100;
-				n = optArgs.IndexOf("-maglimit");
-				if (n != -1)
-					maglimit = Convert.ToDouble(optArgs[n + 1]);
+				double maglimit = Double.MaxValue;
+				if (!string.IsNullOrEmpty(args["maglimit"]))
+					maglimit = Convert.ToDouble(args["maglimit"]);
 
 				double buffer = 0;
-				n = optArgs.IndexOf("-buffer");
-				if (n != -1)
-					buffer = Convert.ToDouble(optArgs[n + 1]); //arcminutes
+				if (!string.IsNullOrEmpty(args["buffer"]))
+					buffer = Convert.ToDouble(args["buffer"]); //arcminutes
 
 				double offsetra = 0;
-				n = optArgs.IndexOf("-offsetra");
-				if (n != -1)
-					offsetra = Convert.ToDouble(optArgs[n + 1]); //arcminutes
+				if (!string.IsNullOrEmpty(args["offsetra"]))
+					offsetra = Convert.ToDouble(args["offsetra"]); //arcminutes
 				ra += (offsetra / 60);
 
 				double offsetdec = 0;
-				n = optArgs.IndexOf("-offsetdec");
-				if (n != -1)
-					offsetdec = Convert.ToDouble(optArgs[n + 1]); //arcminutes
+				if (!string.IsNullOrEmpty(args["offsetdec"]))
+					offsetdec = Convert.ToDouble(args["offsetdec"]); //arcminutes
 				dec += (offsetdec / 60);
 
 				string shape = "rectangle";
 				int shapenum = 1;
-				n = optArgs.IndexOf("-shape");
-				if (n != -1)
-					if ((string)optArgs[n + 1] != "circle" && (string)optArgs[n + 1] != "rectangle")
+				if (!string.IsNullOrEmpty(args["shape"]))
+					if (args["shape"] != "circle" && args["shape"] != "rectangle")
 						throw new Exception("shape may only be \"circle\" or \"rectangle\"");
 					else
-						shape = (string)optArgs[n + 1];
+						shape = args["shape"];
 				if (shape == "circle")
-					if (pixwidth != pixheight)
-						throw new Exception("shape may only be \"circle\" if pixwidth and pixheight are equal");
-					else
 						shapenum = 2;
 				double radius = scale / 3600 * pixwidth / 2 + buffer / 60;// degrees
 				double radiuspix = radius / (scale / 3600);
 
 				double rotation = 0;
-				n = optArgs.IndexOf("-rotation");
-				if (n != -1)
-					if (shape == "circle")
-						throw new Exception("rotation doesn't make sense with a cirlce query.");
-					else
-						rotation = Convert.ToDouble(optArgs[n + 1]) * Math.PI / 180;// radians
+				if (!string.IsNullOrEmpty(args["rotation"]))
+					rotation = Convert.ToDouble(args["rotation"]) * Math.PI / 180;// radians
 
 				double cd11 = -scale / 3600 * Math.Cos(rotation);
 				double cd12 = scale / 3600 * Math.Sin(rotation);
@@ -226,17 +279,15 @@ namespace JPFITS
 
 				string catalogue = "GaiaDR3";
 				int cataloguenum = 1;
-				n = optArgs.IndexOf("-catalogue");
-				if (n != -1)
-					catalogue = (string)optArgs[n + 1];
+				if (!string.IsNullOrEmpty(args["catalogue"]))
+					catalogue = args["catalogue"];
 				if (catalogue != "GaiaDR3")
 					throw new Exception("Catalogue " + catalogue + " not valid.");
 
 				string filter = "g";
 				int filternum = 3;
-				n = optArgs.IndexOf("-filter");
-				if (n != -1)
-					filter = (string)optArgs[n + 1];
+				if (!string.IsNullOrEmpty(args["filter"]))
+					filter = args["filter"];
 				if (catalogue == "GaiaDR3")
 					if (filter == "bp" || filter == "b")
 					{
@@ -257,108 +308,113 @@ namespace JPFITS
 						throw new Exception("Filter " + filter + " not valid for Catalogue " + catalogue);
 
 				bool imageout = false;
-				n = optArgs.IndexOf("-imageout");
-				if (n != -1)
-					imageout = (bool)optArgs[n + 1];
+				if (!string.IsNullOrEmpty(args["imageout"]))
+					imageout = Convert.ToBoolean(args["imageout"]);
 
 				string outformat = ".csv";
 				bool fitsout = false;
-				n = optArgs.IndexOf("-fitsout");
-				if (n != -1)
-					fitsout = true;
+				if (!string.IsNullOrEmpty(args["fitsout"]))
+					fitsout = Convert.ToBoolean(args["fitsout"]);
 				if (fitsout == true)
 					outformat = ".fit";
 
 				bool imageshow = false;
-				n = optArgs.IndexOf("-imageshow");
-				if (n != -1)
-					imageshow = true;
+				if (!string.IsNullOrEmpty(args["imageshow"]))
+					imageshow = Convert.ToBoolean(args["imageshow"]);
 
 				string outdir = Directory.GetCurrentDirectory();
-				n = optArgs.IndexOf("-outdir");
-				if (n != -1)
-					outdir = (string)optArgs[n + 1];
+				if (!string.IsNullOrEmpty(args["outdir"]))
+					outdir = args["outdir"];
 				if (!Directory.Exists(outdir))
 					Directory.CreateDirectory(outdir);
 
 				string rawoutdir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AstraCarta", "AstraCartaRawQueries");
+				if (!string.IsNullOrEmpty(args["rawoutdir"]))
+					rawoutdir = args["rawoutdir"];
 				if (!Directory.Exists(rawoutdir))
 					Directory.CreateDirectory(rawoutdir);
 
 				bool forcenew = false;
-				n = optArgs.IndexOf("-forcenew");
-				if (n != -1)
-					forcenew = true;
+				if (!string.IsNullOrEmpty(args["forcenew"]))
+					forcenew = Convert.ToBoolean(args["forcenew"]);
 
 				int nquery = 500;
-				n = optArgs.IndexOf("-nquery");
-				if (n != -1)
-					nquery = Convert.ToInt32(optArgs[n + 1]);
+				if (!string.IsNullOrEmpty(args["nquery"]))
+					nquery = Convert.ToInt32(args["nquery"]);
 
-				double pmepoch = 0;
-				n = optArgs.IndexOf("-pmepoch");
-				if (n != -1)
-					pmepoch = Convert.ToDouble(optArgs[n + 1]);
+				double pmepoch = Double.MaxValue;
+				if (!string.IsNullOrEmpty(args["pmepoch"]))
+					try
+					{
+                        pmepoch = Convert.ToDouble(args["pmepoch"]);
+                    }
+					catch
+					{
+						try
+						{
+							JPMath.DateToJD(args["pmepoch"], "00:00:00", out pmepoch);
+						}
+						catch
+						{
+                            throw new Exception("pmepoch: '" + args["pmepoch"] + "' is not valid in AstraCarta");
+                        }
+					}					
 
 				double pmlimit = Double.MaxValue;
-				n = optArgs.IndexOf("-pmlimit");
-				if (n != -1)
-					if (pmepoch == 0)
-						throw new Exception("pmlimit is only valid if pmepoch is specified");
+				if (!string.IsNullOrEmpty(args["pmlimit"]))
+					if (pmepoch == Double.MaxValue)
+                        throw new Exception("pmlimit only valid if pmepoch is specified in AstraCarta");
 					else
-						pmlimit = Convert.ToDouble(optArgs[n + 1]);
+						pmlimit = Convert.ToDouble(args["pmlimit"]);
 
-				string entries = "ref_epoch, ra, ra_error, dec, dec_error, pmra, pmra_error, pmdec, pmdec_error, pm, phot_bp_mean_mag, phot_g_mean_mag, phot_rp_mean_mag";
-				n = optArgs.IndexOf("-entries");
-				if (n != -1)
-					if ((string)optArgs[n + 1] == "all")
+				string entries = "source_id, ref_epoch, ra, ra_error, dec, dec_error, pmra, pmra_error, pmdec, pmdec_error, pm, " + filter;
+				if (!string.IsNullOrEmpty(args["entries"]))
+					if (args["entries"] == "all")
 						entries = "*";
 					else
-						entries += " " + (string)optArgs[n + 1];
+						entries += ", " + args["entries"];
 
 				bool notableout = false;
-				n = optArgs.IndexOf("-notableout");
-				if (n != -1)
-					notableout = true;
+				if (!string.IsNullOrEmpty(args["notableout"]))
+					notableout = Convert.ToBoolean(args["notableout"]);
 
 				bool rmvrawquery = false;
-				n = optArgs.IndexOf("-rmvrawquery");
-				if (n != -1)
-					rmvrawquery = true;
+				if (!string.IsNullOrEmpty(args["rmvrawquery"]))
+					rmvrawquery = Convert.ToBoolean(args["rmvrawquery"]);
 
-				double rawqueryfilenamehash, fileoutfilenamehash;
+				ulong rawqueryfilenamehash, fileoutfilenamehash;
 				if (shape == "circle")
 				{
-					rawqueryfilenamehash = (double)Tuple.Create(ra, dec, nquery, cataloguenum, filternum, radius * 3600, shapenum).GetHashCode() + Int32.MaxValue + 1;
-					fileoutfilenamehash = (double)Tuple.Create(rawqueryfilenamehash, maglimit, pmepoch, pmlimit).GetHashCode() + Int32.MaxValue + 1;
+					rawqueryfilenamehash = JPMath.MakeUniqueHashCode(new double[] { ra, dec, nquery, cataloguenum, filternum, radius * 3600, shapenum }, entries);
+					fileoutfilenamehash = JPMath.MakeUniqueHashCode(new double[] { rawqueryfilenamehash, maglimit, pmepoch, pmlimit });
 				}
 				else
 				{
-					rawqueryfilenamehash = (double)Tuple.Create(ra, dec, nquery, cataloguenum, filternum, rotation, ra_topleft, dec_topleft).GetHashCode();
-					rawqueryfilenamehash = (double)Tuple.Create(rawqueryfilenamehash, ra_topright, dec_topright, ra_bottomright, dec_bottomright, ra_bottomleft, dec_bottomleft, shapenum).GetHashCode() + Int32.MaxValue + 1;
-					fileoutfilenamehash = (double)(new double[] { rawqueryfilenamehash, maglimit, pmepoch, pmlimit }).GetHashCode() + Int32.MaxValue + 1;
+					rawqueryfilenamehash = JPMath.MakeUniqueHashCode(new double[] { ra, dec, nquery, cataloguenum, filternum, rotation, ra_topleft, dec_topleft, ra_topright, dec_topright, ra_bottomright, dec_bottomright, ra_bottomleft, dec_bottomleft, shapenum }, entries);
+					fileoutfilenamehash = JPMath.MakeUniqueHashCode(new double[] { rawqueryfilenamehash, maglimit, pmepoch, pmlimit });
 				}
 
 				string outname = fileoutfilenamehash.ToString();
-				n = optArgs.IndexOf("-outname");
-				if (n != -1)
-					outname = (string)optArgs[n + 1];
+				if (!string.IsNullOrEmpty(args["outname"]))
+					outname = args["outname"];
 
 				bool overwrite = false;
-				n = optArgs.IndexOf("-overwrite");
-				if (n != -1)
+				if (!string.IsNullOrEmpty(args["overwrite"]))
+					overwrite = Convert.ToBoolean(args["overwrite"]);
+				else if (args.AllKeys.Contains("overwrite"))
 					overwrite = true;
 
 				#pragma warning disable CS0219 // Variable is assigned but its value is never used
 				bool silent = false;
 				#pragma warning restore CS0219 // Variable is assigned but its value is never used
-				n = optArgs.IndexOf("-silent");
-				if (n != -1)
+				if (!string.IsNullOrEmpty(args["silent"]))
+					silent = Convert.ToBoolean(args["silent"]);
+				else if (args.AllKeys.Contains("silent"))
 					silent = true;
 
 				string rawqueryfilename = Path.Combine(rawoutdir, rawqueryfilenamehash.ToString() + ".csv");
 				string resultsfilename = Path.Combine(outdir, outname + outformat);
-				string imagefilename = Path.Combine(outdir, outname + ".jpg");
+				string imagefilename = Path.Combine(outdir, outname + "ACQuery" + ".jpg");
 
 				if (!overwrite)
 					if (File.Exists(resultsfilename) || File.Exists(imagefilename))
@@ -427,8 +483,7 @@ namespace JPFITS
 						}
 						catch (Exception ex)
 						{
-							//Clipboard.SetText("jobstr: '" + jobstr + "'");
-							MessageBox.Show(ex.Message + Environment.NewLine + ex.TargetSite + Environment.NewLine + ex.StackTrace + Environment.NewLine + ex.Source + Environment.NewLine + ex.InnerException + Environment.NewLine + Environment.NewLine + ex.Data + Environment.NewLine + "jobstr: '" + jobstr + "'" + Environment.NewLine + "content: '" + content + "'");
+                            throw new Exception(ex.Message + Environment.NewLine + ex.TargetSite + Environment.NewLine + ex.StackTrace + Environment.NewLine + ex.Source + Environment.NewLine + ex.InnerException + Environment.NewLine + Environment.NewLine + ex.Data + Environment.NewLine + "jobstr: '" + jobstr + "'" + Environment.NewLine + "content: '" + content + "'");
 						}
 					}
 				}
@@ -454,7 +509,7 @@ namespace JPFITS
 
 						if (values[Array.IndexOf(ttypes, filter)] != "")
 							if (Convert.ToDouble(values[Array.IndexOf(ttypes, filter)]) <= maglimit)
-								if (pmepoch != 0)//update ra & dec
+								if (pmepoch != Double.MaxValue)//update ra & dec
 								{
 									if (values[Array.IndexOf(ttypes, "pm")] != "" && Convert.ToDouble(values[Array.IndexOf(ttypes, "pm")]) < pmlimit)
 									{
@@ -612,8 +667,8 @@ namespace JPFITS
 
 					FITSBinTable fbt = new FITSBinTable(catalogue);
 					fbt.SetFields(ttypes, null, table);
-					fbt.AddExtraHeaderKey("RADEG", RAorig.ToString(), "Right Ascension of query center");
-					fbt.AddExtraHeaderKey("DECDEG", decorig.ToString(), "Declination of query center");
+					fbt.AddExtraHeaderKey("RA", RAorig.ToString(), "Right Ascension of query center");
+					fbt.AddExtraHeaderKey("DEC", decorig.ToString(), "Declination of query center");
 					WorldCoordinateSolution.DegreeElementstoSexagesimalElements(RAorig, decorig, out string rasex, out string decsex, ":", 4);
 					fbt.AddExtraHeaderKey("RASEX", rasex, "Right Ascension of query center");
 					fbt.AddExtraHeaderKey("DECSEX", decsex, "Declination of query center");
@@ -633,8 +688,8 @@ namespace JPFITS
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show(ex.Message + Environment.NewLine + ex.TargetSite + Environment.NewLine + ex.StackTrace + Environment.NewLine + ex.Source + Environment.NewLine + ex.InnerException);
-				return "";
+				throw new Exception(ex.Message + Environment.NewLine + ex.TargetSite + Environment.NewLine + ex.StackTrace + Environment.NewLine + ex.Source + Environment.NewLine + ex.InnerException);
+				//return "";
 			}
 		}
 
@@ -655,10 +710,8 @@ namespace JPFITS
 		/// <param name="pixwidth">The number of horizontal pixels of the image.</param>
 		/// <param name="pixheight">The number of vertical pixels of the image</param>
 		/// <param name="optArgs">Optional arguments list. Possible arguments can be found here: https://github.com/user29A/AstraCarta/wiki, or with AstraCarta.Help call.
-		/// <br />Be sure to pass the switch "-argument"; for example do not pass "buffer", but pass "-buffer", etc.
-		/// <br />Arguments and their values must be consecutive, for example: optArgs.Add("-buffer); optArgs.Add(2); and so on.
-		/// <br />Boolean arguments do not require a value, and their presence indicates true. For example the presence of optArgs.Add("-fitsout") equates to true for writing the file as a FITS bintable.</param>
-		public AstraCarta(double ra, double dec, double scale, int pixwidth, int pixheight, ArrayList? optArgs = null)
+		/// <br />Boolean arguments do not require a value, and their presence indicates true. For example the presence of optArgs.Add("fitsout") equates to true for writing the file as a FITS bintable.</param>
+		public AstraCarta(double ra, double dec, double scale, int pixwidth, int pixheight, NameValueCollection? optArgs = null)
 		{
 			InitializeComponent();
 
@@ -673,214 +726,158 @@ namespace JPFITS
 			if (optArgs == null)
 				return;
 
-			int n;
-
 			BufferTextBox.Text = "";
-			n = optArgs.IndexOf("-buffer");
-			if (n != -1)
-				BufferTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
+			if (!string.IsNullOrEmpty(optArgs["buffer"]))
+				BufferTextBox.Text = Convert.ToDouble(optArgs["buffer"]).ToString();
 
 			RAOffsetTextBox.Text = "";
-			n = optArgs.IndexOf("-offsetra");
-			if (n != -1)
-				RAOffsetTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
+			if (!string.IsNullOrEmpty(optArgs["offsetra"]))
+				RAOffsetTextBox.Text = Convert.ToDouble(optArgs["offsetra"]).ToString();
 
 			DecOffsetTextBox.Text = "";
-			n = optArgs.IndexOf("-offsetdec");
-			if (n != -1)
-				DecOffsetTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
+			if (!string.IsNullOrEmpty(optArgs["offsetdec"]))
+				DecOffsetTextBox.Text = Convert.ToDouble(optArgs["offsetdec"]).ToString();
 
 			NameTextBox.Text = "";
-			n = optArgs.IndexOf("-outname");
-			if (n != -1)
-				NameTextBox.Text = string.Join("_", ((string)optArgs[n + 1]).Split(Path.GetInvalidFileNameChars())) + "_AstraCarta";
+			if (!string.IsNullOrEmpty(optArgs["outname"]))
+				NameTextBox.Text = string.Join("_", (optArgs["outname"]).Split(Path.GetInvalidFileNameChars())) + "_AstraCarta";
 
 			CatalogueDrop.SelectedIndex = 0;//GaiaDR3
-			n = optArgs.IndexOf("-catalogue");
-			if (n != -1)
-				if ((string)optArgs[n + 1] == "GaiaDR3")
+			if (!string.IsNullOrEmpty(optArgs["catalogue"]))
+				if (optArgs["catalogue"] == "GaiaDR3")
 					CatalogueDrop.SelectedIndex = 0;
 				else
-					throw new Exception("Catalogue: '" + (string)optArgs[n + 1] + "' not recognized...");
+					throw new Exception("Catalogue: '" + (string)optArgs["catalogue"] + "' not recognized...");
 
 			FilterDrop.SelectedIndex = 1;//GaiaDR3 g
-			n = optArgs.IndexOf("-filter");
-			if (n != -1)
+			if (!string.IsNullOrEmpty(optArgs["filter"]))
 				if (CatalogueDrop.SelectedIndex == 0)//gaiadr3
 				{
-					if ((string)optArgs[n + 1] == "bp")
+					if (optArgs["filter"] == "bp")
 						FilterDrop.SelectedIndex = 0;
-					else if ((string)optArgs[n + 1] == "g")
+					else if (optArgs["filter"] == "g")
 						FilterDrop.SelectedIndex = 1;
-					else if ((string)optArgs[n + 1] == "rp")
+					else if (optArgs["filter"] == "rp")
 						FilterDrop.SelectedIndex = 2;
 					else
-						throw new Exception("Filter: '" + (string)optArgs[n + 1] + "' not recognized for catalogue '" + CatalogueDrop.SelectedItem.ToString() + "'");
+						throw new Exception("Filter: '" + optArgs["filter"] + "' not recognized for catalogue '" + CatalogueDrop.SelectedItem.ToString() + "'");
 				}
 				else
-					throw new Exception("Filter: '" + (string)optArgs[n + 1] + "' not recognized...");
+					throw new Exception("Filter: '" + optArgs["filter"] + "' not recognized...");
 
 			MagLimitTextBox.Text = "";
-			n = optArgs.IndexOf("-maglimit");
-			if (n != -1)
-				MagLimitTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
+			if (!string.IsNullOrEmpty(optArgs["maglimit"]))
+				MagLimitTextBox.Text = Convert.ToDouble(optArgs["maglimit"]).ToString();
 
 			ShapeDrop.SelectedIndex = 0;
-			n = optArgs.IndexOf("-shape");
-			if (n != -1)
-				if ((string)optArgs[n + 1] == "circle")
+			if (!string.IsNullOrEmpty(optArgs["shape"]))
+				if (optArgs["shape"] == "circle")
 					ShapeDrop.SelectedIndex = 1;
-				else if ((string)optArgs[n + 1] == "rectangle" || (string)optArgs[n + 1] == "square")
+				else if (optArgs["shape"] == "rectangle" || optArgs["shape"] == "square")
 					ShapeDrop.SelectedIndex = 0;
 				else
-					throw new Exception("Shape: '" + (string)optArgs[n + 1] + "' not recognized.");
+					throw new Exception("Shape: '" + optArgs["shape"] + "' not recognized.");
 
 			RotationTextBox.Text = "";
-			n = optArgs.IndexOf("-rotation");
-			if (n != -1)
-				RotationTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
+			if (!string.IsNullOrEmpty(optArgs["rotation"]))
+				RotationTextBox.Text = Convert.ToDouble(optArgs["rotation"]).ToString();
 
 			NQueryTextBox.Text = "500";
-			n = optArgs.IndexOf("-nquery");
-			if (n != -1)
-				NQueryTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
+			if (!string.IsNullOrEmpty(optArgs["nquery"]))
+				NQueryTextBox.Text = Convert.ToDouble(optArgs["nquery"]).ToString();
 
 			PMEpochTextBox.Text = "";
-			n = optArgs.IndexOf("-pmepoch");
-			if (n != -1)
-				PMEpochTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
+			if (!string.IsNullOrEmpty(optArgs["pmepoch"]))
+				PMEpochTextBox.Text = Convert.ToDouble(optArgs["pmepoch"]).ToString();
 
 			PMLimitTextBox.Text = "";
-			n = optArgs.IndexOf("-pmlimit");
-			if (n != -1)
-				PMLimitTextBox.Text = Convert.ToDouble(optArgs[n + 1]).ToString();
+			if (!string.IsNullOrEmpty(optArgs["pmlimit"]))
+				PMLimitTextBox.Text = Convert.ToDouble(optArgs["pmlimit"]).ToString();
 
 			DirectoryTextBox.Text = "";
-			n = optArgs.IndexOf("-outdir");
-			if (n != -1)
-				DirectoryTextBox.Text = (string)optArgs[n + 1];
+			if (!string.IsNullOrEmpty(optArgs["outdir"]))
+				DirectoryTextBox.Text = optArgs["outdir"];
 
 			EntriesTextBox.Text = "";
-			n = optArgs.IndexOf("-entries");
-			if (n != -1)
-				EntriesTextBox.Text = (string)optArgs[n + 1];
+			if (!string.IsNullOrEmpty(optArgs["entries"]))
+				EntriesTextBox.Text = optArgs["entries"];
 
 			SaveTableChck.Checked = true;
-			n = optArgs.IndexOf("-notable");
-			if (n != -1)
+			if (!string.IsNullOrEmpty(optArgs["notable"]))
 				SaveTableChck.Checked = false;
 
 			FITSTableChck.Checked = false;
-			n = optArgs.IndexOf("-fitsout");
-			if (n != -1)
+			if (!string.IsNullOrEmpty(optArgs["fitsout"]))
 				FITSTableChck.Checked = true;
 
 			ShowImageChck.Checked = false;
-			n = optArgs.IndexOf("-imageshow");
-			if (n != -1)
+			if (!string.IsNullOrEmpty(optArgs["imageshow"]))
 				ShowImageChck.Checked = true;
 
 			SaveImageChck.Checked = false;
-			n = optArgs.IndexOf("-outimage");
-			if (n != -1)
+			if (!string.IsNullOrEmpty(optArgs["outimage"]))
 				SaveImageChck.Checked = true;
 
 			ForceNewChck.Checked = false;
-			n = optArgs.IndexOf("-forcenew");
-			if (n != -1)
+			if (!string.IsNullOrEmpty(optArgs["forcenew"]))
 				ForceNewChck.Checked = true;
 
 			RemoveRawQueryChck.Checked = false;
-			n = optArgs.IndexOf("-rmvrawquery");
-			if (n != -1)
+			if (!string.IsNullOrEmpty(optArgs["rmvrawquery"]))
 				RemoveRawQueryChck.Checked = true;
 
 			SilentChck.Checked = false;
-			n = optArgs.IndexOf("-silent");
-			if (n != -1)
+			if (!string.IsNullOrEmpty(optArgs["silent"]))
 				SilentChck.Checked = true;
 
 			OverwriteChck.Checked = false;
-			n = optArgs.IndexOf("-overwrite");
-			if (n != -1)
+			if (!string.IsNullOrEmpty(optArgs["overwrite"]))
 				OverwriteChck.Checked = true;
 		}
 
 		private void ExecuteBtn_Click(object sender, EventArgs e)
 		{
-			ArrayList optArgs = new ArrayList();
+			NameValueCollection optArgs = new NameValueCollection();
 			if (BufferTextBox.Text != "")
-			{
-				optArgs.Add("-buffer");
-				optArgs.Add(Convert.ToDouble(BufferTextBox.Text));
-			}
+				optArgs.Add("buffer", BufferTextBox.Text);
 			if (RAOffsetTextBox.Text != "")
-			{
-				optArgs.Add("-offsetra");
-				optArgs.Add(Convert.ToDouble(RAOffsetTextBox.Text));
-			}
+				optArgs.Add("offsetra", RAOffsetTextBox.Text);
 			if (DecOffsetTextBox.Text != "")
-			{
-				optArgs.Add("-offsetdec");
-				optArgs.Add(Convert.ToDouble(DecOffsetTextBox.Text));
-			}
+				optArgs.Add("offsetdec", DecOffsetTextBox.Text);
 			if (NameTextBox.Text != "")
-			{
-				optArgs.Add("-outname");
-				optArgs.Add(NameTextBox.Text);
-			}
-			optArgs.Add("-catalogue");
-			optArgs.Add(CatalogueDrop.SelectedItem.ToString());
-			optArgs.Add("-filter");
-			optArgs.Add(FilterDrop.SelectedItem.ToString());
+				optArgs.Add("outname", NameTextBox.Text);
+			optArgs.Add("catalogue", CatalogueDrop.SelectedItem.ToString());
+			optArgs.Add("filter", FilterDrop.SelectedItem.ToString());
 			if (MagLimitTextBox.Text != "")
-			{
-				optArgs.Add("-maglimit");
-				optArgs.Add(Convert.ToDouble(MagLimitTextBox.Text));
-			}
-			optArgs.Add("-shape");
-			optArgs.Add(ShapeDrop.SelectedItem.ToString());
+				optArgs.Add("maglimit", MagLimitTextBox.Text);
+			optArgs.Add("shape", ShapeDrop.SelectedItem.ToString());
 			if (ShapeDrop.SelectedItem.ToString() == "rectangle")
 				if (RotationTextBox.Text != "")
-				{
-					optArgs.Add("-rotation");
-					optArgs.Add(Convert.ToDouble(RotationTextBox.Text));
-				}
-			optArgs.Add("-nquery");
-			optArgs.Add(NQueryTextBox.Text);
+					optArgs.Add("rotation", RotationTextBox.Text);
+			optArgs.Add("nquery", NQueryTextBox.Text);
 			if (PMEpochTextBox.Text != "")
-			{
-				optArgs.Add("-pmepoch");
-				optArgs.Add(Convert.ToDouble(PMEpochTextBox.Text));
-			}
+				optArgs.Add("pmepoch", PMEpochTextBox.Text);
 			if (PMLimitTextBox.Text != "")
-			{
-				optArgs.Add("-pmlimit");
-				optArgs.Add(Convert.ToDouble(PMLimitTextBox.Text));
-			}
+				optArgs.Add("pmlimit", PMLimitTextBox.Text);
 			if (DirectoryTextBox.Text != "")
-			{
-				optArgs.Add("-outdir");
-				optArgs.Add(DirectoryTextBox.Text);
-			}
-			optArgs.Add("-entries");
-			optArgs.Add(EntriesTextBox.Text);
+				optArgs.Add("outdir", DirectoryTextBox.Text);
+			optArgs.Add("entries", EntriesTextBox.Text);
 			if (!SaveTableChck.Checked)
-				optArgs.Add("-notable");
+				optArgs.Add("notable", "true");
 			if (FITSTableChck.Checked)
-				optArgs.Add("-fitsout");
+				optArgs.Add("fitsout", "true");
 			if (ShowImageChck.Checked)
-				optArgs.Add("-imageshow");
+				optArgs.Add("imageshow", "true");
 			if (SaveImageChck.Checked)
-				optArgs.Add("-outimage");
+				optArgs.Add("outimage", "true");
 			if (ForceNewChck.Checked)
-				optArgs.Add("-forcenew");
+				optArgs.Add("forcenew", "true");
 			if (RemoveRawQueryChck.Checked)
-				optArgs.Add("-rmvrawquery");
+				optArgs.Add("rmvrawquery", "true");
 			if (SilentChck.Checked)
-				optArgs.Add("-silent");
+				optArgs.Add("silent", "true");
 			if (OverwriteChck.Checked)
-				optArgs.Add("-overwrite");
+				optArgs.Add("overwrite", "true");
 
 			double ra = Convert.ToDouble(RATextBox.Text);
 			double dec = Convert.ToDouble(DecTextBox.Text);
@@ -898,7 +895,7 @@ namespace JPFITS
 			double scale = (double)((object[])e.Argument)[2];
 			int pixwidth = (int)((object[])e.Argument)[3];
 			int pixheight = (int)((object[])e.Argument)[4];
-			ArrayList optArgs = (ArrayList)((object[])e.Argument)[5];
+			NameValueCollection optArgs = (NameValueCollection)((object[])e.Argument)[5];
 
 			BGWrkr.ReportProgress(0, "Calling AstraCarta.Query(ra, dec, scale, pixwidth, pixheight, optArgs)" + Environment.NewLine);
 
@@ -1096,7 +1093,7 @@ namespace JPFITS
 
 		private void AstraCarta_HelpRequested(object sender, HelpEventArgs hlpevent)
 		{
-			AstraCarta.Help();
+			AstraCarta.Help(false);
 		}
 
 		private void LoadMenuBtn_Click(object sender, EventArgs e)

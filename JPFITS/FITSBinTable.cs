@@ -22,9 +22,6 @@ using System;
 using System.Collections;
 using System.Threading.Tasks;
 using System.IO;
-using System.Runtime.Remoting;
-
-
 #nullable enable
 
 namespace JPFITS
@@ -37,7 +34,7 @@ namespace JPFITS
         /// <param name="extensionName">The EXTNAME keyword extension name of the table. Always name your BINTABLEs. Cannot be numeric string.</param>
         public FITSBinTable(string extensionName)
 		{
-			if (extensionName == null || extensionName.Trim() == "")
+			if (string.IsNullOrEmpty(extensionName))
 				throw new Exception("The EXTNAME extension name of the binary table must have a value.");
 
 			if (JPMath.IsNumeric(extensionName))
@@ -57,7 +54,7 @@ namespace JPFITS
 			{
 				fs.Close();
 				if (!hasext)
-					throw new Exception("File '" + fileName + "'  indicates no extensions present.");
+					throw new Exception("File '" + fileName + "' indicates no extensions present.");
 				else
 					throw new Exception("File '" + fileName + "' not formatted as FITS file.");
 			}
@@ -87,11 +84,53 @@ namespace JPFITS
 
 			EATRAWBINTABLEHEADER(header);
 		}
-		#endregion
 
-		#region PRIVATE CLASS MEMBERS
+        /// <summary>Create a FITSBinTable object from an existing extension.</summary>
+        /// <param name="fileName">The full path filename.</param>
+        /// <param name="extensionNumber">The extension number in the BINTABLE.</param>
+        public FITSBinTable(string fileName, int extensionNumber)
+        {
+            FileStream fs = new FileStream(fileName, FileMode.Open);
+            ArrayList header = null;
+            if (!FITSFILEOPS.ScanPrimaryUnit(fs, true, ref header, out bool hasext) || !hasext)
+            {
+                fs.Close();
+                if (!hasext)
+                    throw new Exception("File '" + fileName + "' indicates no extensions present.");
+                else
+                    throw new Exception("File '" + fileName + "' not formatted as FITS file.");
+            }
 
-		private int NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
+            header = new ArrayList();
+            if (!FITSFILEOPS.SeekExtension(fs, "BINTABLE", extensionNumber, ref header, out _, out _, out long tableendposition, out long pcount, out long theap))
+            {
+                fs.Close();
+                throw new Exception("Could not find BINTABLE number '" + extensionNumber + "'");
+            }
+
+            FILENAME = fileName;
+            EXTNAME = "";
+
+            BINTABLE = new byte[((int)(tableendposition - fs.Position))];
+
+            fs.Read(BINTABLE, 0, BINTABLE.Length);
+
+            if (pcount != 0)
+            {
+                fs.Position = fs.Position + theap - BINTABLE.Length;
+                HEAPDATA = new byte[((int)(tableendposition + pcount - fs.Position))];
+                fs.Read(HEAPDATA, 0, HEAPDATA.Length);
+            }
+
+            fs.Close();
+
+            EATRAWBINTABLEHEADER(header);
+        }
+        #endregion
+
+        #region PRIVATE CLASS MEMBERS
+
+        private int NAXIS1 = 0, NAXIS2 = 0, TFIELDS = 0;
 		private string[]? TTYPES;//names of each table entry
 		private string[]? TFORMS;//FITS name for the table entry precisions
 		private bool[]? TTYPEISCOMPLEX;//for tracking complex singles and doubles
@@ -2046,7 +2085,10 @@ namespace JPFITS
 			{
 				if (JPMath.IsNumeric(value))
 					throw new Exception("The EXTNAME extension name of the binary table must not be numeric: " + value);
-				EXTNAME = value;
+                if (string.IsNullOrEmpty(value))
+                    throw new Exception("The EXTNAME extension name of the binary table must have a value.");
+
+                EXTNAME = value;
 			}
 		}
 
@@ -3971,10 +4013,10 @@ namespace JPFITS
 		/// </summary>
 		public enum FieldArrayFormat
 		{
-			/// <summary>
-			/// The entryArray is a 1-dimensional array of numeric or string values, or is a 2-dimensional array of numeric values only. If entryArray is a 1-D array of strings, all strings must be the same length, otherwise specify IsHeapVariableRepeatRows.
-			/// </summary>
-			Default,
+            /// <summary>
+            /// The entryArray is a 1-dimensional array of numeric or string values, or is a 2-dimensional array of numeric values only. If entryArray is a 1-D array of strings, all strings must be the same length, otherwise specify IsHeapVariableLengthRows.
+            /// </summary>
+            Default,
 
 			/// <summary>
 			/// The entryArray is a 2-dimensional array of complex (real, imaginary) numeric value pairings, of either single or double floating point precision. The width of the array can be greater than two, but must be an even number given the pairings.
@@ -4341,14 +4383,14 @@ namespace JPFITS
         /// <summary>
         /// Returns the index of the TTYPE entry.
         /// </summary>
-        /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value.</param>
+        /// <param name="ttypeEntry">The name of the binary table extension entry, i.e. the TTYPE value. Returns -1 if the field is not found.</param>
         public int GetFieldIndex(string ttypeEntry)
 		{
             for (int i = 0; i < TTYPES.Length; i++)
                 if (TTYPES[i] == ttypeEntry)
 					return i;
-			
-			throw new Exception("Extension Entry TTYPE Label wasn't found: '" + ttypeEntry + "'");
+
+			return -1;
         }
 
 		/// <summary>Add an extra key to the extension header. If the key is intended as a COMMENT, leave the keyValue empty, and place the entire comment in keyComment.</summary>
@@ -4455,8 +4497,11 @@ namespace JPFITS
 		/// <summary>Write the binary table into a new or existing FITS file. If the binary table already exists in an existing FITS file, it can optionally be replaced.</summary>
 		/// <param name="FileName">The full file name to write the binary table into. The file can either be new or already exist.</param>
 		/// <param name="OverWriteExtensionIfExists">If the binary table already exists it can be overwritten. If it exists and the option is given to not overwrite it, then an exception will be thrown.</param>
-		public void Write(string FileName, bool OverWriteExtensionIfExists)
+		public void Write(string FileName, bool OverWriteExtensionIfExists = false)
 		{
+			if (String.IsNullOrEmpty(EXTNAME.Trim()))
+				throw new Exception("ExtensionName EXTNAME cannot be null or empty.");
+
 			FILENAME = FileName;
 
 			if (!File.Exists(FILENAME))//then write a new file, otherwise check the existing file for existing table, etc.

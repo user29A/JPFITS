@@ -20,7 +20,6 @@
 
 using System;
 using System.Collections;
-using System.Diagnostics.Eventing.Reader;
 using System.Windows.Forms;
 #nullable enable
 
@@ -94,7 +93,7 @@ namespace JPFITS
 			}
 			catch (Exception e)
 			{
-				MessageBox.Show(e.Data + "	" + e.InnerException + "	" + e.Message + "	" + e.Source + "	" + e.StackTrace + "	" + e.TargetSite);
+				throw new Exception(e.Data + "	" + e.InnerException + "	" + e.Message + "	" + e.Source + "	" + e.StackTrace + "	" + e.TargetSite);
 			}
 		}
 
@@ -323,24 +322,24 @@ namespace JPFITS
 			if (XDrop.Enabled)
 				if (FITSBINTABLE.GetFieldIsHeapEntry(XDrop.SelectedItem.ToString()) || FITSBINTABLE.FieldWidths[XDrop.SelectedIndex] > 1)
 				{
-					MessageBox.Show("Error: X-Axis selection is either a heap entry or has multiple columns. Can only plot with X as a vector of values.");
-					return;
+					throw new Exception("Error: X-Axis selection is either a heap entry or has multiple columns. Can only plot with X as a vector of values.");
+					//return;
 				}
 				else if (FITSBINTABLE.GetFieldTypeCode(XDrop.SelectedItem.ToString()) == TypeCode.Char || FITSBINTABLE.GetFieldTypeCode(XDrop.SelectedItem.ToString()) == TypeCode.Boolean)
 				{
-					MessageBox.Show("Error: X-Axis selection is " + FITSBINTABLE.GetFieldTypeCode(XDrop.SelectedItem.ToString()).ToString());
-					return;
+                    throw new Exception("Error: X-Axis selection is " + FITSBINTABLE.GetFieldTypeCode(XDrop.SelectedItem.ToString()).ToString());
+					//return;
 				}
 
 			if (FITSBINTABLE.GetFieldIsHeapEntry(YDrop.SelectedItem.ToString()) || FITSBINTABLE.FieldWidths[YDrop.SelectedIndex] > 1)
 			{
-				MessageBox.Show("Error: Y-Axis selection is either a heap entry or has multiple columns. Can only plot with Y as a vector of values.");
-				return;
+                throw new Exception("Error: Y-Axis selection is either a heap entry or has multiple columns. Can only plot with Y as a vector of values.");
+				//return;
 			}
 			else if (FITSBINTABLE.GetFieldTypeCode(YDrop.SelectedItem.ToString()) == TypeCode.Char || FITSBINTABLE.GetFieldTypeCode(YDrop.SelectedItem.ToString()) == TypeCode.Boolean)
 			{
-				MessageBox.Show("Error: Y-Axis selection is " + FITSBINTABLE.GetFieldTypeCode(XDrop.SelectedItem.ToString()).ToString());
-				return;
+                throw new Exception("Error: Y-Axis selection is " + FITSBINTABLE.GetFieldTypeCode(XDrop.SelectedItem.ToString()).ToString());
+				//return;
 			}
 
 			double[] x = new double[FITSBINTABLE.Naxis2];

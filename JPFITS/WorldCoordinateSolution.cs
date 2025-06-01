@@ -21,8 +21,10 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Threading.Tasks;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 #nullable enable
 
@@ -41,77 +43,32 @@ namespace JPFITS
 
 		#region CONSTRUCTORS
 
-		/// <summary>Default constructor.</summary>
+		/// <summary>Default constructor, typically used for determining original solutions.</summary>
 		public WorldCoordinateSolution()
 		{
-
-		}
+            SIP_ORDER = 0;
+            A_SIP = null;
+            B_SIP = null;
+        }
 
 		/// <summary>Constructor based on an existing FITS primary image header which contains FITS standard keywords for a WCS solution. If a WCS solution is not present in the header, then the Exists property will be false.</summary>
 		public WorldCoordinateSolution(JPFITS.FITSHeader header)
 		{
-			EATHEADERFORWCS(header);
+            SIP_ORDER = 0;
+            A_SIP = null;
+            B_SIP = null;
+
+            EATHEADERFORWCS(header);
 		}
 
-		/// <summary>
-		/// Constructor based on basic parameters of a World Coordinate Solution
-		/// </summary>
-		/// <param name="cdelt">The plate scale in arcseconds per pixel.</param>
-		/// <param name="crpix1">The coordinate reference pixel on the x-axis.</param>
-		/// <param name="crpix2">The coordinate reference pixel on the y-axis.</param>
-		/// <param name="zeroBasedCRpix">True if the CRPIX values are from zero-based indexing. If true will increment CRPIXn internally by 1.</param>
-		/// <param name="crvalRA">The coordinate reference value on the RA axis.</param>
-		/// <param name="crvalDec">The coordinate reference value on the dec axis.</param>
-		/// <param name="rotation">The field rotation, in degrees.</param>
-		public WorldCoordinateSolution(double cdelt, double crpix1, double crpix2, bool zeroBasedCRpix, double crvalRA, double crvalDec, double rotation)
-		{
-			CTYPEN = new string[2];
-			CTYPEN[0] = "RA---TAN";
-			CTYPEN[1] = "DEC--TAN";
+        #endregion
 
-			CDELTN = new double[2];
-			CDELTN[0] = cdelt;
-			CDELTN[1] = cdelt;
+        #region PRIVATE
 
-			CRPIXN = new double[2];
-			CRPIXN[0] = crpix1;
-			CRPIXN[1] = crpix2;
-			if (zeroBasedCRpix)
-			{
-				CRPIXN[0]++;
-				CRPIXN[1]++;
-			}
-
-			CRVALN = new double[2];
-			CRVALN[0] = crvalRA;
-			CRVALN[1] = crvalDec;
-
-			CROTAN = new double[2];
-			CROTAN[0] = rotation;
-			CROTAN[1] = rotation;
-
-			rotation *= Math.PI / 180;
-			CDMATRIX = new double[2, 2];
-			CDMATRIX[0, 0] = -cdelt / 3600 * Math.Cos(rotation);
-			CDMATRIX[1, 0] = cdelt / 3600 * Math.Sin(rotation);
-			CDMATRIX[0, 1] = -cdelt / 3600 * Math.Sin(rotation);
-			CDMATRIX[1, 1] = -cdelt / 3600 * Math.Cos(rotation);
-
-			CD1_1 = CDMATRIX[0, 0];
-			CD1_2 = CDMATRIX[1, 0];
-			CD2_1 = CDMATRIX[0, 1];
-			CD2_2 = CDMATRIX[1, 1];			
-
-			SET_CDMATRIXINV();
-
-			WCSEXISTS = true;
-		}
-
-		#endregion
-
-		#region PRIVATE
-
-		private double[,]? CDMATRIX;
+        private double[,]? A_SIP; // SIP coefficients for x-distortion (f(u,v)), [i,j] for u^i * v^j
+        private double[,]? B_SIP; // SIP coefficients for y-distortion (g(u,v)), [i,j] for u^i * v^j
+        private int SIP_ORDER;   // SIP polynomial order: 0 = none, 1 = linear, 2 = quadratic, 3 = cubic
+        private double[,]? CDMATRIX;
 		private double[,]? CDMATRIXINV;
 		private double[]? CVAL1;
 		private double[]? CVAL2;
@@ -212,7 +169,34 @@ namespace JPFITS
 			CROTAN[0] = Math.Atan2(CD1_2, -CD1_1) * 180 / Math.PI;
 			CROTAN[1] = Math.Atan2(-CD2_1, -CD2_2) * 180 / Math.PI;
 
-			WCSEXISTS = true;
+            // Read SIP coefficients
+            string a_order_str = header.GetKeyValue("A_ORDER");
+            string b_order_str = header.GetKeyValue("B_ORDER");
+            if (!string.IsNullOrEmpty(a_order_str) && !string.IsNullOrEmpty(b_order_str))
+            {
+                int a_order = Convert.ToInt32(a_order_str);
+                int b_order = Convert.ToInt32(b_order_str);
+                if (a_order == b_order && a_order >= 0 && a_order <= 9) // Match and cap at 9
+                {
+                    SIP_ORDER = a_order;
+                    A_SIP = new double[a_order + 1, a_order + 1];
+                    B_SIP = new double[a_order + 1, a_order + 1];
+                    for (int i = 0; i <= SIP_ORDER; i++)
+                    {
+                        for (int j = 0; j <= SIP_ORDER - i; j++) // Only terms where i + j <= order
+                        {
+                            string a_key = $"A_{i}_{j}";
+                            string b_key = $"B_{i}_{j}";
+                            if (header.GetKeyIndex(a_key, false) >= 0)
+                                A_SIP[i, j] = Convert.ToDouble(header.GetKeyValue(a_key));
+                            if (header.GetKeyIndex(b_key, false) >= 0)
+                                B_SIP[i, j] = Convert.ToDouble(header.GetKeyValue(b_key));
+                        }
+                    }
+                }
+            }
+
+            WCSEXISTS = true;
 
 			//optionally populate this?
 			Parallel.Invoke(
@@ -572,7 +556,7 @@ namespace JPFITS
 			}
 			else
 			{
-				this.Get_Pixels(CVAL1, CVAL2, "TAN", out double[] x, out double[] y, returnZeroBasedPixels);
+				this.Get_Pixels(CVAL1, CVAL2, WCSType.TAN, out double[] x, out double[] y, returnZeroBasedPixels);
 
 				if (coordinate_Axis == 1)
 					return x;
@@ -678,271 +662,467 @@ namespace JPFITS
 		public string GetCTYPEn(int coordinate_Axis)
 		{
 			return CTYPEN[coordinate_Axis - 1];
-		}		
-
-		/// <summary>Solves the projection parameters for a given list of pixel and coordinate values. Pass nullptr for FITS if writing WCS parameters to a primary header not required.</summary>
-		/// <param name="WCS_Type">The world coordinate solution type. For example: TAN, for tangent-plane or Gnomic projection. Only TAN is currently supported.</param>
-		/// <param name="X_pix">An array of the image x-axis pixel locations.</param>
-		/// <param name="Y_pix">An array of the image y-axis pixel locations.</param>
-		/// <param name="zero_based_pixels">A boolean to indicate if the X_Pix and Y_Pix are zero-based coordinates. They will be converted to one-based if true.</param>
-		/// <param name="cval1">An array of coordinate values in degrees on coordinate axis 1.</param>
-		/// <param name="cval2">An array of coordinate values in degrees on coordinate axis 2.</param>
-		/// <param name="header">An FITSImageHeader instance to write the solution into. Pass null if not required.</param>
-		/// <param name="verbose">Copy all WCS diagnostic data into the header in addition to essential WCS keywords.</param>
-		public void Solve_WCS(WCSType WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, FITSHeader? header, bool verbose = false/*, WorldCoordinateSolution? INIT = null*/)
-		{
-			//should first do a check of WCS type to make sure it is valid
-			//if (WCS_Type != "TAN")
-				//throw new Exception("Solution type: '" + WCS_Type + "' is invalid. Valid solution types are: 'TAN'");
-
-			VALIDWCSGRIDLINES = false;
-
-			CTYPEN = new string[2];
-			CTYPEN[0] = "RA---" + WCS_Type;
-			CTYPEN[1] = "DEC--" + WCS_Type;
-
-			CPIX1 = new double[X_pix.Length];
-			CPIX2 = new double[X_pix.Length];
-			CVAL1 = new double[X_pix.Length];
-			CVAL2 = new double[X_pix.Length];
-			DVAL1 = new double[X_pix.Length];
-			DVAL2 = new double[X_pix.Length];
-			for (int i = 0; i < X_pix.Length; i++)
-			{
-				CPIX1[i] = X_pix[i];
-				CPIX2[i] = Y_pix[i];
-				if (zero_based_pixels)
-				{
-					CPIX1[i]++;
-					CPIX2[i]++;
-				}
-				CVAL1[i] = cval1[i];
-				CVAL2[i] = cval2[i];
-			}
-			CRPIXN = new double[2];
-			CRVALN = new double[2];
-			CRPIXN[0] = JPMath.Mean(CPIX1, true);//fix this in the fit boundaries? - NO...let it get the best one...but they should be close
-			CRPIXN[1] = JPMath.Mean(CPIX2, true);//fix this in the fit boundaries? - NO...let it get the best one...but they should be close
-			CRVALN[0] = JPMath.Mean(CVAL1, true);//these are fixed as the coordinate reference value
-			CRVALN[1] = JPMath.Mean(CVAL2, true);//these are fixed as the coordinate reference value
-
-			double[] X_intrmdt = new double[CPIX1.Length];//intermediate coords (degrees)
-			double[] Y_intrmdt = new double[CPIX1.Length];//intermediate coords (degrees)
-			double a0 = CRVALN[0] * Math.PI / 180, d0 = CRVALN[1] * Math.PI / 180, a, d;
-			for (int i = 0; i < CPIX1.Length; i++)
-			{
-				a = CVAL1[i] * Math.PI / 180;//radians
-				d = CVAL2[i] * Math.PI / 180;//radians
-
-				//for tangent plane Gnomic
-				if (WCS_Type == WCSType.TAN)
-				{
-					X_intrmdt[i] = Math.Cos(d) * Math.Sin(a - a0) / (Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0) + Math.Sin(d0) * Math.Sin(d));
-					Y_intrmdt[i] = (Math.Cos(d0) * Math.Sin(d) - Math.Cos(d) * Math.Sin(d0) * Math.Cos(a - a0)) / (Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0) + Math.Sin(d0) * Math.Sin(d));
-				}
-			}
-
-			double[] P0 = new double[6] { 0, 0, 0, 0, CRPIXN[0], CRPIXN[1] };
-			double[] plb = new double[6] { -0.1, -0.1, -0.1, -0.1, JPMath.Min(CPIX1, false), JPMath.Min(CPIX2, false) };
-			double[] pub = new double[6] { 0.1, 0.1, 0.1, 0.1, JPMath.Max(CPIX1, false), JPMath.Max(CPIX2, false) };
-			double[] scale = new double[6] { 4e-6, 4e-6, 4e-6, 4e-6, CRPIXN[0], CRPIXN[1] };
-
-			//if (INIT != null)
-			//{
-			//	P0 = new double[6] { INIT.GetCDi_j(1, 1), INIT.GetCDi_j(1, 2), INIT.GetCDi_j(2, 1), INIT.GetCDi_j(2, 2), INIT.GetCRPIXn(1), INIT.GetCRPIXn(2) };
-			//	//plb = new double[6] { P0[0] - Math.Abs(P0[0]), P0[1] - Math.Abs(P0[1]), P0[2] - Math.Abs(P0[2]), P0[3] - Math.Abs(P0[3]), INIT.GetCRPIXn(1) - 5, INIT.GetCRPIXn(2) - 5};
-			//	//pub = new double[6] { P0[0] + Math.Abs(P0[0]), P0[1] + Math.Abs(P0[1]), P0[2] + Math.Abs(P0[2]), P0[3] + Math.Abs(P0[3]), INIT.GetCRPIXn(1) + 5, INIT.GetCRPIXn(2) + 5 };
-
-			//	CRVALN[0] = INIT.GetCRVALn(1);
-			//	CRVALN[1] = INIT.GetCRVALn(2);
-			//}
-
-			JPMath.Fit_WCSTransform2d(X_intrmdt, Y_intrmdt, CPIX1, CPIX2, ref P0, plb, pub, scale);
-
-			CDMATRIX = new double[2, 2];
-			CDMATRIX[0, 0] = P0[0] * 180 / Math.PI;
-			CDMATRIX[1, 0] = P0[1] * 180 / Math.PI;
-			CDMATRIX[0, 1] = P0[2] * 180 / Math.PI;
-			CDMATRIX[1, 1] = P0[3] * 180 / Math.PI;
-			CRPIXN[0] = P0[4];
-			CRPIXN[1] = P0[5];
-			CD1_1 = CDMATRIX[0, 0];
-			CD1_2 = CDMATRIX[1, 0];
-			CD2_1 = CDMATRIX[0, 1];
-			CD2_2 = CDMATRIX[1, 1];
-
-			CDELTN = new double[2];
-			CDELTN[0] = Math.Sqrt(CD1_1 * CD1_1 + CD1_2 * CD1_2) * 3600;
-			CDELTN[1] = Math.Sqrt(CD2_1 * CD2_1 + CD2_2 * CD2_2) * 3600;
-
-			CROTAN = new double[2];
-			CROTAN[0] = Math.Atan2(CD1_2, -CD1_1) * 180 / Math.PI;
-			CROTAN[1] = Math.Atan2(-CD2_1, -CD2_2) * 180 / Math.PI;
-
-			SET_CDMATRIXINV();
-
-			double[] dxpix = new double[CPIX1.Length];
-			double[] dypix = new double[CPIX1.Length];
-			for (int i = 0; i < CPIX1.Length; i++)
-			{
-				this.Get_Pixel(CVAL1[i], CVAL2[i], "TAN", out double xpix, out double ypix, false);
-				dxpix[i] = xpix - CPIX1[i];
-				dypix[i] = ypix - CPIX2[i];
-
-				DVAL1[i] = dxpix[i] * CDELTN[0];
-				DVAL2[i] = dypix[i] * CDELTN[1];
-			}
-
-			CPIX1RM = JPMath.Mean(dxpix, true);
-			CPIX1RS = JPMath.Stdv(dxpix, true);
-			CVAL1RM = CPIX1RM * CDELTN[0];
-			CVAL1RS = CPIX1RS * CDELTN[0];
-
-			CPIX2RM = JPMath.Mean(dypix, true);
-			CPIX2RS = JPMath.Stdv(dypix, true);
-			CVAL2RM = CPIX2RM * CDELTN[1];
-			CVAL2RS = CPIX2RS * CDELTN[1];
-
-			CPIXRM = Math.Sqrt(CPIX1RM * CPIX1RM + CPIX2RM * CPIX2RM);
-			CPIXRS = Math.Sqrt(CPIX1RS * CPIX1RS + CPIX2RS * CPIX2RS);
-			CVALRM = Math.Sqrt(CVAL1RM * CVAL1RM + CVAL2RM * CVAL2RM);
-			CVALRS = Math.Sqrt(CVAL1RS * CVAL1RS + CVAL2RS * CVAL2RS);
-
-			WCSEXISTS = true;
-
-			if (header == null)
-				return;
-
-			double width = Convert.ToDouble(header.GetKeyValue("NAXIS1"));
-			double height = Convert.ToDouble(header.GetKeyValue("NAXIS2"));
-			Get_Coordinate(width / 2, height / 2, false, "TAN", out double ccvald1, out double ccvald2, out string ccvals1, out string ccvals2);
-			CCVALD1 = ccvald1;
-			CCVALD2 = ccvald2;
-			CCVALS1 = ccvals1;
-			CCVALS2 = ccvals2;
-
-			ClearWCS(header);
-			this.CopyTo(header, verbose);
 		}
 
-		/// <summary>Gets the image [x, y] pixel position for a given world coordinate in degrees at cval1 and cval2.</summary>
-		/// <param name="cval1">A coordinate values in degrees on coordinate axis 1 (i.e. right ascension).</param>
-		/// <param name="cval2">A coordinate values in degrees on coordinate axis 2 (i.e. declination).</param>
-		/// <param name="WCS_Type">The type of WCS solution: "TAN" for tangent-plane or Gnomic projection. Only "TAN" supported at this time.</param>
-		/// <param name="X_pix">The x-pixel position of the sky coordinate.</param>
-		/// <param name="Y_pix">The y-pixel position of the sky coordinate.</param>
-		/// <param name="return_zero_based_pixels">If the pixels for the image should be interpreted as zero-based, pass true.</param>
-		public void Get_Pixel(double cval1, double cval2, string WCS_Type, out double X_pix, out double Y_pix, bool return_zero_based_pixels)
-		{
-			double a0 = CRVALN[0] * Math.PI / 180, d0 = CRVALN[1] * Math.PI / 180;
-			double a = cval1 * Math.PI / 180, d = cval2 * Math.PI / 180;//radians
-			double X_intrmdt = Math.Cos(d) * Math.Sin(a - a0) / (Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0) + Math.Sin(d0) * Math.Sin(d));
-			double Y_intrmdt = (Math.Cos(d0) * Math.Sin(d) - Math.Cos(d) * Math.Sin(d0) * Math.Cos(a - a0)) / (Math.Sin(d0) * Math.Sin(d) + Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0));
-			X_pix = CDMATRIXINV[0, 0] * X_intrmdt + CDMATRIXINV[1, 0] * Y_intrmdt + CRPIXN[0];
-			Y_pix = CDMATRIXINV[0, 1] * X_intrmdt + CDMATRIXINV[1, 1] * Y_intrmdt + CRPIXN[1];
-			if (return_zero_based_pixels)
-			{
-				X_pix--;
-				Y_pix--;
-			}
-		}
+        /// <summary>
+        /// Generates two distortion maps for the SIP polynomial: one for x-dimension (f(u,v)) and one for y-dimension (g(u,v)).
+        /// </summary>
+        /// <param name="width">Width of the image in pixels (e.g., NAXIS1 from FITS header).</param>
+        /// <param name="height">Height of the image in pixels (e.g., NAXIS2 from FITS header).</param>
+        /// <param name="xDistortionMap">Output array with x-dimension distortion values (f(u,v)) in [x, y] order.</param>
+        /// <param name="yDistortionMap">Output array with y-dimension distortion values (g(u,v)) in [x, y] order.</param>
+        /// <param name="useParallel">If true, parallelizes the outer loop; if false, uses sequential execution.</param>
+        public void GenerateSIPDistortionMaps(int width, int height, out double[,] xDistortionMap, out double[,] yDistortionMap, bool useParallel = false)
+        {
+            xDistortionMap = new double[width, height]; // [x, y]
+            yDistortionMap = new double[width, height]; // [x, y]
 
-		/// <summary>Gets arrays of image [x, y] pixel positions for a list of given world coordinates in degrees at cval1 and cval2.</summary>
-		/// <param name="cval1">An array of coordinate values in degrees on coordinate axis 1.</param>
-		/// <param name="cval2">An array of coordinate values in degrees on coordinate axis 2.</param>
-		/// <param name="WCS_Type">The type of WCS solution: "TAN" for tangent-plane or Gnomic projection. Only "TAN" supported at this time.</param>
-		/// <param name="X_pix">An array of the image x-axis pixel locations.</param>
-		/// <param name="Y_pix">An array of the image y-axis pixel locations.</param>
-		/// <param name="return_zero_based_pixels">If the pixels for the image should be interpreted as zero-based, pass true.</param>
-		public void Get_Pixels(double[] cval1, double[] cval2, string WCS_Type, out double[] X_pix, out double[] Y_pix, bool return_zero_based_pixels)
+            if (SIP_ORDER == 0 || A_SIP == null || B_SIP == null)
+                return;
+
+            // Create local references to the arrays to use in lambda
+            double[,] localXDistortionMap = xDistortionMap;
+            double[,] localYDistortionMap = yDistortionMap;
+
+            Action<int> processRow = y =>
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    double u = x + 1 - CRPIXN[0]; // 1-based pixels
+                    double v = y + 1 - CRPIXN[1];
+                    double f_uv = 0, g_uv = 0;
+                    for (int i = 0; i <= SIP_ORDER; i++)
+                    {
+                        for (int j = 0; j <= SIP_ORDER - i; j++)
+                        {
+                            double term = Math.Pow(u, i) * Math.Pow(v, j);
+                            f_uv += A_SIP[i, j] * term;
+                            g_uv += B_SIP[i, j] * term;
+                        }
+                    }
+                    localXDistortionMap[x, y] = f_uv; // x-direction distortion at (x, y)
+                    localYDistortionMap[x, y] = g_uv; // y-direction distortion at (x, y)
+                }
+            };
+
+            if (useParallel)
+            {
+                Parallel.For(0, height, processRow);
+            }
+            else
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    processRow(y);
+                }
+            }
+        }
+
+        /// <summary>Solves the projection parameters for a given list of pixel and coordinate values. Pass nullptr for FITS if writing WCS parameters to a primary header not required.</summary>
+        /// <param name="WCS_Type">The world coordinate solution type. For example: TAN, for tangent-plane or Gnomic projection. Only TAN is currently supported.</param>
+        /// <param name="X_pix">An array of the image x-axis pixel locations.</param>
+        /// <param name="Y_pix">An array of the image y-axis pixel locations.</param>
+        /// <param name="zero_based_pixels">A boolean to indicate if the X_Pix and Y_Pix are zero-based coordinates. They will be converted to one-based if true.</param>
+        /// <param name="cval1">An array of coordinate values in degrees on coordinate axis 1.</param>
+        /// <param name="cval2">An array of coordinate values in degrees on coordinate axis 2.</param>
+        /// <param name="header">An FITSImageHeader instance to write the solution into. Pass null if not required.</param>
+		/// <param name="initCDparams">Initial paramters for the 2x2 CD matrix (degrees per pixel) plus coordinate reference pixel x and y. Pass null if not required. If not passed, maximum scale is 1 arcminute per pixel.</param>
+		/// <param name="initCDparams_LB">Lower bounds on the parameters (degrees per pixel). Pass null if not required. Must be passed if initCDparams is passed.</param>
+		/// <param name="initCDparams_UB">Upper bounds on the parameters (degrees per pixel). Pass null if not required. Must be passed if initCDparams is passed.</param>
+        /// <param name="verbose">Copy all WCS diagnostic data into the header in addition to essential WCS keywords.</param>
+        /// <param name="siporder">SIP polynomial order for distortion corrections. 0 = no SIP, 1 = tip-tilt, 2 = quadratic, 3 = cubic, up to 9. Recommend no higher than 3.</param>
+        public void Solve_WCS(WCSType WCS_Type, double[] X_pix, double[] Y_pix, bool zero_based_pixels, double[] cval1, double[] cval2, FITSHeader? header, double[]? initCDparams, double[]? initCDparams_LB, double[]? initCDparams_UB, bool verbose = false, int siporder = 0)
+		{
+            if (WCS_Type != WCSType.TAN)
+                throw new Exception("Only TAN projection is supported.");
+
+			try
+			{
+				VALIDWCSGRIDLINES = false;
+				SIP_ORDER = Math.Min(siporder, 9); // Cap at 9 per SIP spec
+
+				CTYPEN = new string[2] { "RA---" + WCS_Type, "DEC--" + WCS_Type };
+				CPIX1 = new double[X_pix.Length];
+				CPIX2 = new double[X_pix.Length];
+				CVAL1 = new double[X_pix.Length];
+				CVAL2 = new double[X_pix.Length];
+				DVAL1 = new double[X_pix.Length];
+				DVAL2 = new double[X_pix.Length];
+				for (int i = 0; i < X_pix.Length; i++)
+				{
+					CPIX1[i] = zero_based_pixels ? X_pix[i] + 1 : X_pix[i];
+					CPIX2[i] = zero_based_pixels ? Y_pix[i] + 1 : Y_pix[i];
+					CVAL1[i] = cval1[i];
+					CVAL2[i] = cval2[i];
+				}
+				CRPIXN = new double[2] { JPMath.Mean(CPIX1, true), JPMath.Mean(CPIX2, true) };
+				CRVALN = new double[2] { JPMath.Mean(CVAL1, true), JPMath.Mean(CVAL2, true) };//these are fixed as the coordinate reference value
+
+				double[] X_intrmdt = new double[CPIX1.Length];//intermediate coords (degrees)
+				double[] Y_intrmdt = new double[CPIX1.Length];//intermediate coords (degrees)
+				double a0 = CRVALN[0] * Math.PI / 180, d0 = CRVALN[1] * Math.PI / 180, a, d;
+				for (int i = 0; i < CPIX1.Length; i++)
+				{
+					a = CVAL1[i] * Math.PI / 180;//radians
+					d = CVAL2[i] * Math.PI / 180;//radians
+
+					//for tangent plane Gnomic
+					if (WCS_Type == WCSType.TAN)
+					{
+						X_intrmdt[i] = Math.Cos(d) * Math.Sin(a - a0) / (Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0) + Math.Sin(d0) * Math.Sin(d));
+						Y_intrmdt[i] = (Math.Cos(d0) * Math.Sin(d) - Math.Cos(d) * Math.Sin(d0) * Math.Cos(a - a0)) / (Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0) + Math.Sin(d0) * Math.Sin(d));
+					}
+				}
+
+				// Parameters: [CD1_1, CD1_2, CD2_1, CD2_2, CRPIX1, CRPIX2] + SIP A coeffs + SIP B coeffs
+				int sip_terms = SIP_ORDER == 0 ? 0 : ((SIP_ORDER + 1) * (SIP_ORDER + 2)) / 2; // Triangular number of terms per polynomial
+				double[] P0 = new double[6 + 2 * sip_terms];
+				double[] plb = new double[6 + 2 * sip_terms];
+				double[] pub = new double[6 + 2 * sip_terms];
+				double[] scale = new double[6 + 2 * sip_terms];
+
+				if (initCDparams != null)
+				{
+					if (initCDparams_LB == null || initCDparams_UB == null)
+					{
+						throw new Exception("Bounds cannot be null if initial paramters not null in Solve_WCS in JPFITS.WorldCoordinateSolution");
+					}
+
+                    P0[0] = initCDparams[0] * Math.PI / 180;
+                    P0[1] = initCDparams[1] * Math.PI / 180;
+                    P0[2] = initCDparams[2] * Math.PI / 180;
+                    P0[3] = initCDparams[3] * Math.PI / 180;
+                    P0[4] = initCDparams[4];
+                    P0[5] = initCDparams[5];
+
+                    plb[0] = initCDparams_LB[0] * Math.PI / 180;
+                    plb[1] = initCDparams_LB[1] * Math.PI / 180;
+                    plb[2] = initCDparams_LB[2] * Math.PI / 180;
+                    plb[3] = initCDparams_LB[3] * Math.PI / 180;
+                    plb[4] = initCDparams_LB[4];
+                    plb[5] = initCDparams_LB[5];
+
+                    pub[0] = initCDparams_UB[0] * Math.PI / 180;
+                    pub[1] = initCDparams_UB[1] * Math.PI / 180;
+                    pub[2] = initCDparams_UB[2] * Math.PI / 180;
+                    pub[3] = initCDparams_UB[3] * Math.PI / 180;
+                    pub[4] = initCDparams_UB[4];
+                    pub[5] = initCDparams_UB[5];
+					
+					scale[0] = Math.Max(Math.Max(Math.Abs(P0[0]), Math.Abs(P0[1])), Math.Max(Math.Abs(P0[2]), Math.Abs(P0[3])));
+                    scale[1] = scale[0];
+                    scale[2] = scale[0];
+                    scale[3] = scale[0];
+                    scale[4] = P0[4];
+                    scale[5] = P0[5];
+                }
+				else
+				{
+					P0[0] = 0;
+					P0[1] = 0;
+					P0[2] = 0;
+					P0[3] = 0;
+					P0[4] = CRPIXN[0];
+					P0[5] = CRPIXN[1];
+
+					plb[0] = -2.9e-4;//1 arcminute per pixel
+					plb[1] = -2.9e-4;
+					plb[2] = -2.9e-4;
+					plb[3] = -2.9e-4;
+					plb[4] = JPMath.Min(CPIX1);
+					plb[5] = JPMath.Min(CPIX2);
+
+                    pub[0] = 2.9e-4;
+                    pub[1] = 2.9e-4;
+                    pub[2] = 2.9e-4;
+                    pub[3] = 2.9e-4;
+                    pub[4] = JPMath.Max(CPIX1);
+                    pub[5] = JPMath.Max(CPIX2);
+
+					scale[0] = 2.9e-4 / 60;//1 arcsecond per pixel
+					scale[1] = 2.9e-4 / 60;
+					scale[2] = 2.9e-4 / 60;
+					scale[3] = 2.9e-4 / 60;
+					scale[4] = CRPIXN[0];
+					scale[5] = CRPIXN[1];
+				}
+
+				for (int i = 6; i < P0.Length; i++)
+				{
+					P0[i] = 0;      // SIP coeffs start at 0
+					plb[i] = -2;    // Reasonable bounds for SIP (pixels)
+					pub[i] = 2;
+					scale[i] = 1e-6;// Small scale for SIP terms
+				}
+
+				JPMath.Fit_WCSTransform2d(X_intrmdt, Y_intrmdt, CPIX1, CPIX2, ref P0, plb, pub, scale, siporder);
+
+				CDMATRIX = new double[2, 2];
+				CDMATRIX[0, 0] = P0[0] * 180 / Math.PI;
+				CDMATRIX[1, 0] = P0[1] * 180 / Math.PI;
+				CDMATRIX[0, 1] = P0[2] * 180 / Math.PI;
+				CDMATRIX[1, 1] = P0[3] * 180 / Math.PI;
+				CRPIXN[0] = P0[4];
+				CRPIXN[1] = P0[5];
+				CD1_1 = CDMATRIX[0, 0];
+				CD1_2 = CDMATRIX[1, 0];
+				CD2_1 = CDMATRIX[0, 1];
+				CD2_2 = CDMATRIX[1, 1];
+
+				// Extract SIP coefficients
+				if (SIP_ORDER > 0)
+				{
+					A_SIP = new double[SIP_ORDER + 1, SIP_ORDER + 1];
+					B_SIP = new double[SIP_ORDER + 1, SIP_ORDER + 1];
+					int idx = 6;
+					for (int i = 0; i <= SIP_ORDER; i++)
+					{
+						for (int j = 0; j <= SIP_ORDER - i; j++)
+						{
+							A_SIP[i, j] = P0[idx++];
+							B_SIP[i, j] = P0[idx++];
+						}
+					}
+				}
+
+				CDELTN = new double[2];
+				CDELTN[0] = Math.Sqrt(CD1_1 * CD1_1 + CD1_2 * CD1_2) * 3600;
+				CDELTN[1] = Math.Sqrt(CD2_1 * CD2_1 + CD2_2 * CD2_2) * 3600;
+
+				CROTAN = new double[2];
+				CROTAN[0] = Math.Atan2(CD1_2, -CD1_1) * 180 / Math.PI;
+				CROTAN[1] = Math.Atan2(-CD2_1, -CD2_2) * 180 / Math.PI;
+
+				SET_CDMATRIXINV();
+
+				double[] dxpix = new double[CPIX1.Length];
+				double[] dypix = new double[CPIX1.Length];
+				for (int i = 0; i < CPIX1.Length; i++)
+				{
+					this.Get_Pixel(CVAL1[i], CVAL2[i], WCSType.TAN, out double xpix, out double ypix, false);
+					dxpix[i] = xpix - CPIX1[i];
+					dypix[i] = ypix - CPIX2[i];
+
+					DVAL1[i] = dxpix[i] * CDELTN[0];
+					DVAL2[i] = dypix[i] * CDELTN[1];
+				}
+
+				CPIX1RM = JPMath.Mean(dxpix, true);
+				CPIX1RS = JPMath.Stdv(dxpix, true);
+				CVAL1RM = CPIX1RM * CDELTN[0];
+				CVAL1RS = CPIX1RS * CDELTN[0];
+
+				CPIX2RM = JPMath.Mean(dypix, true);
+				CPIX2RS = JPMath.Stdv(dypix, true);
+				CVAL2RM = CPIX2RM * CDELTN[1];
+				CVAL2RS = CPIX2RS * CDELTN[1];
+
+				CPIXRM = Math.Sqrt(CPIX1RM * CPIX1RM + CPIX2RM * CPIX2RM);
+				CPIXRS = Math.Sqrt(CPIX1RS * CPIX1RS + CPIX2RS * CPIX2RS);
+				CVALRM = Math.Sqrt(CVAL1RM * CVAL1RM + CVAL2RM * CVAL2RM);
+				CVALRS = Math.Sqrt(CVAL1RS * CVAL1RS + CVAL2RS * CVAL2RS);
+
+				WCSEXISTS = true;
+
+				if (header == null)
+					return;
+
+				double width = Convert.ToDouble(header.GetKeyValue("NAXIS1"));
+				double height = Convert.ToDouble(header.GetKeyValue("NAXIS2"));
+				Get_Coordinate(width / 2, height / 2, false, WCSType.TAN, out double ccvald1, out double ccvald2, out string ccvals1, out string ccvals2);
+				CCVALD1 = ccvald1;
+				CCVALD2 = ccvald2;
+				CCVALS1 = ccvals1;
+				CCVALS2 = ccvals2;
+
+				ClearWCS(header);
+				this.CopyTo(header, verbose);
+			}
+            catch (Exception ex)
+            {
+                throw new Exception($"Solve_WCS failed with SipOrder={siporder}, X_pix.Length={X_pix.Length}, cval1.Length={cval1.Length}, StackTrace: {ex.StackTrace}", ex);
+            }
+        }
+
+        /// <summary>Gets the image [x, y] pixel position for a given world coordinate in degrees at cval1 and cval2.</summary>
+        /// <param name="cval1">A coordinate values in degrees on coordinate axis 1 (i.e. right ascension).</param>
+        /// <param name="cval2">A coordinate values in degrees on coordinate axis 2 (i.e. declination).</param>
+        /// <param name="type">The type of WCS solution: "TAN" for tangent-plane or Gnomic projection. Only "TAN" supported at this time.</param>
+        /// <param name="X_pix">The x-pixel position of the sky coordinate.</param>
+        /// <param name="Y_pix">The y-pixel position of the sky coordinate.</param>
+        /// <param name="return_zero_based_pixels">If the pixels for the image should be interpreted as zero-based, pass true.</param>
+        public void Get_Pixel(double cval1, double cval2, WCSType type, out double X_pix, out double Y_pix, bool return_zero_based_pixels)
+        {
+            double a0 = CRVALN[0] * Math.PI / 180, d0 = CRVALN[1] * Math.PI / 180;
+            double a = cval1 * Math.PI / 180, d = cval2 * Math.PI / 180;
+
+            // TAN deprojection to intermediate coords
+            double X_intrmdt = Math.Cos(d) * Math.Sin(a - a0) / (Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0) + Math.Sin(d0) * Math.Sin(d));
+            double Y_intrmdt = (Math.Cos(d0) * Math.Sin(d) - Math.Cos(d) * Math.Sin(d0) * Math.Cos(a - a0)) / (Math.Sin(d0) * Math.Sin(d) + Math.Cos(d0) * Math.Cos(d) * Math.Cos(a - a0));
+
+            // Initial guess: inverse CD matrix without SIP
+            double u = CDMATRIXINV[0, 0] * X_intrmdt + CDMATRIXINV[1, 0] * Y_intrmdt;
+            double v = CDMATRIXINV[0, 1] * X_intrmdt + CDMATRIXINV[1, 1] * Y_intrmdt;
+
+            // Iterate to solve u + f(u,v) = u', v + g(u,v) = v' if SIP is active
+            if (SIP_ORDER > 0 && A_SIP != null && B_SIP != null)
+            {
+                double u_prime = CDMATRIXINV[0, 0] * X_intrmdt + CDMATRIXINV[1, 0] * Y_intrmdt;
+                double v_prime = CDMATRIXINV[0, 1] * X_intrmdt + CDMATRIXINV[1, 1] * Y_intrmdt;
+                for (int iter = 0; iter < 10; iter++)
+                {
+                    double f_uv = 0, g_uv = 0;
+                    double df_du = 0, df_dv = 0, dg_du = 0, dg_dv = 0;
+                    for (int i = 0; i <= SIP_ORDER; i++)
+                    {
+                        for (int j = 0; j <= SIP_ORDER - i; j++)
+                        {
+                            double term = Math.Pow(u, i) * Math.Pow(v, j);
+                            f_uv += A_SIP[i, j] * term;
+                            g_uv += B_SIP[i, j] * term;
+                            if (i > 0) df_du += i * A_SIP[i, j] * Math.Pow(u, i - 1) * Math.Pow(v, j);
+                            if (j > 0) df_dv += j * A_SIP[i, j] * Math.Pow(u, i) * Math.Pow(v, j - 1);
+                            if (i > 0) dg_du += i * B_SIP[i, j] * Math.Pow(u, i - 1) * Math.Pow(v, j);
+                            if (j > 0) dg_dv += j * B_SIP[i, j] * Math.Pow(u, i) * Math.Pow(v, j - 1);
+                        }
+                    }
+
+                    double residual_u = u + f_uv - u_prime;
+                    double residual_v = v + g_uv - v_prime;
+                    if (Math.Abs(residual_u) < 1e-6 && Math.Abs(residual_v) < 1e-6) break;
+
+                    // Jacobian determinant and update
+                    double det = (1 + df_du) * (1 + dg_dv) - df_dv * dg_du;
+                    if (Math.Abs(det) < 1e-10) break; // Avoid division by near-zero
+                    u -= ((1 + dg_dv) * residual_u - df_dv * residual_v) / det;
+                    v -= (-dg_du * residual_u + (1 + df_du) * residual_v) / det;
+                }
+            }
+
+            X_pix = u + CRPIXN[0];
+            Y_pix = v + CRPIXN[1];
+            if (return_zero_based_pixels)
+            {
+                X_pix--;
+                Y_pix--;
+            }
+        }
+
+        /// <summary>Gets arrays of image [x, y] pixel positions for a list of given world coordinates in degrees at cval1 and cval2.</summary>
+        /// <param name="cval1">An array of coordinate values in degrees on coordinate axis 1.</param>
+        /// <param name="cval2">An array of coordinate values in degrees on coordinate axis 2.</param>
+        /// <param name="type">The type of WCS solution: "TAN" for tangent-plane or Gnomic projection. Only "TAN" supported at this time.</param>
+        /// <param name="X_pix">An array of the image x-axis pixel locations.</param>
+        /// <param name="Y_pix">An array of the image y-axis pixel locations.</param>
+        /// <param name="return_zero_based_pixels">If the pixels for the image should be interpreted as zero-based, pass true.</param>
+        public void Get_Pixels(double[] cval1, double[] cval2, WCSType type, out double[] X_pix, out double[] Y_pix, bool return_zero_based_pixels)
 		{
 			X_pix = new double[cval1.Length];
 			Y_pix = new double[cval1.Length];
 
 			for (int i = 0; i < cval1.Length; i++)
 			{
-				this.Get_Pixel(cval1[i], cval2[i], WCS_Type, out double xpix, out double ypix, return_zero_based_pixels);
+				this.Get_Pixel(cval1[i], cval2[i], type, out double xpix, out double ypix, return_zero_based_pixels);
 				X_pix[i] = xpix;
 				Y_pix[i] = ypix;
 			}
 		}
 
-		/// <summary>Gets the cval1 and cval2 world coordinate in degrees for a given image [x, y] pixel position.</summary>
-		/// <param name="X_pix">The x-pixel position of the sky coordinates.</param>
-		/// <param name="Y_pix">The y-pixel position of the sky coordinates.</param>
-		/// <param name="zero_based_pixels">True if the pixels coordinates for the image are zero-based.</param>
-		/// <param name="WCS_Type">The type of WCS solution: "TAN" for tangent-plane or Gnomic projection. Only "TAN" supported at this time.</param>
-		/// <param name="cval1">A coordinate value in degrees on coordinats axis 1 (i.e. right ascension).</param>
-		/// <param name="cval2">A coordinate value in degrees on coordinats axis 2 (i.e. declination).</param>
-		public void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, string WCS_Type, out double cval1, out double cval2)
+        /// <summary>Gets the cval1 and cval2 world coordinate in degrees for a given image [x, y] pixel position.</summary>
+        /// <param name="X_pix">The x-pixel position of the sky coordinates.</param>
+        /// <param name="Y_pix">The y-pixel position of the sky coordinates.</param>
+        /// <param name="zero_based_pixels">True if the pixels coordinates for the image are zero-based.</param>
+        /// <param name="type">The type of WCS solution: "TAN" for tangent-plane or Gnomic projection. Only "TAN" supported at this time.</param>
+        /// <param name="cval1">A coordinate value in degrees on coordinats axis 1 (i.e. right ascension).</param>
+        /// <param name="cval2">A coordinate value in degrees on coordinats axis 2 (i.e. declination).</param>
+        public void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, WCSType type, out double cval1, out double cval2)
 		{
-			Get_Coordinate(X_pix, Y_pix, zero_based_pixels, WCS_Type, out cval1, out cval2, out string sx1, out string sx2);
+			Get_Coordinate(X_pix, Y_pix, zero_based_pixels, type, out cval1, out cval2, out string sx1, out string sx2);
 		}
 
 		/// <summary>Gets the cval1 and cval2 world coordinate in sexagesimal for a given image [x, y] pixel position.</summary>
-		public void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, string WCS_Type, out string cval1_sxgsml, out string cval2_sxgsml)
+		public void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, WCSType type, out string cval1_sxgsml, out string cval2_sxgsml)
 		{
-			Get_Coordinate(X_pix, Y_pix, zero_based_pixels, WCS_Type, out double cv1, out double cv2, out cval1_sxgsml, out cval2_sxgsml);
+			Get_Coordinate(X_pix, Y_pix, zero_based_pixels, type, out double cv1, out double cv2, out cval1_sxgsml, out cval2_sxgsml);
 		}
 
-		/// <summary>Gets the cval1 and cval2 world coordinate in degrees and sexagesimal for a given image [x, y] pixel position.</summary>
-		public void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, string WCS_Type, out double cval1, out double cval2, out string cval1_sxgsml, out string cval2_sxgsml)
-		{
-			if (zero_based_pixels)
-			{
-				X_pix++;
-				Y_pix++;
-			}
-			double X_intrmdt = CDMATRIX[0, 0] * (X_pix - CRPIXN[0]) * Math.PI / 180 + CDMATRIX[1, 0] * (Y_pix - CRPIXN[1]) * Math.PI / 180;
-			double Y_intrmdt = CDMATRIX[0, 1] * (X_pix - CRPIXN[0]) * Math.PI / 180 + CDMATRIX[1, 1] * (Y_pix - CRPIXN[1]) * Math.PI / 180;
-			double a = CRVALN[0] * Math.PI / 180 + Math.Atan(X_intrmdt / (Math.Cos(CRVALN[1] * Math.PI / 180) - Y_intrmdt * Math.Sin(CRVALN[1] * Math.PI / 180)));
-			double d = Math.Asin((Math.Sin(CRVALN[1] * Math.PI / 180) + Y_intrmdt * Math.Cos(CRVALN[1] * Math.PI / 180)) / Math.Sqrt(1 + X_intrmdt * X_intrmdt + Y_intrmdt * Y_intrmdt));
-			a = a * 180 / Math.PI;
-			d = d * 180 / Math.PI;
+        /// <summary>Gets the cval1 and cval2 world coordinate in degrees and sexagesimal for a given image [x, y] pixel position.</summary>
+        public void Get_Coordinate(double X_pix, double Y_pix, bool zero_based_pixels, WCSType type, out double cval1, out double cval2, out string cval1_sxgsml, out string cval2_sxgsml)
+        {
+            if (zero_based_pixels)
+            {
+                X_pix++;
+                Y_pix++;
+            }
 
-			if (a < 0)
-				a += 360;
+            // Shift to SIP coordinates
+            double u = X_pix - CRPIXN[0];
+            double v = Y_pix - CRPIXN[1];
 
-			cval1 = a;
-			cval2 = d;
+            // Apply SIP distortion
+            double f_uv = 0, g_uv = 0;
+            if (SIP_ORDER > 0 && A_SIP != null && B_SIP != null)
+            {
+                for (int i = 0; i <= SIP_ORDER; i++)
+                {
+                    for (int j = 0; j <= SIP_ORDER - i; j++)
+                    {
+                        double term = Math.Pow(u, i) * Math.Pow(v, j);
+                        f_uv += A_SIP[i, j] * term;
+                        g_uv += B_SIP[i, j] * term;
+                    }
+                }
+            }
 
-			double h = Math.Floor(a / 360 * 24);
-			double m = Math.Floor((a / 360 * 24 - h) * 60);
-			double s = Math.Round((a / 360 * 24 - h - m / 60) * 3600, 2);
+            // Intermediate coords with SIP (convert CD matrix to radians)
+            double X_intrmdt = CDMATRIX[0, 0] * (u + f_uv) * Math.PI / 180 + CDMATRIX[1, 0] * (v + g_uv) * Math.PI / 180;
+            double Y_intrmdt = CDMATRIX[0, 1] * (u + f_uv) * Math.PI / 180 + CDMATRIX[1, 1] * (v + g_uv) * Math.PI / 180;
 
-			double decdeg = Math.Abs(d);
-			double deg = Math.Floor(decdeg);
-			double am = Math.Floor((decdeg - deg) * 60);
-			double ars = Math.Round((decdeg - deg - am / 60) * 3600, 2);
+            // TAN projection
+            double a = CRVALN[0] * Math.PI / 180 + Math.Atan(X_intrmdt / (Math.Cos(CRVALN[1] * Math.PI / 180) - Y_intrmdt * Math.Sin(CRVALN[1] * Math.PI / 180)));
+            double d = Math.Asin((Math.Sin(CRVALN[1] * Math.PI / 180) + Y_intrmdt * Math.Cos(CRVALN[1] * Math.PI / 180)) / Math.Sqrt(1 + X_intrmdt * X_intrmdt + Y_intrmdt * Y_intrmdt));
+            a = a * 180 / Math.PI;
+            d = d * 180 / Math.PI;
 
-			String sign = "+";
-			if (d < 0)
-				sign = "-";
+            if (a < 0)
+                a += 360;
 
-			cval1_sxgsml = h.ToString("00") + ":" + m.ToString("00") + ":" + s.ToString("00.00");
-			cval2_sxgsml = sign + deg.ToString("00") + ":" + am.ToString("00") + ":" + ars.ToString("00.00");
-		}
+            cval1 = a;
+            cval2 = d;
 
-		/// <summary>Gets arrays of cval1 and cval2 world coordinates in degrees for a list of given image [x, y] pixel positions.</summary>
-		public void Get_Coordinates(double[] X_pix, double[] Y_pix, bool zero_based_pixels, string WCS_Type, out double[] cval1, out double[] cval2)
+            // Sexagesimal formatting
+            double h = Math.Floor(a / 360 * 24);
+            double m = Math.Floor((a / 360 * 24 - h) * 60);
+            double s = Math.Round((a / 360 * 24 - h - m / 60) * 3600, 2);
+            double decdeg = Math.Abs(d);
+            double deg = Math.Floor(decdeg);
+            double am = Math.Floor((decdeg - deg) * 60);
+            double ars = Math.Round((decdeg - deg - am / 60) * 3600, 2);
+            string sign = d < 0 ? "-" : "+";
+            cval1_sxgsml = h.ToString("00") + ":" + m.ToString("00") + ":" + s.ToString("00.00");
+            cval2_sxgsml = sign + deg.ToString("00") + ":" + am.ToString("00") + ":" + ars.ToString("00.00");
+        }
+
+        /// <summary>Gets arrays of cval1 and cval2 world coordinates in degrees for a list of given image [x, y] pixel positions.</summary>
+        public void Get_Coordinates(double[] X_pix, double[] Y_pix, bool zero_based_pixels, WCSType type, out double[] cval1, out double[] cval2)
 		{
 			string[] sx1 = new string[(X_pix.Length)];
 			string[] sx2 = new string[(X_pix.Length)];
 
-			Get_Coordinates(X_pix, Y_pix, zero_based_pixels, WCS_Type, out cval1, out cval2, out sx1, out sx2);
+			Get_Coordinates(X_pix, Y_pix, zero_based_pixels, type, out cval1, out cval2, out sx1, out sx2);
 		}
 
 		/// <summary>Gets arrays of cval1 and cval2 world coordinates in sexagesimal for a list of given image [x, y] pixel positions.</summary>
-		public void Get_Coordinates(double[] X_pix, double[] Y_pix, bool zero_based_pixels, string WCS_Type, out string[] cval1_sxgsml, out string[] cval2_sxgsml)
+		public void Get_Coordinates(double[] X_pix, double[] Y_pix, bool zero_based_pixels, WCSType type, out string[] cval1_sxgsml, out string[] cval2_sxgsml)
 		{
 			double[] cv1 = new double[(X_pix.Length)];
 			double[] cv2 = new double[(X_pix.Length)];
 
-			Get_Coordinates(X_pix, Y_pix, zero_based_pixels, WCS_Type, out cv1, out cv2, out cval1_sxgsml, out cval2_sxgsml);
+			Get_Coordinates(X_pix, Y_pix, zero_based_pixels, type, out cv1, out cv2, out cval1_sxgsml, out cval2_sxgsml);
 		}
 
 		/// <summary>Gets arrays of cval1 and cval2 world coordinates in degrees and sexagesimal for a list of given image [x, y] pixel positions.</summary>
-		public void Get_Coordinates(double[] X_pix, double[] Y_pix, bool zero_based_pixels, string WCS_Type, out double[] cval1, out double[] cval2, out string[] cval1_sxgsml, out string[] cval2_sxgsml)
+		public void Get_Coordinates(double[] X_pix, double[] Y_pix, bool zero_based_pixels, WCSType type, out double[] cval1, out double[] cval2, out string[] cval1_sxgsml, out string[] cval2_sxgsml)
 		{
 			cval1 = new double[X_pix.Length];
 			cval2 = new double[X_pix.Length];
@@ -951,7 +1131,7 @@ namespace JPFITS
 
 			for (int i = 0; i < cval1.Length; i++)
 			{
-				this.Get_Coordinate(X_pix[i], Y_pix[i], zero_based_pixels, WCS_Type, out double radeg, out double decdeg, out string rasx, out string decsx);
+				this.Get_Coordinate(X_pix[i], Y_pix[i], zero_based_pixels, type, out double radeg, out double decdeg, out string rasx, out string decsx);
 				cval1[i] = radeg;
 				cval2[i] = decdeg;
 				cval1_sxgsml[i] = rasx;
@@ -1043,7 +1223,24 @@ namespace JPFITS
 				header.SetKey("CVALRM", CVALRM.ToString("G"), "Mean of WCS residuals (arcsec)", true, -1);
 				header.SetKey("CVALRS", CVALRS.ToString("G"), "Standard dev of WCS residuals (arcsec)", true, -1);
 
-				if (!verbose)
+                // Write SIP order and coefficients
+                header.SetKey("A_ORDER", SIP_ORDER.ToString(), "SIP polynomial order for x-axis distortion", true, -1);
+                header.SetKey("B_ORDER", SIP_ORDER.ToString(), "SIP polynomial order for y-axis distortion", true, -1);
+                if (SIP_ORDER > 0 && A_SIP != null && B_SIP != null)
+                {
+                    for (int i = 0; i <= SIP_ORDER; i++)
+                    {
+                        for (int j = 0; j <= SIP_ORDER - i; j++)
+                        {
+                            if (A_SIP[i, j] != 0) // Only write non-zero coefficients
+                                header.SetKey($"A_{i}_{j}", A_SIP[i, j].ToString("0.0#########e+00"), $"SIP coefficient A[{i},{j}]", true, -1);
+                            if (B_SIP[i, j] != 0)
+                                header.SetKey($"B_{i}_{j}", B_SIP[i, j].ToString("0.0#########e+00"), $"SIP coefficient B[{i},{j}]", true, -1);
+                        }
+                    }
+                }
+
+                if (!verbose)
 					return;
 
 				header.SetKey("CCVALD1", CCVALD1.ToString("F8"), "WCS field center on axis 1 (degrees)", true, -1);
@@ -1131,7 +1328,12 @@ namespace JPFITS
 			CCVALS1 = "";
 			CCVALS2 = "";
 
-			WCSEXISTS = false;
+            // Clear SIP terms
+            A_SIP = null;
+            B_SIP = null;
+            SIP_ORDER = 0;
+
+            WCSEXISTS = false;
 		}
 
 		/// <summary>Checks if a WCS solution has been computed for this instance.</summary>
@@ -1145,7 +1347,7 @@ namespace JPFITS
 		/// </summary>
 		/// <param name="pictureBox">The picture box.</param>
 		/// <param name="e">The PaintEventArgs from the PictureBox's Paint callback.</param>
-		public void Grid_DrawWCSGrid(System.Windows.Forms.PictureBox pictureBox, PaintEventArgs e)
+		public void Grid_DrawWCSGrid(PictureBox pictureBox, PaintEventArgs e)
 		{
 			if (!WCSEXISTS)
 				return;
@@ -1218,7 +1420,7 @@ namespace JPFITS
 		/// <param name="displayWindow_width">The display window width in display pixels.</param>
 		/// <param name="displayWindow_height">The display window height in display pixels.</param>
 		/// <param name="NapproximateIntervals">Approximate number of intervals in the grid. Suggest 7. Minimum 3.</param>
-		public void Grid_MakeWCSGrid(int wcsImage_width, int wcsImage_height, int displayWindow_width, int displayWindow_height, int NapproximateIntervals)
+		public void Grid_MakeWCSGrid(int wcsImage_width, int wcsImage_height, int displayWindow_width, int displayWindow_height, int NapproximateIntervals = 7)
 		{
 			if (NapproximateIntervals < 3)
 				throw new Exception("Minimum number of grid intervals is 3...you passed: " + NapproximateIntervals);
@@ -1233,16 +1435,16 @@ namespace JPFITS
 				float yscale = (float)displayWindow_height / (float)wcsImage_height;
 				string sexx, sexy;
 
-				Get_Coordinate((double)wcsImage_width / 2, (double)wcsImage_height / 2, false, "TAN", out double fieldcenterRA, out double fieldcenterDEC);
+				Get_Coordinate((double)wcsImage_width / 2, (double)wcsImage_height / 2, false, WCSType.TAN, out double fieldcenterRA, out double fieldcenterDEC);
 
 				bool poleinsidepos = false;
 				bool poleinsideneg = false;
-				Get_Pixel(0, 90, "TAN", out double x, out double y, true);
+				Get_Pixel(0, 90, WCSType.TAN, out double x, out double y, true);
 				if (x > 0 && y > 0 && x < wcsImage_width && y < wcsImage_height)
 					poleinsidepos = true;
 				if (!poleinsidepos)
 				{
-					Get_Pixel(0, -90, "TAN", out x, out y, true);
+					Get_Pixel(0, -90, WCSType.TAN, out x, out y, true);
 					if (x > 0 && y > 0 && x < wcsImage_width && y < wcsImage_height)
 						poleinsideneg = true;
 				}
@@ -1250,7 +1452,7 @@ namespace JPFITS
 				//top left, top middle, top right, middle left, middle right, bottom left, bottom middle, bottom right
 				double[] crosscornersX = new double[8] { 1, wcsImage_width / 2, wcsImage_width, 1, wcsImage_width, 1, wcsImage_width / 2, wcsImage_width };
 				double[] crosscornersY = new double[8] { 1, 1, 1, wcsImage_height / 2, wcsImage_height / 2, wcsImage_height, wcsImage_height, wcsImage_height };
-				Get_Coordinates(crosscornersX, crosscornersY, false, "TAN", out double[] crosscornersRA, out double[] crosscornersDE);
+				Get_Coordinates(crosscornersX, crosscornersY, false, WCSType.TAN, out double[] crosscornersRA, out double[] crosscornersDE);
 
 				double despan = 0;
 				JPMath.MinMax(crosscornersDE, out double minDE, out double maxDE, false);
@@ -1333,7 +1535,7 @@ namespace JPFITS
 
 					for (int j = -nDECsweeppointsHW; j <= nDECsweeppointsHW; j++)
 					{
-						Get_Pixel(fieldcenterRA + (double)j * decsweepinterval, fieldcenterDEC + (double)(i) * decgrad, "TAN", out x, out y, true);
+						Get_Pixel(fieldcenterRA + (double)j * decsweepinterval, fieldcenterDEC + (double)(i) * decgrad, WCSType.TAN, out x, out y, true);
 						DEC_LINES[i + nDECintervalsHW][j + nDECsweeppointsHW] = new PointF((float)x, (float)y);
 					}
 				}
@@ -1379,7 +1581,7 @@ namespace JPFITS
 
 					for (int j = -nRAsweeppointsHW; j <= nRAsweeppointsHW; j++)
 					{
-						Get_Pixel(fieldcenterRA + (double)(i) * ragrad, fieldcenterDEC + (double)j * rasweepinterval, "TAN", out x, out y, true);
+						Get_Pixel(fieldcenterRA + (double)(i) * ragrad, fieldcenterDEC + (double)j * rasweepinterval, WCSType.TAN, out x, out y, true);
 						RAS_LINES[i + nRAintervalsHW][j + nRAsweeppointsHW] = new PointF((float)x, (float)y);
 					}
 				}
@@ -1410,8 +1612,10 @@ namespace JPFITS
 			}
 			catch (Exception ee)
 			{
-				MessageBox.Show(ee.Data + "	" + ee.InnerException + "	" + ee.Message + "	" + ee.Source + "	" + ee.StackTrace + "	" + ee.TargetSite);
-			}
+				//MessageBox.Show(ee.Data + "	" + ee.InnerException + "	" + ee.Message + "	" + ee.Source + "	" + ee.StackTrace + "	" + ee.TargetSite);
+                throw new Exception(ee.Data + "	" + ee.InnerException + "	" + ee.Message + "	" + ee.Source + "	" + ee.StackTrace + "	" + ee.TargetSite);
+
+            }
 		}
 
 		private double ROUNDTOHUMANINTERVAL(double value)
@@ -1526,7 +1730,19 @@ namespace JPFITS
 			header.RemoveKey("CVALRM");
 			header.RemoveKey("CVALRS");
 
-			int key = 0, num = 1;
+            // Clear SIP keys
+            header.RemoveKey("A_ORDER");
+            header.RemoveKey("B_ORDER");
+            for (int i = 0; i <= 9; i++) // Up to order 9
+            {
+                for (int j = 0; j <= 9 - i; j++)
+                {
+                    header.RemoveKey($"A_{i}_{j}");
+                    header.RemoveKey($"B_{i}_{j}");
+                }
+            }
+
+            int key = 0, num = 1;
 			while (key != -1)
 			{
 				key = header.GetKeyIndex("WCD1_" + num.ToString("000"), false);
@@ -1545,13 +1761,45 @@ namespace JPFITS
 			}
 		}
 
-		/// <summary>Convert sexagesimal coordinate elements to degree units, with possibly arbitrary scale delimitters.</summary>
-		/// <param name="ra_sexa">The right ascension in sexagesimal format.</param>
-		/// <param name="dec_sexa">The declination in sexagesimal format.</param>
-		/// <param name="delimit">If the scale delimiter is known then pass it (fast), otherwise it will be arbitrarily determined at each scale separation by passing an empty string (slower).</param>
-		/// <param name="ra_deg">Return parameter for right ascension in degrees.</param>
-		/// <param name="dec_deg">Return parameter for declination in degrees.</param>
-		public static void SexagesimalElementsToDegreeElements(string ra_sexa, string dec_sexa, string delimit, out double ra_deg, out double dec_deg)
+        /// <summary>
+        /// Tests WCS + SIP consistency by converting pixel to sky and back, checking residuals.
+        /// </summary>
+        /// <param name="testPixelsX">Array of test pixel x-coordinates.</param>
+        /// <param name="testPixelsY">Array of test pixel y-coordinates.</param>
+        /// <param name="zeroBased">Whether input pixels are zero-based.</param>
+        /// <returns>Max pixel residual (in pixels).</returns>
+        public double TestWCSConsistency(double[] testPixelsX, double[] testPixelsY, bool zeroBased)
+        {
+            if (testPixelsX.Length != testPixelsY.Length)
+                throw new ArgumentException("Test pixel arrays must have equal length.");
+
+            double maxResidual = 0;
+            for (int i = 0; i < testPixelsX.Length; i++)
+            {
+                // Pixel to sky
+                Get_Coordinate(testPixelsX[i], testPixelsY[i], zeroBased, WCSType.TAN,
+                    out double ra, out double dec, out string _, out string _);
+
+                // Sky back to pixel
+                Get_Pixel(ra, dec, WCSType.TAN, out double xBack, out double yBack, zeroBased);
+
+                // Residual in pixels
+                double dx = xBack - testPixelsX[i];
+                double dy = yBack - testPixelsY[i];
+                double residual = Math.Sqrt(dx * dx + dy * dy);
+                maxResidual = Math.Max(maxResidual, residual);
+            }
+
+            return maxResidual;
+        }
+
+        /// <summary>Convert sexagesimal coordinate elements to degree units, with possibly arbitrary scale delimitters.</summary>
+        /// <param name="ra_sexa">The right ascension in sexagesimal format.</param>
+        /// <param name="dec_sexa">The declination in sexagesimal format.</param>
+        /// <param name="delimit">If the scale delimiter is known then pass it (fast), otherwise it will be arbitrarily determined at each scale separation by passing an empty string (slower).</param>
+        /// <param name="ra_deg">Return parameter for right ascension in degrees.</param>
+        /// <param name="dec_deg">Return parameter for declination in degrees.</param>
+        public static void SexagesimalElementsToDegreeElements(string ra_sexa, string dec_sexa, string delimit, out double ra_deg, out double dec_deg)
 		{
 			double h, m, s, d, am, ars;
 
@@ -1865,7 +2113,7 @@ namespace JPFITS
 				am += 1;
 			}
 
-			String sign = "+";
+			string sign = "+";
 			if (dec_deg < 0)
 				sign = "-";
 
@@ -1968,6 +2216,72 @@ namespace JPFITS
 				sw.WriteLine(raSexagesimal[i] + delimit + decSexagesimal[i]);
 			sw.Close();
 		}
+
+        /// <summary>Parses the right ascension and declination from a string or FITS header, converting them to degrees.</summary>
+        public static void RADecParse(string ra, string dec, FITSImage? fitsImage, out double RA, out double DEC)
+		{
+            if (JPMath.IsNumeric(ra))
+                RA = Convert.ToDouble(ra);
+            else
+            {
+                try
+                {
+                    JPFITS.WorldCoordinateSolution.SexagesimalElementsToDegreeElements(ra, "00:00:00.0", "", out RA, out _);
+                }
+                catch
+                {
+                    if (fitsImage == null)
+                        throw new Exception("FITSImage fitsImage in RADecParse is null. Cannot proceed.");
+
+                    try
+                    {
+                        RA = Convert.ToDouble(fitsImage.Header.GetKeyValue(ra));
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            JPFITS.WorldCoordinateSolution.SexagesimalElementsToDegreeElements(fitsImage.Header.GetKeyValue(ra), "00:00:00.0", "", out RA, out _);
+                        }
+                        catch
+                        {
+                            throw new Exception("Cannot make sense of Right Ascension '" + ra + "' = '" + fitsImage.Header.GetKeyValue(ra) + "'. Stopping RADecParse.");
+                        }
+                    }
+                }
+            }
+
+            if (JPMath.IsNumeric(dec))
+                DEC = Convert.ToDouble(dec);
+            else
+            {
+                try
+                {
+                    JPFITS.WorldCoordinateSolution.SexagesimalElementsToDegreeElements("00:00:00.0", dec, "", out _, out DEC);
+                }
+                catch
+                {
+                    if (fitsImage == null)
+                        throw new Exception("FITSImage fitsImage in RADecParse is null. Cannot proceed.");
+
+                    try
+                    {
+                        DEC = Convert.ToDouble(fitsImage.Header.GetKeyValue(dec));
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            JPFITS.WorldCoordinateSolution.SexagesimalElementsToDegreeElements("00:00:00.0", fitsImage.Header.GetKeyValue(dec), "", out _, out DEC);
+                        }
+                        catch
+                        {
+                            throw new Exception("Cannot make sense of Declination '" + dec + "' = '" + fitsImage.Header.GetKeyValue(dec) + "'. Stopping RADecParse.");
+                        }
+                    }
+                }
+            }
+        }
 
 		#endregion
 	}

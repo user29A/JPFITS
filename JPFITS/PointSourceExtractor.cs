@@ -27,6 +27,8 @@ using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Drawing;
 using System.IO;
+using static JPFITS.WorldCoordinateSolution;
+using System.Linq;
 #nullable enable
 
 namespace JPFITS
@@ -130,7 +132,7 @@ namespace JPFITS
 		/// <param name="kernel_radius">The radius (pixels) of the kernel to centroid.</param>
 		/// <param name="auto_background">Estimate the background at the sources.</param>
 		/// <param name="kernel_filename_template">The template full file name for the kernels to be saved. Sources will be numbered sequentially. Pass empty string for no saving.</param>
-		/// <param name="pix_saturation_mapmin">The minimum vale to which to map out a saturated source. Default of 0 results in the same value as pix_saturation.</param> 
+		/// <param name="pix_saturation_mapmin">The minimum value to which to map out a saturated source. Default of 0 results in the same value as pix_saturation.</param> 
 		public PointSourceExtractor(double[,] image, double[] XCoords, double[] YCoords, double pix_saturation, int kernel_radius, int background_radius, bool auto_background, string kernel_filename_template, double pix_saturation_mapmin = 0)
 		{
 			this.BGWRKR = new BackgroundWorker();
@@ -642,7 +644,7 @@ namespace JPFITS
 		{
 			for (int i = 0; i < N_SRC; i++)
 			{
-				wcs.Get_Coordinate(CENTROIDS_X[i], CENTROIDS_Y[i], true, "TAN", out double a, out double d, out string RAhms, out string DECdamas);
+				wcs.Get_Coordinate(CENTROIDS_X[i], CENTROIDS_Y[i], true, WCSType.TAN, out double a, out double d, out string RAhms, out string DECdamas);
 
 				CENTROIDS_RADEG[i] = a;
 				CENTROIDS_RAHMS[i] = RAhms;
@@ -651,7 +653,7 @@ namespace JPFITS
 
 				if (FITTED)
 				{
-					wcs.Get_Coordinate(FITS_X[i], FITS_Y[i], true, "TAN", out a, out d, out RAhms, out DECdamas);
+					wcs.Get_Coordinate(FITS_X[i], FITS_Y[i], true, WCSType.TAN, out a, out d, out RAhms, out DECdamas);
 
 					FITS_RA_DEG[i] = a;
 					FITS_RA_HMS[i] = RAhms;
@@ -759,7 +761,11 @@ namespace JPFITS
 			Array.Sort(volkey, indices);//by increasing brightness
 			Array.Reverse(indices);//by decreasing brightness; now all location at indices at index >= NBright are no longer wanted
 
-			double dum;
+            //var indexedVolumes = CENTROIDS_VOLUME.Select((v, i) => new { Volume = v, Index = i }).ToList();
+            //indexedVolumes.Sort((a, b) => a.Volume == b.Volume ? a.Index.CompareTo(b.Index) : b.Volume.CompareTo(a.Volume)); // Stable sort: high to low volume, then low to high index
+            //indices = indexedVolumes.Select(x => x.Index).ToArray();
+
+            double dum;
 			string dumstr;
 			for (int i = 0; i < NBright; i++)
 			{
@@ -1225,7 +1231,9 @@ namespace JPFITS
 
 				if (PIX_SAT > 0)//check for saturation islands
 				{
-					Parallel.For(BACKGROUND_RADIUS, IMAGEWIDTH - BACKGROUND_RADIUS, x =>
+                    //for some reason the parallelized version breaks linearity makes unpredictable randomness beyond thread randomness - not sure why yet
+                    for (int x = BACKGROUND_RADIUS; x < IMAGEWIDTH - BACKGROUND_RADIUS; x++)
+                    //Parallel.For(BACKGROUND_RADIUS, IMAGEWIDTH - BACKGROUND_RADIUS, x =>
 					{
 						for (int y = BACKGROUND_RADIUS; y < IMAGEHEIGHT - BACKGROUND_RADIUS; y++)
 						{
@@ -1234,15 +1242,21 @@ namespace JPFITS
 									continue;
 
 							if (IMAGE[x, y] < PIX_SAT)
-								continue;						
+								continue;
 
-							lock (LOCKOBJECT)
+                            if (SOURCE_BOOLEAN_MAP[x, y])
+                                continue;
+
+                            lock (LOCKOBJECT)
 							{
 								if (SOURCE_BOOLEAN_MAP[x, y])
 									continue;
 
 								int xmin = x, xmax = x, ymin = y, ymax = y;
 								MAPSATURATIONISLAND(x, y, src_index, ref xmin, ref xmax, ref ymin, ref ymax);
+
+								//if (Math.Abs((xmax - xmin) - (ymax - ymin)) > 5)//then it is likely a bloomed saturation...ignore for now
+                                    //continue;//this needs work because MAPSTURATIONISLAND does stuff like uses the src_index and does mapping and setting the indexarray etc
 
 								if (xmax - xmin == 0)//single pixel, expand to 3 pixels
 								{
@@ -1308,7 +1322,7 @@ namespace JPFITS
 								}
 							}
 						}
-					});
+					}//);
 
 					/*JPFITS.FITSImage^ ff = new FITSImage("C:\\Users\\Joseph E Postma\\Desktop\\atest.fits", IMAGE_KERNEL_INDEX_SOURCE, false);
 					ff.WriteFile(TypeCode.Int32);*/
@@ -1317,14 +1331,17 @@ namespace JPFITS
 				int intprg = 0;
 				int n0 = (IMAGEWIDTH - 2 * BACKGROUND_RADIUS) / Environment.ProcessorCount + BACKGROUND_RADIUS;
 
-				Parallel.For(BACKGROUND_RADIUS, IMAGEWIDTH - BACKGROUND_RADIUS, (Action<int, ParallelLoopState>)((int x, ParallelLoopState state) =>
+                //for some reason the parallelized version breaks linearity makes unpredictable randomness beyond thread randomness - not sure why yet
+                for (int x = BACKGROUND_RADIUS; x < IMAGEWIDTH - BACKGROUND_RADIUS; x++)
+                //Parallel.For(BACKGROUND_RADIUS, IMAGEWIDTH - BACKGROUND_RADIUS, (Action<int, ParallelLoopState>)((int x, ParallelLoopState state) =>
 				{
 					if (SHOWWAITBAR)
 					{
 						if (WAITBAR.DialogResult == DialogResult.Cancel)
-							state.Stop();
+                            return;
+                        //	state.Stop();///when parallelized
 
-						if (x < n0 && (x - BACKGROUND_RADIUS) * 100 / (n0 - BACKGROUND_RADIUS) > intprg)//keep the update of progress bar to only one thread of the team...avoids locks
+                        if (x < n0 && (x - BACKGROUND_RADIUS) * 100 / (n0 - BACKGROUND_RADIUS) > intprg)//keep the update of progress bar to only one thread of the team...avoids locks
 						{
 							intprg = x * 100 / n0;
 							BGWRKR.ReportProgress(intprg + 1);
@@ -1460,21 +1477,24 @@ namespace JPFITS
 								continue;
 						}
 
-						lock (LOCKOBJECT)
+                        double[,] kernel = GetKernel(IMAGE, (int)x, (int)y, KERNEL_RADIUS, out int[] xdata, out int[] ydata);
+                        if (bg_est != 0)
+                            kernel = JPMath.MatrixSubScalar(kernel, bg_est);
+
+                        Centroid(xdata, ydata, kernel, out double x_centroid, out double y_centroid);
+
+                        if (Double.IsNaN(x_centroid) || Double.IsInfinity(x_centroid) || Double.IsNaN(y_centroid) || Double.IsInfinity(y_centroid))
+                            continue;
+                        if (x_centroid < x - KERNEL_RADIUS || x_centroid > x + KERNEL_RADIUS || y_centroid < y - KERNEL_RADIUS || y_centroid > y + KERNEL_RADIUS)
+                            continue;
+
+                        if (SOURCE_BOOLEAN_MAP[x, y])
+                            continue;
+
+                        lock (LOCKOBJECT)
 						{
 							if (SOURCE_BOOLEAN_MAP[x, y])
-								continue;
-
-							double[,] kernel = GetKernel(IMAGE, (int)x, (int)y, KERNEL_RADIUS, out int[] xdata, out int[] ydata);
-							if (bg_est != 0)
-								kernel = JPMath.MatrixSubScalar(kernel, bg_est);
-
-							Centroid(xdata, ydata, kernel, out double x_centroid, out double y_centroid);
-
-							if (Double.IsNaN(x_centroid) || Double.IsInfinity(x_centroid) || Double.IsNaN(y_centroid) || Double.IsInfinity(y_centroid))
-								continue;
-							if (x_centroid < x - KERNEL_RADIUS || x_centroid > x + KERNEL_RADIUS || y_centroid < y - KERNEL_RADIUS || y_centroid > y + KERNEL_RADIUS)
-								continue;
+								continue;							
 
 							RADIALIZE_MAPS_KERNEL(x, y, src_index, out int npixels);
 
@@ -1499,7 +1519,7 @@ namespace JPFITS
 							}
 						}
 					}
-				}));
+				}//));
 
 				if (SHOWWAITBAR)
 					if (WAITBAR.DialogResult == DialogResult.Cancel)
