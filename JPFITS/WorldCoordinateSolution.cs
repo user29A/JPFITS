@@ -2209,7 +2209,7 @@ namespace JPFITS
 			if (sfd.ShowDialog() == DialogResult.Cancel)
 				return;
 
-			String delimit = "\t"; ;
+			String delimit = "\t";
 
 			StreamWriter sw = new StreamWriter(sfd.FileName);
 			for (int i = 0; i < Nlines; i++)

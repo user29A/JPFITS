@@ -497,123 +497,123 @@ namespace JPFITS
 			/// This approach guarantees that for any input order of points, the output triangle has a unique
 			/// representation based on side lengths, critical for matching triangles.
 			/// </remarks>
-			//      [MethodImpl(256)]/*256 = agressive inlining*/
-			//private void SORTTRIANGLE()
-			//{
-			//	// Define the three sides with their distances and vertex indices
-			//	var sides = new[]
-			//	{
-			//		(Distance: POINTS[0].DistanceTo(POINTS[1]), I0: 0, I1: 1), // Side between points 0 and 1
-			//		(Distance: POINTS[0].DistanceTo(POINTS[2]), I0: 0, I1: 2), // Side between points 0 and 2
-			//		(Distance: POINTS[1].DistanceTo(POINTS[2]), I0: 1, I1: 2)  // Side between points 1 and 2
-			//	};
-
-			//	// Sort sides by distance (shortest to longest); sides[0] is shortest, sides[1] is middle, sides[2] is longest
-			//	Array.Sort(sides, (a, b) => a.Distance.CompareTo(b.Distance));
-
-			//	// Store sorted side lengths for use in angle calculations
-			//	SIDELENGTHS = new double[] { sides[0].Distance, sides[1].Distance, sides[2].Distance };
-
-			//	// Find the vertex common to the two shortest sides (v0)
-			//	// The common vertex is the one shared between sides[0] and sides[1]
-			//	int v0;
-			//	if (sides[0].I0 == sides[1].I0) // If first vertex of side 0 equals first vertex of side 1
-			//		v0 = sides[0].I0;
-			//	else if (sides[0].I1 == sides[1].I1) // If second vertex of side 0 equals second vertex of side 1
-			//		v0 = sides[0].I1;
-			//	else // Otherwise, the common vertex is the other vertex of side 1
-			//		v0 = sides[1].I0;
-
-			//	// Assign v1 as the other vertex of the shortest side (sides[0])
-			//	int v1 = sides[0].I0 == v0 ? sides[0].I1 : sides[0].I0;
-
-			//	// Assign v2 as the other vertex of the middle side (sides[1])
-			//	int v2 = sides[1].I0 == v0 ? sides[1].I1 : sides[1].I0;
-
-			//	// Reorder POINTS: POINTS[0] is the common vertex, POINTS[1] is from the shortest side,
-			//	// POINTS[2] is from the middle side
-			//	POINTS = new PointD[] { POINTS[v0], POINTS[v1], POINTS[v2] };
-			//}
-
 			[MethodImpl(256)]/*256 = agressive inlining*/
 			private void SORTTRIANGLE()
 			{
-				PointD[] points = new PointD[3] { POINTS[0], POINTS[1], POINTS[2] };
-				double D01 = points[0].DistanceTo(points[1]);
-				double D02 = points[0].DistanceTo(points[2]);
-				double D12 = points[1].DistanceTo(points[2]);
-				SIDELENGTHS = new double[3] { D01, D02, D12 };
-				int[] distseq = new int[3] { 0, 1, 2 };
-				Array.Sort(SIDELENGTHS, distseq);
-
-				int common0 = -1;
-
-				switch (distseq[0])
+				// Define the three sides with their distances and vertex indices
+				var sides = new[]
 				{
-					case 0:
-						if (distseq[1] == 1)
-							common0 = 0;
-						else
-							common0 = 1;
-						break;
-					case 1:
-						if (distseq[1] == 0)
-							common0 = 0;
-						else
-							common0 = 2;
-						break;
-					case 2:
-						if (distseq[1] == 1)
-							common0 = 2;
-						else
-							common0 = 1;
-						break;
-				}
+					(Distance: POINTS[0].DistanceTo(POINTS[1]), I0: 0, I1: 1), // Side between points 0 and 1
+					(Distance: POINTS[0].DistanceTo(POINTS[2]), I0: 0, I1: 2), // Side between points 0 and 2
+					(Distance: POINTS[1].DistanceTo(POINTS[2]), I0: 1, I1: 2)  // Side between points 1 and 2
+				};
 
-				int common1 = -1, common2 = -1;
+				// Sort sides by distance (shortest to longest); sides[0] is shortest, sides[1] is middle, sides[2] is longest
+				Array.Sort(sides, (a, b) => a.Distance.CompareTo(b.Distance));
 
-				switch (common0)
-				{
-					case 0:
-						if (distseq[0] == 0)
-						{
-							common1 = 1;
-							common2 = 2;
-						}
-						else
-						{
-							common1 = 2;
-							common2 = 1;
-						}
-						break;
-					case 1:
-						if (distseq[0] == 0)
-						{
-							common1 = 0;
-							common2 = 2;
-						}
-						else
-						{
-							common1 = 2;
-							common2 = 0;
-						}
-						break;
-					case 2:
-						if (distseq[0] == 1)
-						{
-							common1 = 0;
-							common2 = 1;
-						}
-						else
-						{
-							common1 = 1;
-							common2 = 0;
-						}
-						break;
-				}
+				// Store sorted side lengths for use in angle calculations
+				SIDELENGTHS = new double[] { sides[0].Distance, sides[1].Distance, sides[2].Distance };
 
-				POINTS = new PointD[3] { points[common0], points[common1], points[common2] };
+				// Find the vertex common to the two shortest sides (v0)
+				// The common vertex is the one shared between sides[0] and sides[1]
+				int v0;
+				if (sides[0].I0 == sides[1].I0) // If first vertex of side 0 equals first vertex of side 1
+					v0 = sides[0].I0;
+				else if (sides[0].I1 == sides[1].I1) // If second vertex of side 0 equals second vertex of side 1
+					v0 = sides[0].I1;
+				else // Otherwise, the common vertex is the other vertex of side 1
+					v0 = sides[1].I0;
+
+				// Assign v1 as the other vertex of the shortest side (sides[0])
+				int v1 = sides[0].I0 == v0 ? sides[0].I1 : sides[0].I0;
+
+				// Assign v2 as the other vertex of the middle side (sides[1])
+				int v2 = sides[1].I0 == v0 ? sides[1].I1 : sides[1].I0;
+
+				// Reorder POINTS: POINTS[0] is the common vertex, POINTS[1] is from the shortest side,
+				// POINTS[2] is from the middle side
+				POINTS = new PointD[] { POINTS[v0], POINTS[v1], POINTS[v2] };
 			}
+
+			//[MethodImpl(256)]/*256 = agressive inlining*/
+			//private void SORTTRIANGLE()
+			//{
+			//	PointD[] points = new PointD[3] { POINTS[0], POINTS[1], POINTS[2] };
+			//	double D01 = points[0].DistanceTo(points[1]);
+			//	double D02 = points[0].DistanceTo(points[2]);
+			//	double D12 = points[1].DistanceTo(points[2]);
+			//	SIDELENGTHS = new double[3] { D01, D02, D12 };
+			//	int[] distseq = new int[3] { 0, 1, 2 };
+			//	Array.Sort(SIDELENGTHS, distseq);
+
+			//	int common0 = -1;
+
+			//	switch (distseq[0])
+			//	{
+			//		case 0:
+			//			if (distseq[1] == 1)
+			//				common0 = 0;
+			//			else
+			//				common0 = 1;
+			//			break;
+			//		case 1:
+			//			if (distseq[1] == 0)
+			//				common0 = 0;
+			//			else
+			//				common0 = 2;
+			//			break;
+			//		case 2:
+			//			if (distseq[1] == 1)
+			//				common0 = 2;
+			//			else
+			//				common0 = 1;
+			//			break;
+			//	}
+
+			//	int common1 = -1, common2 = -1;
+
+			//	switch (common0)
+			//	{
+			//		case 0:
+			//			if (distseq[0] == 0)
+			//			{
+			//				common1 = 1;
+			//				common2 = 2;
+			//			}
+			//			else
+			//			{
+			//				common1 = 2;
+			//				common2 = 1;
+			//			}
+			//			break;
+			//		case 1:
+			//			if (distseq[0] == 0)
+			//			{
+			//				common1 = 0;
+			//				common2 = 2;
+			//			}
+			//			else
+			//			{
+			//				common1 = 2;
+			//				common2 = 0;
+			//			}
+			//			break;
+			//		case 2:
+			//			if (distseq[0] == 1)
+			//			{
+			//				common1 = 0;
+			//				common2 = 1;
+			//			}
+			//			else
+			//			{
+			//				common1 = 1;
+			//				common2 = 0;
+			//			}
+			//			break;
+			//	}
+
+			//	POINTS = new PointD[3] { points[common0], points[common1], points[common2] };
+			//}
 
 			[MethodImpl(256)]/*256 = agressive inlining*/
 			private void MAKEVERTEXANGLES()
